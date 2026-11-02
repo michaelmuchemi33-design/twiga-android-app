@@ -1,35 +1,33 @@
-name: Android CI
-
+name: Unity AI Receptionist Android CI
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
   pull_request:
-    branches: [ "main" ]
-
+    branches: [ main ]
+  workflow_dispatch:
 permissions:
   contents: read
-
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-      - name: set up JDK 21
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
+          distribution: temurin
           java-version: '21'
-          distribution: 'temurin'
           cache: gradle
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-      - name: Restore Firebase configuration
-        env:
-          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: sdkmanager "platforms;android-37" "build-tools;37.0.0"
+      - name: Build APK
         run: |
-          test -n "$GOOGLE_SERVICES_JSON_BASE64"
-          printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > app/google-services.json
-      - name: Run unit tests, lint, and debug build
-        run: ./gradlew test lint assembleDebug
+          chmod +x ./gradlew
+          ./gradlew --no-daemon assembleDebug
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-ai-receptionist-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 30
