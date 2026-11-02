@@ -17,7 +17,7 @@ if (file("google-services.json").isFile) {
 
 val appVersionName = providers.gradleProperty("appVersionName").orNull
     ?: error("appVersionName must be set in gradle.properties")
-require(Regex("""(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)""").matches(appVersionName)) {
+require(Regex("""(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)""").matches(appVersionName)) {
     "appVersionName must use MAJOR.MINOR.PATCH semantic versioning"
 }
 val appVersionCode = providers.gradleProperty("appVersionCode").orNull
@@ -35,7 +35,6 @@ android {
         targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersionName
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -57,12 +56,17 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            if (keystorePath != null) {
-                signingConfig = signingConfigs.getByName("release")
+            // Until a private production keystore is configured, use the debug
+            // key so the optimized APK can be installed for internal testing.
+            signingConfig = if (keystorePath != null) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
             }
         }
         debug {
@@ -135,7 +139,6 @@ dependencies {
 
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
-
     implementation(libs.gson)
 
     implementation(libs.hilt.android)
