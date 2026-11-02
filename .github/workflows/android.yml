@@ -6,7 +6,7 @@ on:
     branches: [ main ]
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -26,7 +26,7 @@ jobs:
       - name: Build debug APK
         run: |
           chmod +x ./gradlew
-          ./gradlew --no-daemon assembleDebug
+          ./gradlew --no-daemon testDebugUnitTest assembleDebug
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
@@ -34,3 +34,15 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish direct GitHub APK download
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk unity-ai-receptionist.apk
+          if gh release view latest-apk >/dev/null 2>&1; then
+            gh release upload latest-apk unity-ai-receptionist.apk --clobber
+          else
+            gh release create latest-apk unity-ai-receptionist.apk --title "Unity AI Receptionist - Latest APK" --notes "Latest automatically built debug APK. For testing only; not a production-signed release." --prerelease
+          fi
