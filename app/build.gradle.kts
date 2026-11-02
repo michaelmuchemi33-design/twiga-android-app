@@ -27,12 +27,12 @@ val appVersionCode = providers.gradleProperty("appVersionCode").orNull
 
 android {
     namespace = "dev.alenajam.opendialer"
-    compileSdk = 37
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.unity.receptionist"
         minSdk = 29
-        targetSdk = 37
+        targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersionName
 
