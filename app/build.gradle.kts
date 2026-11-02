@@ -17,7 +17,7 @@ if (file("google-services.json").isFile) {
 
 val appVersionName = providers.gradleProperty("appVersionName").orNull
     ?: error("appVersionName must be set in gradle.properties")
-require(Regex("""(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)""").matches(appVersionName)) {
+require(Regex("""(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)""").matches(appVersionName)) {
     "appVersionName must use MAJOR.MINOR.PATCH semantic versioning"
 }
 val appVersionCode = providers.gradleProperty("appVersionCode").orNull
