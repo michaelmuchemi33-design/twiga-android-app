@@ -30,8 +30,8 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "dev.alenajam.opendialer"
-        minSdk = 24
+        applicationId = "com.unity.receptionist"
+        minSdk = 29
         targetSdk = 37
         versionCode = appVersionCode
         versionName = appVersionName
