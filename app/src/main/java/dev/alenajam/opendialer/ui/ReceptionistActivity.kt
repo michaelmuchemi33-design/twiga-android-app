@@ -101,6 +101,15 @@ private fun ReceptionistScreen(onDefaultDialer: () -> Unit) {
     var greeting by remember { mutableStateOf(prefs.getString("greeting", "Hello! Thanks for calling. How can I help you today?") ?: "") }
     var endpoint by remember { mutableStateOf(prefs.getString("endpoint", "") ?: "") }
     var assistantEnabled by remember { mutableStateOf(prefs.getBoolean("enabled", false)) }
+    var llmProvider by remember { mutableStateOf(prefs.getString("llm_provider", "SautiKit") ?: "SautiKit") }
+    var llmModel by remember { mutableStateOf(prefs.getString("llm_model", "") ?: "") }
+    var voiceProvider by remember { mutableStateOf(prefs.getString("voice_provider", "ElevenLabs") ?: "ElevenLabs") }
+    var voiceId by remember { mutableStateOf(prefs.getString("voice_id", "") ?: "") }
+    var languageMode by remember { mutableStateOf(prefs.getString("language_mode", "English + Kiswahili") ?: "English + Kiswahili") }
+    var silenceSeconds by remember { mutableIntStateOf(prefs.getInt("silence_seconds", 10)) }
+    var callMode by remember { mutableStateOf(prefs.getString("call_mode", "Ask me per call") ?: "Ask me per call") }
+    var followupText by remember { mutableStateOf("") }
+    var followups by remember { mutableStateOf(prefs.getString("followups_v1", "[]") ?: "[]") }
     var tab by remember { mutableIntStateOf(0) }
     var customers by remember { mutableStateOf(readCustomers(prefs)) }
     var orders by remember { mutableStateOf(readOrders(prefs)) }
@@ -116,7 +125,11 @@ private fun ReceptionistScreen(onDefaultDialer: () -> Unit) {
 
     fun saveSettings() {
         prefs.edit().putString("business", business).putString("greeting", greeting)
-            .putString("endpoint", endpoint).putBoolean("enabled", assistantEnabled).apply()
+            .putString("endpoint", endpoint).putBoolean("enabled", assistantEnabled)
+            .putString("llm_provider", llmProvider).putString("llm_model", llmModel)
+            .putString("voice_provider", voiceProvider).putString("voice_id", voiceId)
+            .putString("language_mode", languageMode).putInt("silence_seconds", silenceSeconds)
+            .putString("call_mode", callMode).apply()
         message = "Settings saved on this phone."
     }
     fun dial(number: String) {
@@ -133,7 +146,7 @@ private fun ReceptionistScreen(onDefaultDialer: () -> Unit) {
     Scaffold(
         bottomBar = {
             NavigationBar(containerColor = Color.White) {
-                val tabs = listOf("Home" to Icons.Default.Home, "Calls" to Icons.Default.Call, "Orders" to Icons.Default.ShoppingBag, "Customers" to Icons.Default.People, "Setup" to Icons.Default.Settings)
+                val tabs = listOf("Home" to Icons.Default.Home, "Calls" to Icons.Default.Call, "Orders" to Icons.Default.ShoppingBag, "Customers" to Icons.Default.People, "AI" to Icons.Default.RecordVoiceOver, "Setup" to Icons.Default.Settings)
                 tabs.forEachIndexed { index, item ->
                     NavigationBarItem(selected = tab == index, onClick = { tab = index; message = "" }, icon = { Icon(item.second, null) }, label = { Text(item.first, maxLines = 1, fontSize = 10.sp) })
                 }
@@ -145,8 +158,8 @@ private fun ReceptionistScreen(onDefaultDialer: () -> Unit) {
                 Icon(Icons.Default.GraphicEq, null, tint = Ink, modifier = Modifier.size(30.dp))
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("UNITY", fontWeight = FontWeight.Black, letterSpacing = 2.sp, color = Ink)
-                    Text("AI RECEPTIONIST", fontSize = 11.sp, color = Muted)
+                    Text("TWIGA", fontWeight = FontWeight.Black, letterSpacing = 2.sp, color = Ink)
+                    Text("AI BUSINESS ASSISTANT", fontSize = 11.sp, color = Muted)
                 }
                 Text("LOCAL MODE", color = Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             }
@@ -286,8 +299,84 @@ private fun ReceptionistScreen(onDefaultDialer: () -> Unit) {
                         }
                     }
                 }
+                4 -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    item { Text("Twiga AI assistant", fontSize = 25.sp, fontWeight = FontWeight.Bold, color = Ink); Text("Choose the AI brain, voice and call behaviour for your business.", color = Muted) }
+                    item {
+                        Card(colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Column(Modifier.weight(1f)) { Text("AI assistant", fontWeight = FontWeight.Bold); Text("This switch saves your preference; it does not activate AI until a backend is connected.", color = Muted, fontSize = 11.sp) }
+                                    Switch(checked = assistantEnabled, onCheckedChange = { assistantEnabled = it; saveSettings() })
+                                }
+                                HorizontalDivider()
+                                Text("Language", fontWeight = FontWeight.SemiBold)
+                                listOf("English + Kiswahili", "English", "Kiswahili", "Mixed Kenyan Sheng").forEach { choice ->
+                                    Row(verticalAlignment = Alignment.CenterVertically) { RadioButton(selected = languageMode == choice, onClick = { languageMode = choice }); Text(choice, fontSize = 13.sp) }
+                                }
+                                HorizontalDivider()
+                                Text("LLM provider", fontWeight = FontWeight.SemiBold)
+                                listOf("SautiKit", "OpenAI", "Google Gemini", "Anthropic Claude", "OpenRouter", "Custom OpenAI-compatible").forEach { choice ->
+                                    Row(verticalAlignment = Alignment.CenterVertically) { RadioButton(selected = llmProvider == choice, onClick = { llmProvider = choice }); Text(choice, fontSize = 13.sp) }
+                                }
+                                OutlinedTextField(llmModel, { llmModel = it }, label = { Text("Model ID (optional)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                                HorizontalDivider()
+                                Text("Voice provider", fontWeight = FontWeight.SemiBold)
+                                listOf("ElevenLabs", "OpenAI TTS", "Google Cloud TTS", "Azure Speech", "SautiKit", "Custom provider").forEach { choice ->
+                                    Row(verticalAlignment = Alignment.CenterVertically) { RadioButton(selected = voiceProvider == choice, onClick = { voiceProvider = choice }); Text(choice, fontSize = 13.sp) }
+                                }
+                                OutlinedTextField(voiceId, { voiceId = it }, label = { Text("Voice ID (optional)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                                Button(onClick = { saveSettings() }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Save, null); Spacer(Modifier.width(8.dp)); Text("Save AI preferences") }
+                            }
+                        }
+                    }
+                    item {
+                        Card(colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("Call behaviour", fontWeight = FontWeight.Bold)
+                                Text("Answering mode", color = Muted, fontSize = 12.sp)
+                                listOf("Ask me per call", "AI answers first", "I answer personally").forEach { choice ->
+                                    Row(verticalAlignment = Alignment.CenterVertically) { RadioButton(selected = callMode == choice, onClick = { callMode = choice }); Text(choice, fontSize = 13.sp) }
+                                }
+                                Text("Silence timeout: $silenceSeconds seconds", fontWeight = FontWeight.SemiBold)
+                                Slider(value = silenceSeconds.toFloat(), onValueChange = { silenceSeconds = it.toInt() }, valueRange = 5f..30f, steps = 4)
+                                Text("This timeout is a policy setting for AI-managed calls. It will not automatically hang up ordinary SIM calls in this build.", color = Muted, fontSize = 11.sp)
+                                Button(onClick = { saveSettings() }, modifier = Modifier.fillMaxWidth()) { Text("Save call behaviour") }
+                            }
+                        }
+                    }
+                    item {
+                        Card(colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("Follow-up reminders", fontWeight = FontWeight.Bold)
+                                OutlinedTextField(followupText, { followupText = it }, label = { Text("What needs a follow-up?") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+                                Button(onClick = {
+                                    if (followupText.isBlank()) message = "Enter a follow-up reminder."
+                                    else {
+                                        val arr = JSONArray(followups)
+                                        arr.put(JSONObject().put("text", followupText.trim()).put("created", System.currentTimeMillis()).put("done", false))
+                                        followups = arr.toString(); prefs.edit().putString("followups_v1", followups).apply()
+                                        followupText = ""; message = "Follow-up saved on this phone."
+                                    }
+                                }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.AddAlarm, null); Spacer(Modifier.width(8.dp)); Text("Add follow-up") }
+                                val tasks = runCatching { JSONArray(followups) }.getOrDefault(JSONArray())
+                                if (tasks.length() == 0) Text("No follow-ups saved yet.", color = Muted, fontSize = 12.sp)
+                                for (i in 0 until tasks.length()) {
+                                    val task = tasks.optJSONObject(i) ?: continue
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Checkbox(checked = task.optBoolean("done"), onCheckedChange = { done ->
+                                            task.put("done", done); followups = tasks.toString(); prefs.edit().putString("followups_v1", followups).apply()
+                                        })
+                                        Text(task.optString("text"), Modifier.weight(1f), fontSize = 12.sp)
+                                        IconButton(onClick = { tasks.remove(i); followups = tasks.toString(); prefs.edit().putString("followups_v1", followups).apply() }) { Icon(Icons.Default.Delete, contentDescription = "Delete follow-up") }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    item { Text("Provider selection is saved locally. Actual AI calls require a configured backend; provider API keys must stay on the server, not in the APK.", color = Muted, fontSize = 12.sp) }
+                }
                 else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    item { Text("Business setup", fontSize = 25.sp, fontWeight = FontWeight.Bold, color = Ink); Text("These settings are saved locally on this phone.", color = Muted) }
+                    item { Text("Twiga setup", fontSize = 25.sp, fontWeight = FontWeight.Bold, color = Ink); Text("Business profile and secure AI backend connection.", color = Muted) }
                     item {
                         Card(colors = CardDefaults.cardColors(containerColor = Color.White)) {
                             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -303,8 +392,8 @@ private fun ReceptionistScreen(onDefaultDialer: () -> Unit) {
                             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text("Calling status", fontWeight = FontWeight.Bold)
                                 Text("SIM calling: opens Android's dialler for manual confirmation.", color = Muted, fontSize = 12.sp)
-                                Text("AI answering: not connected until a compatible SIP/WebRTC voice backend is configured.", color = Muted, fontSize = 12.sp)
-                                Text("WhatsApp and M-Pesa: not connected in this build.", color = Muted, fontSize = 12.sp)
+                                Text("AI answering: requires a supported call-audio bridge such as SIP/WebRTC. SIM audio is not universally exposed to apps.", color = Muted, fontSize = 12.sp)
+                                Text("WhatsApp, M-Pesa, cloud sync and Unity ERP: integration points planned; not active in this APK.", color = Muted, fontSize = 12.sp)
                             }
                         }
                     }
