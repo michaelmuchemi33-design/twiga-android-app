@@ -27,7 +27,7 @@ val appVersionCode = providers.gradleProperty("appVersionCode").orNull
 
 android {
     namespace = "dev.alenajam.opendialer"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.unity.receptionist"
