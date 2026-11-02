@@ -6,7 +6,6 @@ plugins {
     alias(libs.plugins.hilt)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.firebase.crashlytics)
 }
 
 // Firebase is used for production telemetry, but local debug builds should not
