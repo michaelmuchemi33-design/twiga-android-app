@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
-    <string name="app_name" translatable="false">OpenDialer</string>
+    <string name="app_name" translatable="false">Unity AI Receptionist</string>
     <string name="channel_incoming_calls" comment="Android notification channel for incoming calls.">Incoming Calls</string>
     <string name="channel_ongoing_calls" comment="Android notification channel for active calls.">Ongoing Calls</string>
     <string name="channel_outgoing_calls" comment="Android notification channel for outgoing calls.">Outgoing Calls</string>
