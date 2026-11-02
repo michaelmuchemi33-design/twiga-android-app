@@ -194,6 +194,7 @@ private fun RowScope.DigitButton(
             .clip(ButtonDefaults.shape)
             .combinedClickable(
                 interactionSource = interactionSource,
+                indication = null,
                 onClick = {
                     if (!handledOnPress || onLongClick != null) onClick(digit)
                     handledOnPress = false
