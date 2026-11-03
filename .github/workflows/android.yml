@@ -27,6 +27,19 @@ jobs:
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;37.0.0" "platform-tools"
 
+      - name: Prepare signing key and build number
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          echo "ORG_GRADLE_PROJECT_appVersionCode=$((400000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/twiga.p12"
+            echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/twiga.p12" >> "$GITHUB_ENV"
+            echo "ANDROID_KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}" >> "$GITHUB_ENV"
+          fi
+
       - name: Run tests and build debug APK
         run: |
           chmod +x ./gradlew
@@ -57,9 +70,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cp app/build/outputs/apk/release/app-release.apk unity-ai-receptionist.apk
+          CODE=$((400000 + GITHUB_RUN_NUMBER))
           if gh release view latest-apk >/dev/null 2>&1; then
             gh release upload latest-apk unity-ai-receptionist.apk --clobber
-            gh release edit latest-apk --title "Unity AI Receptionist - Latest Optimized APK" --notes "Optimized R8 release build for device testing. This build uses the Android debug signing key because no private production keystore is configured. Configure a private signing keystore before public production distribution."
+            gh release edit latest-apk --title "Unity AI Receptionist - Latest Optimized APK" --notes "Optimized release build. build: $CODE. Signed with the permanent TWIGA release key."
           else
-            gh release create latest-apk unity-ai-receptionist.apk --title "Unity AI Receptionist - Latest Optimized APK" --notes "Optimized R8 release build for device testing. This build uses the Android debug signing key because no private production keystore is configured. Configure a private signing keystore before public production distribution." --prerelease
+            gh release create latest-apk unity-ai-receptionist.apk --title "Unity AI Receptionist - Latest Optimized APK" --notes "Optimized release build. build: $CODE. Signed with the permanent TWIGA release key." --prerelease
           fi
