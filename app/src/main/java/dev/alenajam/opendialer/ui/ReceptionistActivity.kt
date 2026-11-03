@@ -207,6 +207,7 @@ private fun ReceptionistScreen(onDefaultDialer: () -> Unit) {
                     item {
                         OutlinedButton(onClick = onDefaultDialer, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.PhoneAndroid, null); Spacer(Modifier.width(8.dp)); Text("Set as default phone app") }
                     }
+                    item { RemoteDeskCard() }
                     item { Text("SIM calls open the Android phone dialler for you to confirm. This APK does not secretly answer or capture SIM-call audio.", color = Muted, fontSize = 12.sp) }
                 }
                 1 -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
