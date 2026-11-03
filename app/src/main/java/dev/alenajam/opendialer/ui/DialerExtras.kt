@@ -106,5 +106,8 @@ fun BusinessTab() {
             ) { Text("Orders and stock") }
         }
         RemoteDeskCard()
+        AiSettingsCard()
+        WhatsAppSoonCard()
+        UpdateCard()
     }
 }
