@@ -54,7 +54,10 @@ fun RemoteDeskCard() {
     val muted = Color(0xFF667085)
 
     fun startDesk() {
-        runCatching { context.startForegroundService(Intent(context, RemoteDeskService::class.java)) }
+        runCatching {
+            if (RemoteDesk.remoteControl(context)) context.startForegroundService(Intent(context, RemoteDeskService::class.java))
+            else context.stopService(Intent(context, RemoteDeskService::class.java))
+        }
     }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { startDesk() }
     fun askPermissions() {
@@ -132,6 +135,14 @@ fun RemoteDeskCard() {
                         val token = RemoteDesk.token(context)
                         Thread { runCatching { RemoteDesk.rpc("device_set_ai", JSONObject().put("p_token", token).put("p_enabled", v)) } }.start()
                     })
+                }
+                var remote by remember { mutableStateOf(RemoteDesk.remoteControl(context)) }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Dial and answer from the dashboard")
+                        Text("Checks in every 15 seconds, and instantly during calls. Turn off to save more battery.", fontSize = 11.sp, color = muted)
+                    }
+                    Switch(checked = remote, onCheckedChange = { remote = it; RemoteDesk.setRemoteControl(context, it); startDesk() })
                 }
                 OutlinedButton(onClick = { askPermissions() }, modifier = Modifier.fillMaxWidth()) { Text("Check phone permissions") }
                 OutlinedButton(onClick = {
