@@ -71,9 +71,11 @@ jobs:
         run: |
           cp app/build/outputs/apk/release/app-release.apk unity-ai-receptionist.apk
           CODE=$((400000 + GITHUB_RUN_NUMBER))
+          SIZE=$(stat -c%s unity-ai-receptionist.apk)
+          printf '{"build": %s, "size": %s, "apk": "https://github.com/%s/releases/download/latest-apk/unity-ai-receptionist.apk"}' "$CODE" "$SIZE" "$GITHUB_REPOSITORY" > version.json
           if gh release view latest-apk >/dev/null 2>&1; then
-            gh release upload latest-apk unity-ai-receptionist.apk --clobber
+            gh release upload latest-apk unity-ai-receptionist.apk version.json --clobber
             gh release edit latest-apk --title "Unity AI Receptionist - Latest Optimized APK" --notes "Optimized release build. build: $CODE. Signed with the permanent TWIGA release key."
           else
-            gh release create latest-apk unity-ai-receptionist.apk --title "Unity AI Receptionist - Latest Optimized APK" --notes "Optimized release build. build: $CODE. Signed with the permanent TWIGA release key." --prerelease
+            gh release create latest-apk unity-ai-receptionist.apk version.json --title "Unity AI Receptionist - Latest Optimized APK" --notes "Optimized release build. build: $CODE. Signed with the permanent TWIGA release key." --prerelease
           fi
