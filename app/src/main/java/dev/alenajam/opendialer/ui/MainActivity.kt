@@ -16,6 +16,7 @@ import dev.alenajam.opendialer.feature.appShell.HomeNavigationItem
 import dev.alenajam.opendialer.feature.appShell.HomeScreenConfiguration
 import dev.alenajam.opendialer.remote.RemoteDesk
 import dev.alenajam.opendialer.remote.RemoteDeskService
+import dev.alenajam.opendialer.update.UpdateManager
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -29,7 +30,8 @@ class MainActivity : ComponentActivity() {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
             window.isNavigationBarContrastEnforced = false
         }
-        if (RemoteDesk.isPaired(this)) {
+        UpdateManager.autoCheck(applicationContext)
+        if (RemoteDesk.isPaired(this) && RemoteDesk.remoteControl(this)) {
             runCatching { startForegroundService(Intent(this, RemoteDeskService::class.java)) }
         }
         setContent {

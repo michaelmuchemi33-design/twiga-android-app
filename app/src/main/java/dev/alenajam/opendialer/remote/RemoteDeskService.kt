@@ -5,10 +5,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.net.Uri
 import android.os.Bundle
@@ -17,55 +14,29 @@ import android.os.IBinder
 import android.os.Looper
 import android.telecom.TelecomManager
 import android.telephony.TelephonyManager
-import androidx.core.content.ContextCompat
 import org.json.JSONArray
 import org.json.JSONObject
-import java.util.UUID
-import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
- * Keeps this phone connected to the TWIGA dashboard:
- *  - reports calls (ringing, active, ended, missed) as they happen on the SIM line
- *  - runs dial, answer, decline and hang-up commands sent from the dashboard
- *  - keeps the dashboard's AI switch in sync
- * It does not record or capture call audio.
+ * Optional "dial and answer from the dashboard" link. It checks in every 15 seconds while idle and
+ * every 3 seconds during a call or just after a command. Call reporting itself does not need this
+ * service (see CallStateReceiver). It does not record or capture call audio.
  */
 class RemoteDeskService : Service() {
     @Volatile private var running = false
+    @Volatile private var fastUntil = 0L
     private var worker: Thread? = null
-    private var registered = false
     private val ui = Handler(Looper.getMainLooper())
-    private val events = ConcurrentLinkedQueue<JSONObject>()
-
-    private var state = TelephonyManager.EXTRA_STATE_IDLE
-    private var key = ""
-    private var number = ""
-    private var dir = "in"
-    private var startMs = 0L
-    private var connected = false
-    private var dialing = ""
-
-    private val receiver = object : BroadcastReceiver() {
-        @Suppress("DEPRECATION")
-        override fun onReceive(context: Context, intent: Intent) {
-            val st = intent.getStringExtra(TelephonyManager.EXTRA_STATE) ?: return
-            onPhone(st, intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER).orEmpty())
-        }
-    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (!RemoteDesk.isPaired(this)) { stopSelf(); return START_NOT_STICKY }
+        if (!RemoteDesk.isPaired(this) || !RemoteDesk.remoteControl(this)) { stopSelf(); return START_NOT_STICKY }
         try {
             showNotice()
         } catch (e: Exception) {
             stopSelf()
             return START_NOT_STICKY
-        }
-        if (!registered) {
-            ContextCompat.registerReceiver(this, receiver, IntentFilter(TelephonyManager.ACTION_PHONE_STATE_CHANGED), ContextCompat.RECEIVER_EXPORTED)
-            registered = true
         }
         if (!running) {
             running = true
@@ -77,7 +48,6 @@ class RemoteDeskService : Service() {
     override fun onDestroy() {
         running = false
         worker?.interrupt()
-        if (registered) { runCatching { unregisterReceiver(receiver) }; registered = false }
         super.onDestroy()
     }
 
@@ -86,70 +56,32 @@ class RemoteDeskService : Service() {
         nm.createNotificationChannel(NotificationChannel("twiga_desk", "TWIGA remote desk", NotificationManager.IMPORTANCE_LOW))
         val n = Notification.Builder(this, "twiga_desk")
             .setContentTitle("TWIGA remote desk")
-            .setContentText("Connected. Your dashboard can dial and monitor calls.")
+            .setContentText("Connected. Your dashboard can dial and answer calls.")
             .setSmallIcon(android.R.drawable.sym_action_call)
             .setOngoing(true)
             .build()
         startForeground(1101, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
     }
 
-    private fun onPhone(st: String, num: String) {
-        val now = System.currentTimeMillis()
-        when (st) {
-            TelephonyManager.EXTRA_STATE_RINGING -> {
-                if (state != st) {
-                    key = UUID.randomUUID().toString(); number = num; dir = "in"; startMs = now; connected = false
-                    push("ringing", 0)
-                } else if (num.isNotBlank() && num != number) {
-                    number = num
-                    push("ringing", 0)
-                }
-            }
-            TelephonyManager.EXTRA_STATE_OFFHOOK -> {
-                if (state == TelephonyManager.EXTRA_STATE_IDLE) {
-                    key = UUID.randomUUID().toString(); dir = "out"; number = dialing; dialing = ""
-                }
-                if (state != st) {
-                    connected = true; startMs = now
-                    push("active", 0)
-                }
-            }
-            TelephonyManager.EXTRA_STATE_IDLE -> {
-                if (state != st && key.isNotEmpty()) {
-                    val secs = if (connected) ((now - startMs) / 1000).toInt() else 0
-                    push(if (!connected && dir == "in") "missed" else "ended", secs)
-                    key = ""
-                }
-            }
-        }
-        state = st
-    }
-
-    private fun push(st: String, secs: Int) {
-        events.add(JSONObject().put("p_key", key).put("p_direction", dir).put("p_number", number).put("p_state", st).put("p_duration", secs))
-    }
-
     private fun loop() {
         while (running) {
             try {
                 val token = RemoteDesk.token(this)
-                if (token.isBlank()) { stopSelf(); return }
-                while (true) {
-                    val e = events.peek() ?: break
-                    RemoteDesk.rpc("device_event", e.put("p_token", token))
-                    events.poll()
-                }
-                val out = JSONObject(RemoteDesk.rpc("device_sync", JSONObject().put("p_token", token).put("p_state", state)))
+                if (token.isBlank() || !RemoteDesk.remoteControl(this)) { stopSelf(); return }
+                RemoteDesk.flush(this)
+                val out = JSONObject(RemoteDesk.rpc("device_sync", JSONObject().put("p_token", token).put("p_state", CallTracker.state(this))))
                 RemoteDesk.prefs(this).edit().putBoolean("ai", out.optBoolean("ai_enabled")).apply()
                 val cmds = out.optJSONArray("commands") ?: JSONArray()
                 for (i in 0 until cmds.length()) {
                     val c = cmds.getJSONObject(i)
+                    fastUntil = System.currentTimeMillis() + 60000L
                     ui.post { run(token, c) }
                 }
             } catch (e: Exception) {
                 // Offline or server busy: try again on the next round.
             }
-            try { Thread.sleep(2500) } catch (e: InterruptedException) { return }
+            val busy = CallTracker.state(this) != TelephonyManager.EXTRA_STATE_IDLE || System.currentTimeMillis() < fastUntil
+            try { Thread.sleep(if (busy) 3000L else 15000L) } catch (e: InterruptedException) { return }
         }
     }
 
@@ -164,7 +96,7 @@ class RemoteDeskService : Service() {
                 "dial" -> {
                     val n = c.optString("number").trim()
                     if (n.isBlank()) throw IllegalArgumentException("No number")
-                    dialing = n
+                    RemoteDesk.prefs(this).edit().putString("dialing", n).apply()
                     tm.placeCall(Uri.fromParts("tel", n, null), Bundle())
                 }
                 "answer" -> tm.acceptRingingCall()
