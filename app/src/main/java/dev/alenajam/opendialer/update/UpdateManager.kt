@@ -17,7 +17,7 @@ import java.net.URL
 
 /** Checks the GitHub release for a newer build and installs it with one tap (or silently when Android allows). */
 object UpdateManager {
-    private const val API = "https://api.github.com/repos/michaelmuchemi33-design/unity-ai-receptionist-app/releases/tags/latest-apk"
+    private const val API = "https://github.com/michaelmuchemi33-design/unity-ai-receptionist-app/releases/download/latest-apk/version.json"
 
     data class Info(val build: Long, val url: String, val size: Long)
 
@@ -33,18 +33,11 @@ object UpdateManager {
         try {
             conn.connectTimeout = 8000
             conn.readTimeout = 10000
-            conn.setRequestProperty("Accept", "application/vnd.github+json")
             if (conn.responseCode != 200) return null
             val j = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
-            val build = Regex("build: (\\d+)").find(j.optString("body"))?.groupValues?.get(1)?.toLongOrNull() ?: return null
-            val assets = j.optJSONArray("assets") ?: return null
-            var url = ""
-            var size = 0L
-            for (i in 0 until assets.length()) {
-                val a = assets.getJSONObject(i)
-                if (a.optString("name").endsWith(".apk")) { url = a.optString("browser_download_url"); size = a.optLong("size") }
-            }
-            return if (url.isNotBlank() && build > installedBuild(c)) Info(build, url, size) else null
+            val build = j.optLong("build", 0L)
+            val url = j.optString("apk")
+            return if (build > 0 && url.isNotBlank() && build > installedBuild(c)) Info(build, url, j.optLong("size", 0L)) else null
         } finally {
             conn.disconnect()
         }
