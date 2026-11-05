@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TWIGA – Live Calls</title>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<link rel="icon" id="fav" href="data:,"><script src="config.js"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script><link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--logo:url(data:image/png;base64,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);--logofull:url(data:image/png;base64,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)}
+:root{--bg:#FFFFFF;--panel:#FFFFFF;--soft:#F6F6F5;--line:#E7E5E2;--ink:#111111;--mute:#6B6863;--side:#111111;--sideink:#EDEBE8;--sidemute:#9A968F;--or:#F47721;--orsoft:#FEEFE3;--ok:#1F8A5B;--oksoft:#E4F4EC;--bad:#C23B2E;--badsoft:#FBE9E6;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171716;--panel:#1E1E1D;--soft:#262625;--line:#33322F;--ink:#F3F1EE;--mute:#A09C95;--side:#0B0B0B;--orsoft:#3A2412;--oksoft:#16301F;--badsoft:#3A1C18;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#171716;--panel:#1E1E1D;--soft:#262625;--line:#33322F;--ink:#F3F1EE;--mute:#A09C95;--side:#0B0B0B;--orsoft:#3A2412;--oksoft:#16301F;--badsoft:#3A1C18;color-scheme:dark}
+*{box-sizing:border-box;margin:0}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{background:var(--bg);color:var(--ink);font:13.5px/1.5 Poppins,system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100%;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--or);outline-offset:2px}
+.app{display:grid;grid-template-columns:224px 1fr;min-height:100vh}
+aside{background:var(--side);color:var(--sideink);padding:20px 12px;display:flex;flex-direction:column;gap:18px;position:sticky;top:0;height:100vh;overflow:auto}
+.brand{display:flex;align-items:center;gap:10px;padding:0 8px;font-weight:700;font-size:18px;letter-spacing:.04em}
+.logo{width:32px;height:32px;border-radius:9px;background:var(--or);display:grid;place-items:center;color:#111;font-weight:700}
+nav{display:flex;flex-direction:column;gap:2px}
+nav a{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:8px;color:var(--sidemute);text-decoration:none;font-weight:500}
+nav a:hover{color:var(--sideink);background:#1d1d1d}
+nav a.on{background:var(--or);color:#111;font-weight:600}
+nav .n{font-size:12px;background:#2a2a2a;color:var(--sideink);border-radius:99px;padding:0 7px}
+nav a.on .n{background:#111;color:#fff}
+.sidefoot{margin-top:auto;padding:10px;border:1px solid #2a2a2a;border-radius:10px;font-size:12px;color:var(--sidemute)}
+main{padding:22px 28px 40px;min-width:0}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+h1{font-size:22px;font-weight:700}
+.sub{color:var(--mute);font-size:13px}
+.tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--panel);border-radius:99px;padding:6px 12px;font-weight:600;font-size:13px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.dot.live{background:var(--or);animation:p 1.6s ease-in-out infinite}
+.dot.off{background:var(--mute);animation:none}
+@keyframes p{50%{box-shadow:0 0 0 5px rgba(244,119,33,.18)}}
+@media (prefers-reduced-motion:reduce){.dot.live{animation:none}}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:7px 13px;font-weight:600}
+.btn.pri{background:var(--or);border-color:var(--or);color:#111}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.stat{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:var(--panel)}
+.stat b{display:block;font-size:26px;font-weight:700;line-height:1.1;margin-top:4px}
+.stat span{color:var(--mute);font-size:13px}
+.stat small{color:var(--mute);font-size:12px}
+.cols{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:18px;align-items:start}
+.card{border:1px solid var(--line);border-radius:12px;background:var(--panel);overflow:hidden}
+.card h2{font-size:15px;font-weight:700;padding:14px 16px 0}
+.live-list{display:grid;gap:10px;padding:12px 16px 16px}
+.lc{display:flex;gap:12px;align-items:center;width:100%;text-align:left;border:1px solid var(--line);background:var(--soft);border-radius:10px;padding:10px 12px}
+.lc.sel,.row.sel{border-color:var(--or);background:var(--orsoft)}
+.av{width:36px;height:36px;border-radius:50%;background:var(--ink);color:var(--bg);display:grid;place-items:center;font-weight:700;font-size:13px;flex:none}
+.lc .g{flex:1;min-width:0}
+.lc .g b,.row .nm b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lc .g span{color:var(--mute);font-size:12px}
+.tm{font-variant-numeric:tabular-nums;font-weight:600}
+.tabs{display:flex;gap:4px;padding:12px 16px 0;flex-wrap:wrap}
+.tabs button{border:0;background:none;padding:6px 10px;border-radius:8px;font-weight:600;color:var(--mute)}
+.tabs button.on{background:var(--ink);color:var(--bg)}
+.rows{padding:8px 8px 10px}
+.row{display:grid;grid-template-columns:1.4fr 1fr auto;gap:10px;align-items:center;width:100%;text-align:left;border:1px solid transparent;background:none;border-radius:10px;padding:9px 10px}
+.row:hover{background:var(--soft)}
+.row .nm span{color:var(--mute);font-size:12px}
+.tag{display:inline-block;border-radius:99px;padding:2px 9px;font-size:12px;font-weight:600;white-space:nowrap}
+.t-ok{background:var(--oksoft);color:var(--ok)}
+.t-or{background:var(--orsoft);color:#C25A0E}
+.t-bad{background:var(--badsoft);color:var(--bad)}
+.t-gr{background:var(--soft);color:var(--mute)}
+.detail{position:sticky;top:16px}
+.dh{padding:16px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center}
+.dh h2{padding:0;font-size:17px}
+.meta{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.meta span{color:var(--mute);font-size:12px;display:block}
+.meta b{font-weight:600}
+.sec{padding:14px 16px;border-bottom:1px solid var(--line)}
+.sec h3{font-size:13px;font-weight:700;margin-bottom:8px}
+.tr{display:grid;gap:7px;max-height:190px;overflow:auto}
+.m{max-width:88%;padding:7px 10px;border-radius:10px;font-size:13px}
+.m.ai{background:var(--soft);justify-self:start}
+.m.cu{background:var(--ink);color:var(--bg);justify-self:end}
+.m i{display:block;font-style:normal;font-size:11px;opacity:.65;margin-bottom:1px}
+.tl{list-style:none;padding:0;display:grid;gap:12px}
+.tl li{display:grid;grid-template-columns:22px 1fr;gap:10px}
+.tl .k{width:22px;height:22px;border-radius:50%;background:var(--or);color:#111;font-size:12px;font-weight:700;display:grid;place-items:center}
+.tl li.wait .k{background:var(--soft);color:var(--mute);border:1px dashed var(--mute)}
+.tl b{font-weight:600;display:block}
+.tl span{color:var(--mute);font-size:13px}
+.out{margin:14px 16px 16px;padding:12px 14px;border-radius:10px;background:var(--orsoft);display:flex;justify-content:space-between;gap:10px;align-items:center}
+.out.ok{background:var(--oksoft)}.out.bad{background:var(--badsoft)}.out.gr{background:var(--soft)}
+.out span{color:var(--mute);font-size:12px;display:block}
+.out b{font-weight:700}
+@media (max-width:1100px){.cols{grid-template-columns:1fr}.detail{position:static}}
+@media (max-width:820px){.app{grid-template-columns:1fr}aside{position:static;height:auto;flex-direction:row;align-items:center;padding:10px 12px;overflow-x:auto}nav{flex-direction:row}nav a{white-space:nowrap}.sidefoot{display:none}.stats{grid-template-columns:repeat(2,1fr)}main{padding:16px 14px 32px}.row{grid-template-columns:1fr auto}.row .hide{display:none}}
+.tw{overflow-x:auto}table{width:100%;border-collapse:collapse}th{text-align:left;font-size:12px;color:var(--mute);font-weight:600;padding:8px 14px;border-bottom:1px solid var(--line);white-space:nowrap}td{padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:middle}tr:last-child td{border:0}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}.g3{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:18px}.pg{margin-bottom:18px}.pb{padding:0 16px 16px;display:grid;gap:10px}
+.bars{display:flex;align-items:flex-end;gap:8px;height:150px;padding:6px 16px 16px}.bars div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;height:100%;font-size:11px;color:var(--mute)}.bars i{display:block;width:100%;background:var(--or);border-radius:5px 5px 0 0;min-height:3px}
+.sw{position:relative;width:38px;height:22px;flex:none}.sw input{position:absolute;inset:0;opacity:0;cursor:pointer;margin:0;z-index:1}.sw s{position:absolute;inset:0;background:var(--line);border-radius:99px;transition:.15s}.sw s:after{content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.15s}.sw input:checked+s{background:var(--or)}.sw input:checked+s:after{left:19px}.sw input:focus-visible+s{outline:2px solid var(--or);outline-offset:2px}
+.opt{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 16px;border-top:1px solid var(--line)}.opt span{color:var(--mute);font-size:12px;display:block}
+input[type=password],input[type=text],input[type=search],input[type=time],input[type=number],select,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 10px;max-width:100%}
+.cal{display:grid;grid-template-columns:56px repeat(3,minmax(130px,1fr));grid-template-rows:auto repeat(8,52px);min-width:560px}.cal>div{border-top:1px solid var(--line);border-left:1px solid var(--line);padding:5px 8px;font-size:12px;color:var(--mute)}.cal .ev{background:var(--orsoft);color:var(--ink);border-left:3px solid var(--or);border-radius:6px;margin:3px;font-weight:600}
+.btn.sm{padding:3px 10px;font-size:12px}
+@media (max-width:820px){.g2{grid-template-columns:1fr}}
+.ni{width:18px;text-align:center;font-size:15px}nav a{gap:10px}nav a.on .ni{color:#111}
+.upg{background:#1a1a1a;border-color:#2a2a2a}.upg .btn{padding:7px}
+.scrim,.burger{display:none}.burger{width:38px;height:38px;border:1px solid var(--line);background:var(--panel);border-radius:10px;place-items:center;font-size:18px}
+.bar{display:flex;align-items:center;gap:10px;margin:-22px -28px 20px;padding:12px 28px;border-bottom:1px solid var(--line);background:var(--bg);position:sticky;top:0;z-index:10}.bar .sp{flex:1}
+.sc{padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:var(--panel);min-width:0}.sc .ic{width:30px;height:30px;border-radius:9px;background:var(--orsoft);color:var(--or);display:grid;place-items:center;font-size:16px}.sc b{font-size:28px;font-weight:700;line-height:1.2}.up{color:var(--ok);font-size:12px;font-weight:700;margin-left:4px}.sc svg{width:100%;height:34px;display:block;margin-top:6px}
+.oc{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:18px;margin-bottom:18px;align-items:stretch}.oc>.card{margin:0}
+.lk{color:#C25A0E;font-weight:600;text-decoration:none;font-size:12px}
+.cal.w{grid-template-columns:48px repeat(5,minmax(96px,1fr));grid-template-rows:auto repeat(5,56px);min-width:540px}.ev.g{background:var(--soft);border-left-color:var(--mute)}.ev small{display:block;font-weight:500;color:var(--mute)}
+.cb{background:var(--orsoft);border-radius:12px;padding:18px 12px;text-align:center}.ph{width:46px;height:46px;border-radius:50%;background:var(--or);color:#111;display:grid;place-items:center;font-size:22px;margin:0 auto 8px}
+.wave{display:flex;align-items:center;justify-content:center;gap:3px;height:42px;margin-top:8px}.wave i{width:3px;background:var(--or);border-radius:2px}
+.chk{width:22px;height:22px;border-radius:50%;background:var(--or);color:#111;font-size:12px;font-weight:700;display:grid;place-items:center;flex:none}
+@media (max-width:1100px){.oc{grid-template-columns:1fr}}
+@media (max-width:820px){aside{position:fixed;inset:0 auto 0 0;width:272px;height:100%;flex-direction:column;align-items:stretch;transform:translateX(-102%);transition:transform .2s;z-index:30;padding:calc(20px + env(safe-area-inset-top,0px)) 12px calc(20px + env(safe-area-inset-bottom,0px));overflow:auto}body.nav aside{transform:none}body.nav{overflow:hidden}nav{flex-direction:column}.sidefoot{display:block}body.nav .scrim{display:block;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:20}.burger{display:grid}.hm{display:none}.bar{margin:-16px -14px 16px;padding:10px 14px}.top h1{font-size:20px}.sc b{font-size:24px}.tabs button{padding:6px 8px}.opt{flex-wrap:wrap}.btn{padding:8px 12px}}
+@media (prefers-reduced-motion:reduce){aside{transition:none}}
+svg.lucide{width:18px;height:18px;vertical-align:-3px;flex:none}.ni svg{display:block}.sc .ic svg{width:17px;height:17px}.ph svg{width:22px;height:22px}.k svg{width:13px;height:13px;stroke-width:3}.burger svg{width:20px;height:20px}
+.bubble{background:#DCF8C6;color:#111;border-radius:12px 12px 12px 2px;padding:10px 12px;white-space:pre-wrap;max-width:380px;font-size:13px}
+.lgo{width:42px;height:42px;border-radius:11px;background:#fff var(--logo) center/86% no-repeat;flex:none}.nlink{color:var(--sidemute);text-decoration:none;padding:4px 10px;font-size:13px}
+.lgf{width:190px;height:240px;margin:0 auto 14px;border-radius:16px;background:#fff var(--logofull) center/contain no-repeat;border:1px solid var(--line)}.lg{max-width:380px;margin:6vh auto 0;text-align:center}
+body.auth aside,body.auth .bar,body.auth .scrim{display:none}body.auth .app{grid-template-columns:1fr}
+:root{--bd:#111111;--r:18px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bd:#58554f}}
+:root[data-theme="dark"]{--bd:#58554f}
+.card,.sc,.stat{border:1px solid var(--bd);border-radius:var(--r);box-shadow:0 3px 0 var(--bd)}
+.btn,.pill{border-radius:99px;border-color:var(--bd)}.btn{box-shadow:0 2px 0 var(--bd);transition:transform .08s,box-shadow .08s}.btn:active{transform:translateY(2px);box-shadow:none}.btn.pri{border-color:var(--bd)}
+.burger,input[type=text],input[type=password],input[type=search],input[type=time],input[type=number],select,textarea{border-color:var(--bd);border-radius:12px}
+.lc,.cb,.out{border-radius:14px}.lc{border-color:var(--bd)}.tabs button{border-radius:99px}nav a{border-radius:99px}.lgo{border:1px solid #fff}
+.tabbar{display:none}
+@media (max-width:820px){.tabbar{display:flex;position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:15;background:var(--panel);border:1px solid var(--bd);border-radius:24px;box-shadow:0 3px 0 var(--bd);padding:6px;gap:2px}.tabbar a,.tabbar button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border:0;background:none;border-radius:18px;color:var(--mute);font-size:11px;font-weight:600;text-decoration:none}.tabbar .on{background:var(--or);color:#111}.tabbar svg{width:20px;height:20px}main{padding-bottom:110px}body.nav .tabbar,body.auth .tabbar{display:none}}
+.av img{width:100%;height:100%;object-fit:cover;display:block}.pre main{visibility:hidden}.kp{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.kp .btn{font-size:20px;padding:12px 0}</style>
+</head>
+<body>
+<div class="app">
+<div class="scrim" id="scrim"></div>
+<aside>
+<div class="brand"><div class="lgo" role="img" aria-label="TWIGA logo"></div>TWIGA</div>
+<nav aria-label="Main" id="nav"></nav>
+<div class="sidefoot upg"><b style="color:var(--sideink)"><i data-lucide="crown"></i> Upgrade to Pro</b><div style="margin:4px 0 10px">Unlock more features for your business.</div><a href="#settings" class="btn pri" style="display:block;text-align:center;text-decoration:none">View plans</a></div><a href="#login" class="nlink">Sign out</a>
+</aside>
+<main>
+<header class="bar"><button class="burger" id="burger" aria-label="Open menu"><i data-lucide="menu"></i></button><span class="lgo" style="width:30px;height:30px;border-radius:9px" role="img" aria-label="TWIGA"></span><span class="pill"><span class="dot"></span>AI Receptionist: <b style="color:var(--ok)">Online</b></span><span class="sp"></span><select class="hm" aria-label="Language"><option>English</option><option>Kiswahili</option></select><select class="hm" aria-label="Business" id="bsel"><option>TWIGA Salon</option></select><div style="position:relative"><button class="av" id="prof" aria-label="Account menu" style="border:1px solid var(--bd);padding:0;overflow:hidden">S</button><div id="pm" class="card" hidden style="position:absolute;right:0;top:46px;width:240px;padding:12px;z-index:40"></div></div></header>
+<div id="v-other" hidden></div>
+<div id="v-live">
+<div class="top">
+<div><h1>Live Calls</h1><div class="sub">Watch your receptionist work, and step in when needed.</div></div>
+<div class="tools">
+<span class="pill"><span class="dot live" id="stDot"></span><span id="stTxt">Listening</span></span>
+<button class="btn pri" id="pause">Pause AI</button>
+</div>
+</div>
+<section class="stats" aria-label="Today">
+<div class="stat"><span>Calls today</span><b id="sCalls">0</b><small id="sCallsS"></small></div>
+<div class="stat"><span>Booked by AI</span><b id="sBook">0</b><small>Added to Google Calendar</small></div>
+<div class="stat"><span>Handed to staff</span><b id="sTrans">0</b><small>Transferred or message taken</small></div>
+<div class="stat"><span>Needs attention</span><b id="sAttn">0</b><small>Missed or failed calls</small></div>
+</section>
+<div class="cols">
+<div style="display:grid;gap:18px">
+<div class="card"><h2>On the line now</h2><div class="live-list" id="liveList"></div></div>
+<div class="card">
+<h2>Today’s calls</h2>
+<div class="tabs" id="tabs" role="tablist"></div>
+<div class="rows" id="rows"></div>
+</div>
+</div>
+<div class="card detail" id="detail" aria-live="polite"></div>
+</div>
+</div>
+</main>
+</div>
+<div class="tabbar" id="tabbar" role="navigation" aria-label="Quick links"><a href="#overview"><i data-lucide="layout-dashboard"></i>Home</a><a href="#live"><i data-lucide="phone-call"></i>Calls</a><a href="#calendar"><i data-lucide="calendar"></i>Calendar</a><a href="#phone"><i data-lucide="phone"></i>Dialer</a><button id="more"><i data-lucide="menu"></i>More</button></div>
+<script>
+var calls=[
+{id:1,name:"Wanjiru Kamau",phone:"+254 712 345 678",dir:"in",st:"live",start:"10:42",dur:128,lang:"Kiswahili / English",out:["Booking in progress","or"],
+tr:[["ai","Hello, karibu TWIGA Salon. How can I help you today?"],["cu","Habari. Nataka kusukwa knotless braids, Jumamosi."],["ai","Sawa. Medium au small braids? Medium ni KES 3,500."],["cu","Medium. Mchana kama inawezekana."]],
+more:[["ai","Jumamosi saa saba mchana, Faith yuko free. Nikuwekee?"],["cu","Ndiyo, tafadhali."],["ai","Nimekuwekea. I’m sending the confirmation to your WhatsApp now."]],
+act:[["Answered the caller","Greeted in English and picked up Kiswahili."],["Identified the service","Knotless braids, medium."],["Checked the calendar","Faith is free Saturday at 1:00 pm."]],pend:["Create the appointment","Send WhatsApp confirmation"]},
+{id:2,name:"Brian Otieno",phone:"+254 722 118 904",dir:"out",st:"live",start:"10:44",dur:61,lang:"English",out:["Reminder call","or"],
+tr:[["ai","Hi Brian, this is TWIGA Salon calling to remind you of your haircut tomorrow at 9:30."],["cu","Oh, can we move it a bit later?"]],more:[],
+act:[["Called the customer","Appointment reminder campaign."],["Customer asked to reschedule","Looking for later slots with Joseph."]],pend:["Update the appointment","Send updated confirmation"]},
+{id:3,name:"Amina Hassan",phone:"+254 701 220 415",dir:"in",st:"ok",start:"10:15",dur:222,lang:"Kiswahili / English",out:["Appointment booked","ok"],
+tr:[["ai","Hello, karibu TWIGA Salon. How can I help you today?"],["cu","Nataka knotless braids, tafadhali."],["ai","Sawa. Nina nafasi Alhamisi saa nne asubuhi na Faith."],["cu","Poa, weka hiyo."]],more:[],
+act:[["Answered the customer","Greeted the caller and understood the request."],["Identified a service","Customer requested knotless braids."],["Checked the calendar","Found an available stylist and time."],["Created an appointment","Saved the booking and added it to Google Calendar."],["Confirmed the booking","Gave the customer the appointment details."]],pend:[]},
+{id:4,name:"Grace Njeri",phone:"+254 733 904 117",dir:"in",st:"tr",start:"09:58",dur:95,lang:"English",out:["Transferred to manager","or"],
+tr:[["cu","I want to complain about my last visit. Someone should call me back."],["ai","I’m sorry to hear that. Let me connect you to the manager now."]],more:[],
+act:[["Answered the customer","Listened to the complaint."],["Recognised a serious complaint","This needs a person."],["Transferred the call","Manager picked up after 12 seconds."]],pend:[]},
+{id:5,name:"Unknown caller",phone:"+254 745 003 882",dir:"in",st:"miss",start:"09:31",dur:0,lang:"Not detected",out:["Missed, call back","bad"],
+tr:[],more:[],act:[["Call dropped before answer","Caller hung up while connecting."],["Added a follow-up","Callback task created for staff."]],pend:[]},
+{id:6,name:"Faith Achieng",phone:"+254 717 551 260",dir:"out",st:"ok",start:"09:10",dur:74,lang:"English",out:["Rescheduled","ok"],
+tr:[["ai","Hi Faith, you missed your appointment yesterday. Would you like to rebook?"],["cu","Yes, Friday afternoon works."]],more:[],
+act:[["Called the customer","Missed appointment follow-up."],["Offered new times","Friday 2:00 pm accepted."],["Updated the appointment","Calendar event moved."]],pend:[]},
+{id:7,name:"Mercy Wambui",phone:"+254 790 118 346",dir:"out",st:"ok",start:"08:50",dur:48,lang:"Kiswahili",out:["Feedback 5 of 5","ok"],
+tr:[["ai","Habari Mercy, huduma ilikuwaje jana?"],["cu","Nzuri sana, asante!"]],more:[],
+act:[["Called the customer","Post-visit feedback call."],["Recorded the rating","5 out of 5."]],pend:[]}
+];
+var stMap={live:["Live","or"],ok:["Completed","ok"],tr:["Transferred","or"],miss:["Missed","bad"]};
+var sel=1,filter="All",paused=false;
+var $=function(i){return document.getElementById(i)};
+function esc(s){return String(s).replace(/[&<>]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;"}[c]})}
+function ini(n){return n==="Unknown caller"?"?":n.split(" ").map(function(w){return w[0]}).join("").slice(0,2)}
+function fmt(s){var m=Math.floor(s/60),r=s%60;return m+":"+(r<10?"0":"")+r}
+function stats(){
+var live=calls.filter(function(c){return c.st==="live"}).length;
+$("sCalls").textContent=calls.length;
+$("sCallsS").textContent=calls.filter(function(c){return c.dir==="in"}).length+" in, "+calls.filter(function(c){return c.dir==="out"}).length+" out";
+$("sBook").textContent=1+calls.filter(function(c){return c.out[0].indexOf("Appointment booked")===0||c.out[0]==="Rescheduled"}).length;
+$("sTrans").textContent=calls.filter(function(c){return c.st==="tr"}).length;
+$("sAttn").textContent=calls.filter(function(c){return c.st==="miss"}).length;
+$("navLive").textContent=live;
+}
+function liveList(){
+var l=calls.filter(function(c){return c.st==="live"});
+$("liveList").innerHTML=l.length?l.map(function(c){return '<button class="lc'+(c.id===sel?' sel':'')+'" data-id="'+c.id+'"><div class="av">'+ini(c.name)+'</div><div class="g"><b>'+esc(c.name)+'</b><span>'+(c.dir==="in"?"Inbound":"Outbound")+' &middot; '+esc(c.lang)+'</span></div><div class="tm" data-t="'+c.id+'">'+fmt(c.dur)+'</div></button>'}).join(""):'<div class="sub">No calls right now. The receptionist is ready.</div>';
+}
+function tabs(){
+var f=["All","Inbound","Outbound","Transferred","Missed"];
+$("tabs").innerHTML=f.map(function(x){return '<button role="tab" class="'+(x===filter?'on':'')+'" data-f="'+x+'">'+x+'</button>'}).join("");
+}
+function rows(){
+var l=calls.filter(function(c){return filter==="All"||(filter==="Inbound"&&c.dir==="in")||(filter==="Outbound"&&c.dir==="out")||(filter==="Transferred"&&c.st==="tr")||(filter==="Missed"&&c.st==="miss")});
+$("rows").innerHTML=l.length?l.map(function(c){return '<button class="row'+(c.id===sel?' sel':'')+'" data-id="'+c.id+'"><div class="nm"><b>'+esc(c.name)+'</b><span>'+c.start+' &middot; '+(c.dir==="in"?"Inbound":"Outbound")+'</span></div><div class="hide sub">'+esc(c.out[0])+'</div><span class="tag t-'+(c.st==="ok"?"ok":c.st==="miss"?"bad":c.st==="live"||c.st==="tr"?"or":"gr")+'">'+stMap[c.st][0]+'</span></button>'}).join(""):'<div class="sub" style="padding:10px">No calls match this filter.</div>';
+}
+function msgs(c){
+return c.tr.length?c.tr.map(function(m){return '<div class="m '+m[0]+'"><i>'+(m[0]==="ai"?"TWIGA":"Caller")+'</i>'+esc(m[1])+'</div>'}).join(""):'<div class="sub">No conversation. The caller hung up before the AI could answer.</div>';
+}
+function detail(){
+var c=calls.filter(function(x){return x.id===sel})[0];
+var live=c.st==="live";
+var acts=c.act.map(function(a,i){return '<li><div class="k">'+(i+1)+'</div><div><b>'+esc(a[0])+'</b><span>'+esc(a[1])+'</span></div></li>'}).join("")+c.pend.map(function(p){return '<li class="wait"><div class="k">&hellip;</div><div><b>'+esc(p)+'</b><span>Waiting</span></div></li>'}).join("");
+var oc=c.out[1];
+$("detail").innerHTML='<div class="dh"><div class="av">'+ini(c.name)+'</div><div style="flex:1;min-width:0"><h2>'+esc(c.name)+'</h2><div class="sub">'+c.phone+'</div></div><span class="tag t-'+(c.st==="ok"?"ok":c.st==="miss"?"bad":"or")+'">'+stMap[c.st][0]+'</span></div>'
++'<div class="meta"><div><span>Direction</span><b>'+(c.dir==="in"?"Inbound":"Outbound")+'</b></div><div><span>Started</span><b>'+c.start+'</b></div><div><span>Duration</span><b class="tm" id="dDur">'+fmt(c.dur)+'</b></div><div><span>Language</span><b>'+esc(c.lang)+'</b></div></div>'
++'<div class="sec"><h3>'+(live?"Live transcript":"Transcript")+'</h3><div class="tr" id="tr">'+msgs(c)+'</div></div>'
++'<div class="sec" style="border:0"><h3>What the AI did</h3><ol class="tl">'+acts+'</ol></div>'
++'<div class="out '+(oc==="or"?"":oc)+'"><div><span>Outcome</span><b>'+esc(c.out[0])+'</b></div>'+(live?'<button class="btn" id="take">Take over call</button>':c.st==="miss"?'<button class="btn pri">Call back</button>':'')+'</div>';
+var t=$("tr");if(t)t.scrollTop=t.scrollHeight;
+}
+function render(){stats();liveList();tabs();rows();detail()}
+document.addEventListener("click",function(e){
+var b=e.target.closest("[data-id]");if(b){sel=+b.dataset.id;liveList();rows();detail();return}
+var f=e.target.closest("[data-f]");if(f){filter=f.dataset.f;tabs();rows()}
+});
+$("pause").addEventListener("click",function(){
+paused=!paused;
+$("pause").textContent=paused?"Resume AI":"Pause AI";
+$("pause").className=paused?"btn":"btn pri";
+$("stTxt").textContent=paused?"Paused, calls go to staff":"Listening";
+$("stDot").className=paused?"dot off":"dot live";
+});
+setInterval(function(){
+calls.forEach(function(c){if(c.st==="live"){c.dur++;var e=document.querySelector('[data-t="'+c.id+'"]');if(e)e.textContent=fmt(c.dur);if(c.id===sel&&$("dDur"))$("dDur").textContent=fmt(c.dur)}});
+},1000);
+setInterval(function(){
+var c=calls[0];if(c.st!=="live"||!c.more.length)return;
+var m=c.more.shift();c.tr.push(m);
+if(!c.more.length){c.act.push(["Created the appointment","Saturday 1:00 pm with Faith, added to Google Calendar."]);c.pend=["Send WhatsApp confirmation"];c.out=["Booking created","ok"]}
+if(sel===1)detail();
+},5000);
+var V={overview:"Overview",live:"Live Calls",phone:"Dialer",history:"Call History",ai:"AI Receptionist",appointments:"Appointments",calendar:"Calendar",customers:"Customers",services:"Services &amp; Pricing",orders:"Orders",payments:"Payments &amp; Quotes",whatsapp:"WhatsApp",followups:"Follow-ups",campaigns:"Campaigns",staff:"Staff &amp; Transfers",reports:"Reports",integrations:"Integrations",settings:"Settings"};
+var appts=[["09:30","Brian Otieno","Men’s haircut","Joseph","Confirmed"],["10:00","Amina Hassan","Knotless braids","Faith","Confirmed"],["11:30","Wanjiru Kamau","Wash and blow-dry","Mary","Confirmed"],["13:00","Mercy Wambui","Gel nails","Mary","Pending"],["14:00","Faith Achieng","Box braids","Faith","Rescheduled"]];
+var fu=[["Unknown caller, +254 745 003 882","Call back, missed at 09:31",0],["Grace Njeri","Manager to call back about her complaint",0],["Faith Achieng","Confirm Friday 2:00 pm rebooking",0]];
+var G=function(t,c){return '<span class="tag t-'+c+'">'+t+'</span>'};
+var T=function(h,r,id){return '<div class="tw"><table'+(id?' id="'+id+'"':'')+'><thead><tr>'+h.map(function(x){return '<th>'+x+'</th>'}).join('')+'</tr></thead><tbody>'+r.map(function(x){return '<tr>'+x.map(function(c){return '<td>'+c+'</td>'}).join('')+'</tr>'}).join('')+'</tbody></table></div>'};
+var C=function(t,b){return '<div class="card pg"><h2>'+t+'</h2><div style="height:10px"></div>'+b+'</div>'};
+var SW=function(on){return '<label class="sw"><input type="checkbox"'+(on?' checked':'')+' aria-label="Turn on or off"><s></s></label>'};
+var O=function(t,s,on){return '<div class="opt"><div><b>'+t+'</b><span>'+s+'</span></div>'+SW(on)+'</div>'};
+var S=function(l,v,s){return '<div class="stat"><span>'+l+'</span><b>'+v+'</b><small>'+(s||'&nbsp;')+'</small></div>'};
+var B=function(v,l){var m=Math.max.apply(null,v);return '<div class="bars">'+v.map(function(n,i){return '<div>'+n+'<i style="height:'+(n/m*80)+'%"></i>'+l[i]+'</div>'}).join('')+'</div>'};
+var ST={Confirmed:"ok",Pending:"or",Rescheduled:"or",Cancelled:"bad"};
+var R={
+overview:function(){return["What the receptionist has done today, and what needs you.",'<div class="stats">'+S("Calls received",42,"Inbound today")+S("Calls made",18,"Reminders and follow-ups")+S("Bookings created",14,"By the AI")+S("Appointments changed",5,"Rescheduled or cancelled")+'</div><div class="stats">'+S("Calls transferred",4,"Handed to staff")+S("Missed or failed",3,"Need a callback")+S("Satisfaction","4.7 / 5","From call feedback")+S("Estimated revenue","KES 48,500","Bookings and orders")+'</div><div class="g2">'+C("Today’s schedule",T(["Time","Customer","Service","Stylist"],appts.map(function(a){return a.slice(0,4)})))+C("AI activity",'<ul class="tl pb">'+[["10:44","Called Brian Otieno","He asked to move his reminder slot."],["10:42","Booking Wanjiru Kamau","Knotless braids, Saturday 1:00 pm."],["10:15","Booked Amina Hassan","Added to Google Calendar."],["09:58","Transferred Grace Njeri","Complaint, manager picked up."],["09:31","Missed call","Callback task created."]].map(function(a){return '<li><div class="k">&bull;</div><div><b>'+a[1]+'</b><span>'+a[0]+', '+a[2]+'</span></div></li>'}).join('')+'</ul>')+'</div>']},
+history:function(){return["Every call the receptionist handled. Open one to see exactly what it did.",C("All calls",T(["Caller","Direction","Time","Language","Outcome",""],calls.map(function(c){return[esc(c.name),c.dir==="in"?"Inbound":"Outbound",c.start+", "+fmt(c.dur),esc(c.lang),G(esc(c.out[0]),c.out[1]),'<button class="btn sm" data-open="'+c.id+'">View</button>']})))]},
+ai:function(){return["Choose what your receptionist can do and when it hands over to a person.",'<div class="g2">'+C("Abilities",O("Answer inbound calls","Picks up every call, day and night",1)+O("English and Kiswahili","Follows the caller, including mid-call switches",1)+O("Book appointments","Only for services marked bookable",1)+O("Make outbound calls","Within your calling hours",1)+O("Send quotes and payment links","On WhatsApp, with PalPlus",1)+O("Send receipts","On WhatsApp, after payment",1)+O("Record calls","Only with the caller’s consent",0))+C("Ask a person first",O("Refunds and payments","Staff approve before anything moves",1)+O("Special service requests","Things the AI can’t confirm",1)+O("Serious complaints","Transfer to the manager",1)+O("Caller asks for a person","Always transfer",1))+'</div>'+C("Greeting",'<div class="pb"><textarea rows="3" aria-label="Greeting">Hello, karibu TWIGA Salon. How can I help you today?</textarea><div><button class="btn pri" data-save>Save greeting</button></div></div>')]},
+appointments:function(){return["Book, move or cancel. The AI checks the calendar again before every save, so slots never double up.",C("Today",T(["Time","Customer","Service","Stylist","Status",""],appts.map(function(a,i){return[a[0],a[1],a[2],a[3],G(a[4],ST[a[4]]),a[4]==="Cancelled"?"":'<button class="btn sm" data-ap="'+i+':Rescheduled">Reschedule</button> <button class="btn sm" data-ap="'+i+':Cancelled">Cancel</button>']})))]},
+calendar:function(){var st=["Faith","Joseph","Mary"],ev=[[0,1,2,"Amina, knotless braids"],[0,5,3,"Faith A., box braids"],[1,0,1,"Brian, haircut"],[1,3,1,"Walk-in"],[2,2,1,"Wanjiru, blow-dry"],[2,4,1,"Mercy, gel nails"],[2,6,1,"Grace, treatment"]],h='<div></div>'+st.map(function(s){return '<div style="font-weight:700;color:var(--ink)">'+s+'</div>'}).join(''),i,j;for(i=0;i<8;i++){h+='<div style="grid-column:1;grid-row:'+(i+2)+'">'+(9+i)+':00</div>';for(j=0;j<3;j++)h+='<div style="grid-column:'+(j+2)+';grid-row:'+(i+2)+'"></div>'}ev.forEach(function(e){h+='<div class="ev" style="grid-column:'+(e[0]+2)+';grid-row:'+(e[1]+2)+'/span '+e[2]+'">'+e[3]+'</div>'});return["Each stylist has their own calendar, so two bookings never clash.",C("Today",'<div class="tw"><div class="cal">'+h+'</div></div>')]},
+customers:function(){return["Profiles, preferences and balances the receptionist uses on every call.",'<div class="pg"><input type="search" placeholder="Search customers" aria-label="Search customers" style="width:100%;max-width:320px" oninput="var v=this.value.toLowerCase();document.querySelectorAll(\'#ct tbody tr\').forEach(function(r){r.hidden=r.textContent.toLowerCase().indexOf(v)<0})"></div>'+C("Customers",T(["Name","Phone","Last visit","Next visit","Balance","Notes"],[["Wanjiru Kamau","+254 712 345 678","12 Oct","Braids, due 23 Nov","KES 0","Prefers afternoons"],["Amina Hassan","+254 701 220 415","30 Sep","Braids, due 11 Nov","KES 0","Likes Faith"],["Brian Otieno","+254 722 118 904","20 Oct","Haircut, due 3 Nov","KES 0","Early mornings"],["Grace Njeri","+254 733 904 117","18 Oct","On hold","KES 900","Complaint open"],["Mercy Wambui","+254 790 118 346","1 Nov","Nails, due 22 Nov","KES 0","Speaks Kiswahili"]],"ct"))]},
+services:function(){return["What the AI can quote and book. Durations set how long each slot is held.",C("Services",T(["Service","Time","Price (KES)","AI can book"],[["Knotless braids, medium","4 h","3,500",SW(1)],["Box braids","3 h","3,000",SW(1)],["Wash and blow-dry","1 h","800",SW(1)],["Gel nails","1 h 30","1,500",SW(1)],["Men’s haircut","45 min","500",SW(1)],["Bridal styling","3 h","8,000",SW(0)]]))]},
+orders:function(){return["Product sales and service orders, with M-Pesa references and stock.",'<div class="g2">'+C("Orders",T(["Order","Customer","Items","KES","M-Pesa ref","Status"],[["#1042","Amina Hassan","Edge control, shea butter","1,800","QJ8K2LM4PX",G("Paid","ok")],["#1043","Walk-in","Shampoo, conditioner","2,400","QJ8M7TR2NA",G("Paid","ok")],["#1044","Grace Njeri","Hair oil","900","Awaiting",G("Deposit","or")]]))+C("Stock",T(["Product","Left",""],[["Shampoo 500 ml",3,G("Low","bad")],["Conditioner",12,G("OK","ok")],["Hair oil",4,G("Low","bad")],["Shea butter",18,G("OK","ok")]]))+'</div>']},
+campaigns:function(){var c=[["Appointment reminder","Calls before a booking",1,"18 calls today"],["Missed appointment","Offers to rebook",1,"2 rebooked"],["Follow-up","Asks how the visit went",1,"4.7 average rating"],["Rebooking","Customers due another visit",0,"Off"],["Booking confirmation","Confirms new bookings",1,"9 confirmed"],["Schedule change","Tells customers about changes",1,"1 this week"],["Customer feedback","Collects a rating",1,"12 ratings"],["Special offer","Opted-in customers only",0,"Off"]];return["The AI only calls with a reason, inside your hours, and never after an opt-out.",'<div class="g3">'+c.map(function(x){return '<div class="card"><div class="opt" style="border:0"><div><b>'+x[0]+'</b><span>'+x[1]+'</span></div>'+SW(x[2])+'</div><div class="sub" style="padding:0 16px 12px">'+x[3]+'</div></div>'}).join('')+'</div>'+C("Calling rules",'<div class="pb"><div>Calling hours <input type="time" value="08:00" aria-label="From"> to <input type="time" value="19:00" aria-label="To"></div><div>Maximum calls a day <input type="number" value="60" style="width:80px" aria-label="Maximum calls"></div><div>'+G("7 customers opted out","gr")+' They will never be called again.</div><div><button class="btn pri" data-save>Save rules</button></div></div>')]},
+followups:function(){return["Callbacks the AI created for your team.",C("To do",fu.map(function(f,i){return '<div class="opt"><div><b>'+f[0]+'</b><span>'+f[1]+'</span></div>'+(f[2]?G("Done","ok"):'<button class="btn sm" data-fu="'+i+'">Mark done</button>')+'</div>'}).join(''))]},
+staff:function(){return["Who the AI transfers to, in order. If nobody answers, it takes a message and creates a follow-up.",C("Team",T(["Name","Role","Hours","Phone","Transfer order"],[["Faith","Senior stylist","9:00 to 17:00","+254 712 000 111","First"],["Joseph","Barber","9:00 to 17:00","+254 722 000 222","Second"],["Mary","Nails and treatments","10:00 to 18:00","+254 733 000 333","Third"],["Manager","Owner","Always","+254 700 000 444","Complaints and refunds"]]))]},
+reports:function(){return["What the receptionist is worth to you.",'<div class="stats">'+S("Booking conversion","68%","Calls that ended in a booking")+S("Handled without help","87%","No staff needed")+S("Average call","2:48","Minutes")+S("Revenue from AI","KES 212,000","This week")+'</div><div class="g2">'+C("Bookings this week",B([9,12,8,14,16,22,11],["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]))+C("Language",T(["Language","Share of calls"],[["English","54%"],["Kiswahili","21%"],["Mixed","25%"]]))+'</div>']},
+integrations:function(){var i=[["ElevenLabs Agents","AI voice and conversations","Connected","ok"],["HostPro SIP","Kenyan numbers. Verify trunk settings before live calls.","Needs check","or"],["Google Calendar","Staff calendars and bookings","Connected","ok"],["Apps Script and Sheets","Salon records and booking logic","Connected","ok"],["WhatsApp","Quotes, payment links and receipts","Needs setup","or"],["PalPlus","Payment links and receipts","Needs setup","or"],["SautiKit","Numbers and WhatsApp calling","Connected","ok"],["Supabase","Secure multi-business accounts","Later","gr"]];return["Sample statuses for now. Real connections come with the backend build.",'<div class="g3">'+i.map(function(x){return '<div class="card"><div class="opt" style="border:0"><div><b>'+x[0]+'</b><span>'+x[1]+'</span></div>'+G(x[2],x[3])+'</div></div>'}).join('')+'</div>']},
+settings:function(){return["Business details and rules the receptionist follows.",C("Business",'<div class="pb" style="max-width:420px"><label>Name<br><input type="text" value="TWIGA Salon" style="width:100%"></label><label>Opening hours<br><input type="text" value="Mon to Sat, 9:00 to 18:00" style="width:100%"></label><label>Main language<br><select><option>English and Kiswahili</option><option>English</option><option>Kiswahili</option></select></label><div><button class="btn pri" data-save>Save settings</button></div></div>')+C("Privacy",O("Ask for consent before recording","Recommended",1)+O("Delete recordings after 90 days","Transcripts stay",1))]}
+};
+var SP=function(p,c){var m=Math.max.apply(null,p),n=p.length;return '<svg viewBox="0 0 100 34" preserveAspectRatio="none" aria-hidden="true"><polyline fill="none" stroke="'+c+'" stroke-width="2" vector-effect="non-scaling-stroke" points="'+p.map(function(v,i){return (i*100/(n-1))+','+(32-v/m*28)}).join(' ')+'"/></svg>'};
+var SC=function(ic,l,v,t,p,c){var z=t==="0%";return '<div class="sc"><div class="ic"><i data-lucide="'+IM[ic]+'"></i></div><span class="sub" style="display:block;margin-top:8px">'+l+'</span><b>'+v+'</b><span class="up"'+(z?' style="color:var(--mute)"':'')+'>'+(z?'&ndash;':'&uarr;')+' '+t+'</span>'+SP(p,c)+'</div>'};
+R.overview=function(){var d=new Date(),h=d.getHours(),g=h<12?"Good morning":h<17?"Good afternoon":"Good evening",m=new Date(d.getFullYear(),d.getMonth(),d.getDate()-((d.getDay()+6)%7)),i,j,x='<div></div>',ev=[[0,0,"Braids","9:00 AM",1],[0,2,"Nails","11:00 AM",0],[1,0,"Haircut","9:30 AM",0],[2,0,"Nails","9:00 AM",1],[2,2,"Braids","11:00 AM",0],[3,1,"Facial","10:00 AM",1],[3,3,"Haircut","12:00 PM",0],[4,0,"Braids","9:30 AM",0],[4,2,"Nails","11:30 AM",1]],tm=["9 AM","10 AM","11 AM","12 PM","1 PM"],w='';for(i=0;i<5;i++)x+='<div style="font-weight:700;color:var(--ink)">'+new Date(m.getFullYear(),m.getMonth(),m.getDate()+i).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})+'</div>';for(i=0;i<5;i++){x+='<div style="grid-column:1;grid-row:'+(i+2)+'">'+tm[i]+'</div>';for(j=0;j<5;j++)x+='<div style="grid-column:'+(j+2)+';grid-row:'+(i+2)+'"></div>'}ev.forEach(function(e){x+='<div class="ev'+(e[4]?'':' g')+'" style="grid-column:'+(e[0]+2)+';grid-row:'+(e[1]+2)+'">'+e[2]+'<small>'+e[3]+'</small></div>'});for(i=0;i<30;i++)w+='<i style="height:'+(8+Math.abs(Math.sin(i*1.7))*28|0)+'px"></i>';return["Here’s what’s happening with your salon today.",'<div class="stats">'+SC("✆","Calls today",28,"12%",[3,5,4,7,6,9,8],"#F47721")+SC("▣","Appointments booked",12,"20%",[2,3,3,5,4,6,7],"#F47721")+SC("✓","Follow-ups completed",9,"18%",[4,4,5,4,6,6,7],"#9A968F")+SC("⇄","Calls transferred",3,"0%",[3,2,3,3,2,3,3],"#9A968F")+'</div><div class="oc"><div class="card"><div class="opt" style="border:0"><b>Salon Calendar, This Week</b><a href="#calendar" class="lk">View full calendar &rarr;</a></div><div class="tw"><div class="cal w">'+x+'</div></div></div><div class="card" style="padding:16px"><b><span class="dot live" style="display:inline-block;margin-right:6px"></span>Live AI Call</b><div class="cb" style="margin-top:12px"><div class="ph"><i data-lucide="phone"></i></div><b style="font-size:20px">On a call</b><div class="tm sub" data-t="1">'+fmt(calls[0].dur)+'</div><div class="wave">'+w+'</div></div><div style="display:flex;gap:10px;align-items:center;margin:14px 0"><div class="av">WK</div><div><b>+254 712 345678</b><div class="sub">Inbound, English</div></div></div><button class="btn" style="width:100%" data-open="1">View Details &rarr;</button></div></div><div class="oc" style="grid-template-columns:minmax(0,1fr) minmax(0,1.3fr)">'+C("AI Activity Timeline",'<ul class="tl pb">'+[["Answered call","9:24 AM"],["Checked stylist availability","9:24 AM"],["Booked knotless braids","9:25 AM"],["Sent confirmation (SMS)","9:25 AM"]].map(function(a){return '<li><div class="k"><i data-lucide="check"></i></div><div><b>'+a[0]+'</b><span>Today at '+a[1]+'</span></div></li>'}).join('')+'</ul>')+C("Recent Calls <a href=\"#history\" class=\"lk\" style=\"float:right\">View all &rarr;</a>",T(["Caller","Type","Duration","Result"],[["+254 712 345678","Inbound","3m 42s",G("Booked","ok")],["+254 723 998877","Outbound","2m 18s",G("Follow-up","or")],["+254 735 112233","Inbound","1m 20s",G("Info","gr")]]))+'</div>',g+", "+(window.UF||"there")+" 👋"]};
+var IM={"\u2706":"phone-call","\u25a3":"calendar-check","\u2713":"circle-check","\u21c4":"arrow-left-right"};
+var svc=[["Knotless braids, medium",3500],["Box braids",3000],["Wash and blow-dry",800],["Gel nails",1500],["Men’s haircut",500]];
+var docs=[["QT-2041","Amina Hassan","Quotation","Knotless braids, medium",3500,"Sent"],["PL-1180","Wanjiru Kamau","Payment link","Knotless braids, medium",3500,"Sent"],["RC-0912","Brian Otieno","Receipt","Men’s haircut",500,"Paid"],["PL-1179","Mercy Wambui","Payment link","Gel nails",1500,"Paid"]];
+function pv(){var n=$("pc").value,s=svc[+$("ps").value],t=$("pt").value,a="KES "+s[1].toLocaleString();$("pvb").textContent=t==="Quotation"?"Hello "+n+", here is your quotation from TWIGA Salon:\n"+s[0]+": "+a+"\nValid for 7 days. Reply YES and I will book it for you.":t==="Payment link"?"Hello "+n+", please pay "+a+" for "+s[0]+" using this PalPlus link:\n[PalPlus payment link]":"Thank you, "+n+". We received "+a+" for "+s[0]+".\nYour receipt is attached."}
+R.payments=function(){var nm=calls.filter(function(c){return c.name!=="Unknown caller"}).map(function(c){return c.name}),o=function(a){return a.map(function(x,i){return '<option value="'+(typeof x==="string"?x:i)+'">'+(typeof x==="string"?x:x[0]+", KES "+x[1].toLocaleString())+'</option>'}).join('')};return["Send quotations, payment links and receipts to customers on WhatsApp. This is a preview until PalPlus and WhatsApp are connected.",'<div class="stats">'+S("Quotes sent",8,"This week")+S("Payment links",11,"Sent")+S("Paid",9,"Through PalPlus")+S("Collected","KES 31,200","This week")+'</div><div class="g2">'+C("New message",'<div class="pb"><label>Customer<br><select id="pc" onchange="pv()" style="width:100%">'+o(nm)+'</select></label><label>Service<br><select id="ps" onchange="pv()" style="width:100%">'+o(svc)+'</select></label><label>Send<br><select id="pt" onchange="pv()" style="width:100%"><option>Quotation</option><option>Payment link</option><option>Receipt</option></select></label><div><button class="btn pri" data-send>Send on WhatsApp</button></div></div>')+C("WhatsApp preview",'<div class="pb"><div class="bubble" id="pvb"></div></div>')+'</div>'+C("Sent documents",T(["No.","Customer","Type","Service","KES","Status"],docs.map(function(d){return[d[0],d[1],d[2],d[3],d[4].toLocaleString(),G(d[5],d[5]==="Paid"?"ok":"or")]})))]};
+var LOGIN='<div class="lg"><div class="lgf" role="img" aria-label="TWIGA"></div><h1>Welcome back</h1><div class="sub">Sign in to your receptionist dashboard.</div><div class="pb" style="margin-top:18px;text-align:left"><button class="btn pri" data-act="g" style="text-align:center">Continue with Google</button><div class="sub" id="lerr"></div></div></div>';
+function route(keep){var k=(location.hash||"#overview").slice(1);if(window.gate_&&gate_(k))return;if(k==="login"){document.body.classList.add("auth");$("v-live").hidden=true;$("v-other").hidden=false;$("v-other").innerHTML=LOGIN;if(window.lucide)lucide.createIcons();return}document.body.classList.remove("auth");if(!V[k])k="overview";[].forEach.call($("nav").querySelectorAll("a"),function(a){var on=a.getAttribute("href")==="#"+k;a.className=on?"on":"";if(on)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")});$("v-live").hidden=k!=="live";$("v-other").hidden=k==="live";if(k==="live"){render()}else{var r=R[k]();$("v-other").innerHTML='<div class="top"><div><h1>'+(r[2]||V[k])+'</h1><div class="sub">'+r[0]+'</div></div></div>'+r[1]}[].forEach.call(document.querySelectorAll("#tabbar a"),function(a){a.className=a.getAttribute("href")==="#"+k?"on":""});if($("pvb"))pv();if(window.lucide)lucide.createIcons();if(keep!==1)window.scrollTo(0,0)}
+var IC={overview:"layout-dashboard",live:"phone-call",phone:"phone",history:"history",ai:"bot",appointments:"calendar-check",calendar:"calendar",customers:"users",services:"scissors",orders:"shopping-bag",payments:"credit-card",whatsapp:"message-circle",followups:"phone-forwarded",campaigns:"megaphone",staff:"user-check",reports:"trending-up",integrations:"plug",settings:"settings"};
+$("nav").innerHTML=Object.keys(V).map(function(k){return '<a href="#'+k+'"><span class="ni"><i data-lucide="'+IC[k]+'"></i></span><span style="flex:1">'+V[k]+'</span>'+(k==="live"?'<span class="n" id="navLive">2</span>':'')+'</a>'}).join("");
+document.addEventListener("click",function(e){var b=e.target.closest("[data-open]");if(b){sel=+b.dataset.open;location.hash="#live";return}b=e.target.closest("[data-ap]");if(b){var p=b.dataset.ap.split(":");appts[+p[0]][4]=p[1];route(1);return}b=e.target.closest("[data-fu]");if(b){fu[+b.dataset.fu][2]=1;route(1);return}b=e.target.closest("[data-save]");if(b){var t=b.textContent;b.textContent="Saved";setTimeout(function(){b.textContent=t},1500)}});
+document.addEventListener("click",function(e){if(e.target.closest("#burger,#more"))document.body.classList.toggle("nav");else if(e.target.closest("#scrim,nav a"))document.body.classList.remove("nav")});
+document.addEventListener("click",function(e){if(e.target.closest("[data-send]")){var t=$("pt").value,s=svc[+$("ps").value],p={"Quotation":"QT-","Payment link":"PL-","Receipt":"RC-"}[t];docs.unshift([p+(2042+docs.length),$("pc").value,t,s[0],s[1],t==="Receipt"?"Paid":"Sent"]);route(1)}});
+addEventListener("hashchange",route);
+render();route();
+</script>
+<script>
+(function(){
+var K=window.TWIGA_CONFIG||{},pre=function(){document.documentElement.classList.remove("pre")};
+setTimeout(pre,7000);
+if(!K.supabaseUrl||!window.supabase){R.phone=function(){return["Sign in to use the dialer.",""]};pre();return}
+var sb=window.sb=supabase.createClient(K.supabaseUrl,K.supabaseKey,{auth:{flowType:"pkce"}});
+window.SESS=null;window.BIZ=null;window.READY=false;window.UF="";
+var TX="",TYPES=[["salon","Salon or barber"],["shop","Shop or retail"],["clinic","Clinic"],["restaurant","Restaurant"],["repair","Repair or technician"],["legal","Law firm"],["realestate","Real estate"],["general","Other"]];
+var opt=function(a){return a.map(function(x){return '<option value="'+x[0]+'">'+x[1]+'</option>'}).join("")};
+var SETUP='<div class="lg"><div class="lgf" role="img" aria-label="TWIGA"></div><h1>Set up your business</h1><div class="sub">This creates your private workspace.</div><div class="pb" style="margin-top:18px;text-align:left"><label>Business name<br><input type="text" id="bn" style="width:100%"></label><label>Type of business<br><select id="bt" style="width:100%">'+opt(TYPES)+'</select></label><button class="btn pri" data-act="mkbiz">Create workspace</button><div class="sub" id="serr"></div></div></div>';
+var fav=document.getElementById("fav"),lg=getComputedStyle(document.documentElement).getPropertyValue("--logo").trim().replace(/^url\(|\)$/g,"").replace(/["']/g,"");
+if(lg)fav.href=lg;
+function ini(n){return (n||"").split(" ").map(function(w){return w[0]||""}).join("").slice(0,2).toUpperCase()}
+function paint(){
+ var u=SESS&&SESS.user,m=(u&&u.user_metadata)||{},nm=m.full_name||m.name||(u&&u.email)||"",av=m.avatar_url||m.picture||"",b=BIZ;
+ UF=nm.split(" ")[0]||"";
+ $("prof").innerHTML=av?'<img src="'+esc(av)+'" alt="" referrerpolicy="no-referrer">':esc(ini(nm)||"?");
+ $("pm").innerHTML=u?'<b>'+esc(nm)+'</b><div class="sub">'+esc(u.email||"")+'</div>'+(b?'<div class="sub" style="margin-top:8px">'+esc(b.name)+', '+esc(b.business_type)+'<br>'+esc(b.status)+', paid to '+esc(b.paid_through)+'</div>':"")+'<button class="btn" style="width:100%;margin-top:10px" data-act="out">Sign out</button>':"";
+ if(b&&$("bsel"))$("bsel").innerHTML='<option>'+esc(b.name)+'</option>';
+}
+async function load(){
+ var r=await sb.auth.getSession();SESS=r.data.session;BIZ=null;
+ if(SESS){var q=await sb.from("business_members").select("role,businesses(id,name,business_type,status,paid_through)").limit(1),w=q.data&&q.data[0];if(w&&w.businesses){BIZ=w.businesses;BIZ.role=w.role}}
+ READY=true;paint();route();pre();
+}
+window.gate_=function(k){
+ if(!READY)return true;
+ if(!SESS){if(k==="login")return false;location.hash="#login";return true}
+ if(k==="login"){location.hash=BIZ?"#overview":"#setup";return true}
+ if(!BIZ){if(k!=="setup"){location.hash="#setup";return true}
+  document.body.classList.add("auth");$("v-live").hidden=true;$("v-other").hidden=false;$("v-other").innerHTML=SETUP;return true}
+ if(k==="setup"){location.hash="#overview";return true}
+ return false};
+sb.auth.onAuthStateChange(function(e){if(e==="SIGNED_OUT")setTimeout(load,0)});
+async function L(a,d){var s=(await sb.auth.getSession()).data.session;if(!s)throw new Error("Please sign in again.");
+ var r=await fetch(K.ledgerUrl,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:a,token:s.access_token,business_id:BIZ.id,data:d||{},txn:(d&&d.txn)||""})});
+ var j=await r.json();if(!j.ok)throw new Error(String(j.error||"Request failed").replace(/^INACTIVE\|/,""));return j}
+function msg(t,bad){var e=$("omsg");if(e){e.textContent=t;e.style.color=bad?"var(--bad)":"var(--ok)"}}
+async function list(){try{var o=(await L("listOrders",{limit:60})).orders;
+ $("ol").innerHTML=o.length?T(["Order","Customer","Total","Paid","Status",""],o.map(function(x){var due=Number(x.Paid)<Number(x.Total)&&x.Status!=="Quote"&&x.Status!=="Cancelled",open=["Completed","Paid","Cancelled"].indexOf(x.Status)<0;
+  return[esc(x.OrderId)+'<div class="sub">'+esc(x.Type)+'</div>',esc(x.Customer),Number(x.Total).toLocaleString(),Number(x.Paid).toLocaleString(),G(esc(x.Status),x.Status==="Paid"||x.Status==="Completed"?"ok":x.Status==="Cancelled"?"bad":"or"),
+  (due?'<button class="btn sm" data-act="paid" data-id="'+esc(x.OrderId)+'">Mark paid</button> '+(x.Phone?'<button class="btn sm" data-act="stk" data-id="'+esc(x.OrderId)+'" data-ph="'+esc(x.Phone)+'">M-Pesa</button> ':""):"")+(open?'<button class="btn sm" data-act="done" data-id="'+esc(x.OrderId)+'">Done</button>':"")]})):"No orders yet."}catch(e){$("ol").textContent=e.message}}
+var FORM='<div class="pb"><label>Customer<br><input type="text" id="oc" style="width:100%"></label><label>Phone (07...)<br><input type="text" id="op" style="width:100%"></label><label>Type<br><select id="ot" style="width:100%"><option>Sale</option><option>Appointment</option><option>Service</option><option>Quote</option></select></label><label>Item or service<br><input type="text" id="oi" style="width:100%"></label><label>Quantity<br><input type="number" id="oq" value="1" min="1" style="width:100%"></label><label>Price (KES)<br><input type="number" id="opr" min="0" style="width:100%"></label><label>Payment<br><select id="om" style="width:100%"><option>Pay later</option><option>Cash</option><option>M-Pesa</option><option>Card</option></select></label><button class="btn pri" data-act="mk">Save order</button><div class="sub" id="omsg"></div></div>';
+var T0=R.orders;
+R.orders=function(){if(!K.ledgerUrl)return T0();setTimeout(list,0);return["Every sale, booking and job, saved in your business spreadsheet.",'<div class="g2">'+C("New order",FORM)+C("Orders",'<div id="ol" class="pb">Loading...</div>')+'</div>']};
+document.addEventListener("click",async function(e){
+ if(e.target.closest("#prof")){$("pm").hidden=!$("pm").hidden;return}
+ if(!e.target.closest("#pm"))$("pm").hidden=true;
+ var b=e.target.closest("[data-act]");if(!b)return;
+ var a=b.dataset.act,id=b.dataset.id;
+ try{
+  if(a==="g"){var o=await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+"/"}});if(o.error)$("lerr").textContent=o.error.message}
+  else if(a==="out"){await sb.auth.signOut();load()}
+  else if(a==="mkbiz"){var n=$("bn").value.trim();if(n.length<2){$("serr").textContent="Enter your business name.";return}var r=await sb.from("businesses").insert({name:n,business_type:$("bt").value});if(r.error){$("serr").textContent=r.error.message;return}load()}
+  else if(a==="mk"){if(!TX)TX=crypto.randomUUID();var pm=$("om").value,j=await L("createOrder",{txn:TX,customer:$("oc").value,phone:$("op").value,type:$("ot").value,method:pm,paid:pm!=="Pay later",items:[{name:$("oi").value,qty:$("oq").value,unitPrice:$("opr").value}]});TX="";msg("Saved "+j.orderId+", KES "+j.total.toLocaleString());list()}
+  else if(a==="paid"){await L("updateOrder",{orderId:id,paid:true,method:"Cash"});list()}
+  else if(a==="done"){await L("updateOrder",{orderId:id,status:"Completed"});list()}
+  else if(a==="stk"){var s=await L("stkStart",{orderId:id,phone:b.dataset.ph});msg(s.message);
+   for(var i=0;i<12;i++){await new Promise(function(r){setTimeout(r,5000)});var c=await L("stkCheck",{paymentId:s.paymentId});
+    if(c.status==="SUCCESS"){msg("Paid. Receipt "+(c.receipt||""));list();break}
+    if(["FAILED","CANCELLED","EXPIRED","REVERSED","REVIEW"].indexOf(c.status)>=0){msg(c.message||"Payment not completed",1);break}}}
+ }catch(err){msg(err.message,1)}
+});
+var DEV=null,PT=null,NUM="",CMD=null,EV=[],AIT=0,PAIR="";
+var ST={ringing:["Ringing","or"],active:["On call","ok"],ended:["Ended","gr"],missed:["Missed","bad"]};
+function ago(t){if(!t)return"never";var s=Math.max(0,Math.round((Date.now()-new Date(t))/1000));return s<60?s+"s ago":s<3600?Math.round(s/60)+" min ago":"a while ago"}
+function dur(s){s=Math.max(0,Math.floor(s||0));var m=Math.floor(s/60);return m+":"+(s%60<10?"0":"")+(s%60)}
+function online(){return DEV&&DEV.last_seen&&Date.now()-new Date(DEV.last_seen)<60000}
+var KEYS="123456789*0#".split("").map(function(k){return '<button class="btn" data-act="k" data-k="'+k+'">'+k+'</button>'}).join("");
+R.phone=function(){
+ if(!PT)PT=setInterval(pull,2000);setTimeout(pull,0);
+ return["Dial from the dashboard. Your phone's SIM makes and receives the calls.",'<div id="dp"><div class="g2"><div class="card pg"><h2>Dial pad</h2><div class="pb" style="margin-top:10px"><input type="text" id="dn" inputmode="tel" autocomplete="off" placeholder="07XX XXX XXX" value="'+esc(NUM)+'" style="width:100%;font-size:22px;text-align:center"><div class="kp">'+KEYS+'</div><div style="display:flex;gap:8px"><button class="btn pri" style="flex:1" data-act="dial"><i data-lucide="phone"></i> Call</button><button class="btn" data-act="bk" aria-label="Delete"><i data-lucide="delete"></i></button></div><div class="sub" id="dmsg"></div></div></div><div id="dside"></div></div><div id="dhist"></div></div>']};
+async function pull(){
+ if(!$("dp")){clearInterval(PT);PT=null;return}
+ try{
+  var d=await sb.from("devices").select("id,name,ai_enabled,phone_state,last_seen").eq("business_id",BIZ.id).order("created_at",{ascending:false}).limit(1);DEV=(d.data&&d.data[0])||null;
+  if(DEV){
+   var e=await sb.from("call_events").select("call_key,direction,number,state,duration_s,ai_on,updated_at").eq("business_id",BIZ.id).order("updated_at",{ascending:false}).limit(25);EV=e.data||[];
+   var c=await sb.from("call_commands").select("action,number,status,message,created_at").eq("device_id",DEV.id).order("created_at",{ascending:false}).limit(1);CMD=(c.data&&c.data[0])||null}
+ }catch(x){}
+ draw()}
+function draw(){
+ if(!$("dp"))return;
+ var on=online(),live=on&&EV.filter(function(e){return(e.state==="ringing"||e.state==="active")&&Date.now()-new Date(e.updated_at)<6*36e5})[0];
+ var side='<div class="card pg"><h2>'+(DEV?esc(DEV.name):"Phone")+' '+(DEV?G(on?"Online":"Offline, seen "+ago(DEV.last_seen),on?"ok":"bad"):G("Not paired","gr"))+'</h2><div class="pb" style="margin-top:10px">';
+ if(live){side+='<div class="cb" style="padding:14px"><div class="sub">'+(live.direction==="in"?"Incoming call":"Outgoing call")+'</div><b style="font-size:20px">'+esc(live.number||"Unknown number")+'</b><div class="tm" style="margin:4px 0"><span id="tmr" data-t="'+live.updated_at+'">0:00</span> '+G(ST[live.state][0],ST[live.state][1])+'</div><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">'+(live.state==="ringing"&&live.direction==="in"?'<button class="btn pri" data-act="cmd" data-a="answer">Answer</button><button class="btn" data-act="cmd" data-a="decline">Decline</button>':'<button class="btn pri" data-act="cmd" data-a="hangup">Hang up</button>')+'</div></div>'}
+ else side+='<div class="sub">'+(on?"No active call.":DEV?"Open the TWIGA app on the phone and keep it connected.":"Pair your phone to start.")+'</div>';
+ if(CMD&&Date.now()-new Date(CMD.created_at)<30000)side+='<div class="sub">'+(CMD.status==="failed"?"Failed: "+esc(CMD.message||""):CMD.status==="done"?"Sent to phone.":"Sending to phone...")+'</div>';
+ if(DEV)side+='<div class="opt" style="padding:8px 0"><div><b>AI receptionist</b><span>When on, incoming calls are tagged for the AI. Voice answering over a SIM line needs an audio bridge, coming next.</span></div><label class="sw"><input type="checkbox" id="aisw" aria-label="AI receptionist"'+(DEV.ai_enabled?" checked":"")+'><s></s></label></div>';
+ side+='<div><button class="btn sm" data-act="pair">'+(DEV?"Pair another phone":"Pair phone")+'</button> '+(PAIR?'<b style="font-size:20px;letter-spacing:3px">'+esc(PAIR)+'</b> <span class="sub">Type this in the phone app. Valid for 10 minutes.</span>':"")+'</div><a class="lk" href="https://github.com/michaelmuchemi33-design/unity-ai-receptionist-app/releases/download/latest-apk/unity-ai-receptionist.apk">Download the phone app</a></div></div>';
+ var keep=Date.now()-AIT<4000&&$("aisw")?$("aisw").checked:null;
+ $("dside").innerHTML=side;if(keep!==null&&$("aisw"))$("aisw").checked=keep;
+ $("dhist").innerHTML=C("Recent calls",EV.length?T(["Time","Call","Number","Status","Length",""],EV.map(function(e){return[new Date(e.updated_at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),(e.direction==="in"?"In":"Out")+(e.ai_on?" "+G("AI on","or"):""),esc(e.number||"Unknown"),G(ST[e.state][0],ST[e.state][1]),dur(e.duration_s),e.number?'<button class="btn sm" data-act="redial" data-n="'+esc(e.number)+'">Call back</button>':""]})):'<div class="pb sub">No calls yet. Calls made or received on the paired phone appear here.</div>');
+ if(window.lucide)lucide.createIcons()}
+setInterval(function(){var t=$("tmr");if(t)t.textContent=dur((Date.now()-new Date(t.dataset.t))/1000)},1000);
+function dmsg(t){var m=$("dmsg");if(m)m.textContent=t}
+async function send(a,n){
+ if(!DEV){dmsg("Pair a phone first.");return}
+ if(!online()){dmsg("Phone is offline. Open the TWIGA app on it.");return}
+ var r=await sb.from("call_commands").insert({business_id:BIZ.id,device_id:DEV.id,action:a,number:n||null});
+ if(r.error)dmsg(r.error.message);else{dmsg(a==="dial"?"Calling "+n+"...":"Sent.");pull()}}
+document.addEventListener("input",function(e){if(e.target.id==="dn")NUM=e.target.value});
+document.addEventListener("change",function(e){if(e.target.id==="aisw"&&DEV){AIT=Date.now();sb.rpc("set_device_ai",{p_device:DEV.id,p_enabled:e.target.checked}).then(function(r){if(r.error)dmsg(r.error.message)})}});
+document.addEventListener("click",async function(e){
+ var b=e.target.closest("[data-act]");if(!b||!$("dp"))return;var a=b.dataset.act;
+ if(a==="k"){NUM+=b.dataset.k;$("dn").value=NUM}
+ else if(a==="bk"){NUM=NUM.slice(0,-1);$("dn").value=NUM}
+ else if(a==="dial"||a==="redial"){var n=(a==="redial"?b.dataset.n:NUM).replace(/[\s()-]/g,"");if(!/^[0-9+*#]{3,20}$/.test(n)){dmsg("Enter a valid number.");return}send("dial",n)}
+ else if(a==="cmd")send(b.dataset.a);
+ else if(a==="pair"){var r=await sb.rpc("create_pairing",{p_business:BIZ.id});if(r.error)dmsg(r.error.message);else{PAIR=r.data;draw()}}
+});
+var AI0=R.ai;
+R.ai=function(){
+ var base=AI0?AI0():["",""];
+ setTimeout(loadAi,0);
+ return[base[0],'<div class="card pg"><h2>My business and AI</h2><div class="pb" style="margin-top:10px"><label>What we offer: services, prices, hours, location, rules<br><textarea id="aip" rows="10" maxlength="20000" style="width:100%"></textarea></label><div class="sub" id="aic">0 / 20000</div><label>Greeting<br><input type="text" id="aig" maxlength="500" style="width:100%"></label><label>Message for missed calls<br><input type="text" id="aim" maxlength="500" style="width:100%"></label><div><button class="btn pri" data-act="aisave">Save</button></div><div class="sub" id="aimsg"></div></div></div>'+base[1]]};
+async function loadAi(){
+ var r=await sb.from("business_ai").select("prompt,greeting,auto_reply").eq("business_id",BIZ.id).maybeSingle(),d=r.data||{};
+ if($("aip")){$("aip").value=d.prompt||"";$("aig").value=d.greeting||"";$("aim").value=d.auto_reply||"";$("aic").textContent=$("aip").value.length+" / 20000"}}
+document.addEventListener("input",function(e){if(e.target.id==="aip"&&$("aic"))$("aic").textContent=e.target.value.length+" / 20000"});
+document.addEventListener("click",async function(e){
+ var b=e.target.closest('[data-act="aisave"]');if(!b)return;
+ var r=await sb.rpc("save_business_ai",{p_business:BIZ.id,p_prompt:$("aip").value,p_greeting:$("aig").value,p_auto_reply:$("aim").value});
+ $("aimsg").textContent=r.error?r.error.message:"Saved. Your phone has it too.";$("aimsg").style.color=r.error?"var(--bad)":"var(--ok)"});
+R.whatsapp=function(){return["Manage customer chats, price lists and orders on WhatsApp.",'<div class="card pg"><h2>WhatsApp manager '+G("Coming soon","or")+'</h2><div class="pb" style="margin-top:10px"><div>Planned: reply to customers with the AI, send your price list and quotations, take orders and payment links, and follow up after calls.</div><div class="sub">Calls and call logs work today. WhatsApp will be switched on in a later update.</div></div></div>']};
+if(K.mode==="live"){
+ V={overview:"Overview",phone:"Dialer",history:"Call History",ai:"AI Receptionist",orders:"Orders",services:"Items &amp; Pricing",customers:"Customers",test:"Testing zone",whatsapp:"WhatsApp",settings:"Settings"};
+ IC.test="flask-conical";IC.services="package";
+ $("nav").innerHTML=Object.keys(V).map(function(k){return '<a href="#'+k+'"><span class="ni"><i data-lucide="'+IC[k]+'"></i></span><span style="flex:1">'+V[k]+'</span></a>'}).join("");
+ $("tabbar").innerHTML='<a href="#overview"><i data-lucide="layout-dashboard"></i>Home</a><a href="#phone"><i data-lucide="phone"></i>Dialer</a><a href="#ai"><i data-lucide="bot"></i>AI</a><a href="#orders"><i data-lucide="shopping-bag"></i>Orders</a><button id="more"><i data-lucide="menu"></i>More</button>';
+ var pl=document.querySelector(".bar .pill");if(pl)pl.innerHTML='<span class="dot"></span>Live workspace';
+ var PC='<div class="card pg"><h2>My business and AI</h2><div class="pb" style="margin-top:10px"><label>What we offer: services, prices, hours, location, rules<br><textarea id="aip" rows="10" maxlength="20000" style="width:100%"></textarea></label><div class="sub" id="aic">0 / 20000</div><label>Greeting (optional)<br><input type="text" id="aig" maxlength="500" style="width:100%"></label><label>Message for missed calls<br><input type="text" id="aim" maxlength="500" style="width:100%"></label><div><button class="btn pri" data-act="aisave">Save</button></div><div class="sub" id="aimsg"></div></div></div>';
+ var VOPT="EXAVITQu4vr4xnSDxMaL:Sarah,Xb7hH8MSUJpSbSDYk0k2:Alice,hpp4J3VqNfWAUOO0d1Us:Bella,cgSgspJ2msm6clMCkdW9:Jessica,pFZP5JQG7iQjIQuC4Bku:Lily".split(",").map(function(x){x=x.split(":");return '<option value="'+x[0]+'">'+x[1]+'</option>'}).join("");
+ var AIBOX='<div class="pb"><div style="display:flex;gap:8px;flex-wrap:wrap"><select id="aiLang"><option value="en">English</option><option value="sw">Kiswahili (beta)</option></select><select id="aiVoice">'+VOPT+'</select><span class="tag t-gr" id="aiSt">Ready</span></div><button class="btn pri" data-act="aigo">Start talking</button><div id="aiTr" class="sub" style="max-height:220px;overflow:auto;display:grid;gap:6px">Your microphone is used for this test. Calls stop after 5 minutes.</div><div class="sub" id="aiErr" style="color:var(--bad)"></div></div>';
+ var CALL=null,AIL={connecting:"Connecting",listening:"Listening",speaking:"Speaking",ended:"Ready"};
+ function aiState(s){var e=$("aiSt");if(e)e.textContent=AIL[s]||s;var b=document.querySelector('[data-act="aigo"]');if(b){b.disabled=s==="connecting";b.textContent=(s==="listening"||s==="speaking")?"End call":s==="connecting"?"Connecting...":"Start talking"}}
+ function aiLine(role,text){var t=$("aiTr");if(!t)return;if(t.dataset.f!=="1"){t.innerHTML="";t.dataset.f="1"}var d=document.createElement("div");d.style.cssText="padding:7px 10px;border-radius:12px;max-width:90%;"+(role==="user"?"background:var(--ink);color:var(--bg);justify-self:end":"background:var(--soft)");d.textContent=text;t.appendChild(d);t.scrollTop=t.scrollHeight}
+ async function aiToggle(){
+  if(CALL&&CALL.live){CALL.stop();return}
+  var mod=await import("/vapi-call.js"),d=await sb.from("business_ai").select("prompt,greeting").eq("business_id",BIZ.id).maybeSingle(),x=d.data||{};
+  $("aiErr").textContent="";$("aiTr").innerHTML="";$("aiTr").dataset.f="1";
+  CALL=mod.createCall(K.vapiKey,{state:aiState,line:aiLine,error:function(m){$("aiErr").textContent=m;aiState("ended")}});
+  CALL.start({name:BIZ.name,prompt:x.prompt,greeting:x.greeting,voice:$("aiVoice").value,lang:$("aiLang").value,maxSeconds:300})}
+ var chk=function(ok,n,d){return '<li><div class="k" style="'+(ok?"":"background:var(--badsoft);color:var(--bad)")+'"><i data-lucide="'+(ok?"check":"x")+'"></i></div><div><b>'+n+'</b><span>'+esc(d)+'</span></div></li>'};
+ function tbl(h,r,e){return r.length?T(h,r):'<div class="pb sub">'+e+'</div>'}
+ R.overview=function(){setTimeout(ovLoad,0);return["Everything here is real. Numbers start at zero until you take calls and orders.",'<div class="stats" id="ovs">'+S("Calls today","-")+S("Missed","-")+S("Orders today","-")+S("Sales today (KSh)","-")+'</div><div class="g2">'+C("Get started",'<ul class="tl pb" id="ovg"></ul>')+C("Recent calls",'<div id="ovc" class="pb sub">Loading...</div>')+'</div>']};
+ async function ovLoad(){
+  if(!$("ovs"))return;
+  var since=new Date();since.setHours(0,0,0,0);
+  var ev=await sb.from("call_events").select("direction,number,state,duration_s,ai_on,updated_at").eq("business_id",BIZ.id).order("updated_at",{ascending:false}).limit(100),rows=ev.data||[];
+  var today=rows.filter(function(e){return new Date(e.updated_at)>=since}),missed=today.filter(function(e){return e.state==="missed"}).length;
+  var dv=await sb.from("devices").select("id").eq("business_id",BIZ.id).limit(1),paired=!!(dv.data&&dv.data[0]);
+  var ba=await sb.from("business_ai").select("prompt").eq("business_id",BIZ.id).maybeSingle(),hasAi=!!(ba.data&&ba.data.prompt);
+  var s={ordersToday:0,revenueToday:0},items=0;
+  if(K.ledgerUrl){try{s=await L("summary");items=(await L("listItems")).items.length}catch(x){}}
+  if(!$("ovs"))return;
+  $("ovs").innerHTML=S("Calls today",today.length)+S("Missed",missed)+S("Orders today",s.ordersToday||0)+S("Sales today (KSh)",Number(s.revenueToday||0).toLocaleString());
+  var st=[["Pair your phone",paired,"#phone"],["Describe your business to the AI",hasAi,"#ai"],["Add your items and prices",items>0,"#services"],["Run the testing zone",false,"#test"]];
+  $("ovg").innerHTML=st.map(function(x){return '<li><div class="k" style="'+(x[1]?"":"background:var(--soft);color:var(--mute);border:1px dashed var(--mute)")+'"><i data-lucide="'+(x[1]?"check":"circle")+'"></i></div><div><b><a href="'+x[2]+'" style="color:inherit">'+x[0]+'</a></b><span>'+(x[1]?"Done":"To do")+'</span></div></li>'}).join("");
+  $("ovc").outerHTML='<div id="ovc">'+tbl(["Time","Call","Number","Result"],rows.slice(0,6).map(function(e){return[new Date(e.updated_at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),e.direction==="in"?"In":"Out",esc(e.number||"Unknown"),G(ST[e.state][0],ST[e.state][1])+(e.ai_on?" "+G("AI on","or"):"")]}),"No calls yet. Calls on your paired phone appear here.")+'</div>';
+  if(window.lucide)lucide.createIcons()}
+ R.history=function(){setTimeout(hiLoad,0);return["Every call on your paired phone.",C("Calls",'<div id="hi" class="pb sub">Loading...</div>')]};
+ async function hiLoad(){var ev=await sb.from("call_events").select("direction,number,state,duration_s,ai_on,updated_at").eq("business_id",BIZ.id).order("updated_at",{ascending:false}).limit(100),rows=ev.data||[];if(!$("hi"))return;
+  $("hi").outerHTML='<div id="hi">'+tbl(["When","Call","Number","Result","Length"],rows.map(function(e){return[new Date(e.updated_at).toLocaleString([],{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}),e.direction==="in"?"In":"Out",esc(e.number||"Unknown"),G(ST[e.state][0],ST[e.state][1])+(e.ai_on?" "+G("AI on","or"):""),dur(e.duration_s)]}),"No calls yet.")+'</div>'}
+ R.ai=function(){setTimeout(loadAi,0);return["Describe your business once. The AI uses it on every call.",PC+C("Try your AI receptionist",AIBOX)]};
+ R.services=function(){setTimeout(svLoad,0);return["The things you sell or book. Orders use these prices.",'<div class="g2">'+C("Add an item",'<div class="pb"><label>Name<br><input type="text" id="sn" style="width:100%"></label><label>Price (KSh)<br><input type="number" id="sp" min="0" style="width:100%"></label><label>Type<br><select id="sk" style="width:100%"><option value="service">Service</option><option value="product">Product with stock</option></select></label><label>Stock (products only)<br><input type="number" id="ss" min="0" value="0" style="width:100%"></label><button class="btn pri" data-act="svsave">Save item</button><div class="sub" id="smsg"></div></div>')+C("Your items",'<div id="sl" class="pb sub">Loading...</div>')+'</div>']};
+ async function svLoad(){try{var it=(await L("listItems")).items;if($("sl"))$("sl").outerHTML='<div id="sl">'+tbl(["Name","Type","Price","Stock"],it.map(function(i){return[esc(i.Name),esc(i.Kind),Number(i.Price).toLocaleString(),i.TrackStock?i.Stock:"-"]}),"No items yet. Add your first one.")+'</div>'}catch(x){if($("sl"))$("sl").textContent=x.message}}
+ R.customers=function(){setTimeout(cuLoad,0);return["People you have saved. Contacts from your phone will sync here.",C("Customers",'<div id="cu" class="pb sub">Loading...</div>')]};
+ async function cuLoad(){try{var c=(await L("listContacts",{limit:200})).contacts;if($("cu"))$("cu").outerHTML='<div id="cu">'+tbl(["Name","Phone","Email"],c.map(function(x){return[esc(x.Name||""),esc(x.Phone),esc(x.Email||"")]}),"No customers yet.")+'</div>'}catch(x){if($("cu"))$("cu").textContent=x.message}}
+ R.settings=function(){setTimeout(stLoad,0);return["Your business, plan and storage.",C("Business",'<div class="pb"><div><b>'+esc(BIZ.name)+'</b> ('+esc(BIZ.business_type)+')</div><div class="sub">Plan: '+esc(BIZ.status)+', paid until '+esc(BIZ.paid_through)+'</div><div class="sub" id="stu">Storage: checking...</div></div>')+C("Account",'<div class="pb"><div class="sub">'+esc(SESS.user.email||"")+'</div><button class="btn" data-act="out">Sign out</button></div>')]};
+ async function stLoad(){try{var u=await L("usage");if($("stu"))$("stu").textContent="Storage: "+(u.used/1048576).toFixed(1)+" MB of 500 MB used"}catch(x){if($("stu"))$("stu").textContent="Storage: "+x.message}}
+ R.test=function(){return["Check that everything works before you rely on it.",'<div class="g2">'+C("System checks",'<div id="tchk" class="pb sub">Press Run checks.</div><div class="pb"><button class="btn pri" data-act="tcheck">Run checks</button></div>')+C("Try your AI receptionist",AIBOX)+'</div>'+C("Try the dialer",'<div class="pb"><label>Number to call (use your other phone)<br><input type="text" id="tnum" inputmode="tel" style="width:100%"></label><button class="btn pri" data-act="tdial">Call from my paired phone</button><div class="sub" id="tmsg"></div></div>')]};
+ async function runChecks(){
+  var o=[];
+  o.push(chk(!!SESS,"Signed in",SESS.user.email||""));
+  o.push(chk(true,"Business",BIZ.name+", "+BIZ.status+", paid to "+BIZ.paid_through));
+  try{var u=await L("usage");o.push(chk(true,"Cloud storage",(u.used/1048576).toFixed(1)+" MB of 500 MB used"))}catch(x){o.push(chk(false,"Cloud storage",x.message))}
+  var dv=await sb.from("devices").select("name,last_seen,ai_enabled").eq("business_id",BIZ.id).order("created_at",{ascending:false}).limit(1),dev=dv.data&&dv.data[0];
+  o.push(chk(!!dev,"Phone paired",dev?dev.name:"No phone yet. Open the Dialer page and tap Pair phone."));
+  var up=dev&&dev.last_seen&&Date.now()-new Date(dev.last_seen)<60000;
+  o.push(chk(!!up,"Phone online",dev?(up?"Checked in "+ago(dev.last_seen):"Last seen "+ago(dev.last_seen)+". Open the TWIGA app."):"-"));
+  var ev=await sb.from("call_events").select("direction,number,state,updated_at").eq("business_id",BIZ.id).order("updated_at",{ascending:false}).limit(1),e=ev.data&&ev.data[0];
+  o.push(chk(!!e,"Call reporting",e?(e.direction==="in"?"Incoming":"Outgoing")+" call "+(e.number||"")+", "+e.state+", "+ago(e.updated_at):"No calls reported yet. Make or receive one on the phone."));
+  var ba=await sb.from("business_ai").select("prompt").eq("business_id",BIZ.id).maybeSingle();
+  o.push(chk(!!(ba.data&&ba.data.prompt),"AI business prompt",ba.data&&ba.data.prompt?(ba.data.prompt.length+" characters saved"):"Not written yet. Go to AI Receptionist."));
+  o.push(chk(!!K.vapiKey,"AI voice key",K.vapiKey?"Configured":"Missing"));
+  o.push(chk(!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia),"Microphone","Browser can use a microphone"));
+  if($("tchk")){$("tchk").outerHTML='<ul class="tl pb" id="tchk" style="padding:0 16px">'+o.join("")+'</ul>';if(window.lucide)lucide.createIcons()}}
+ document.addEventListener("click",async function(e){
+  var b=e.target.closest("[data-act]");if(!b)return;var a=b.dataset.act;
+  try{
+   if(a==="aigo")aiToggle();
+   else if(a==="tcheck"){b.disabled=true;await runChecks();b.disabled=false}
+   else if(a==="tdial"){var n=($("tnum").value||"").replace(/[\s()-]/g,"");if(!/^[0-9+*#]{3,20}$/.test(n)){$("tmsg").textContent="Enter a valid number.";return}
+    var d=await sb.from("devices").select("id").eq("business_id",BIZ.id).order("created_at",{ascending:false}).limit(1),dev=d.data&&d.data[0];
+    if(!dev){$("tmsg").textContent="Pair a phone first on the Dialer page.";return}
+    var r=await sb.from("call_commands").insert({business_id:BIZ.id,device_id:dev.id,action:"dial",number:n});$("tmsg").textContent=r.error?r.error.message:"Sent. Your phone will place the call within about 15 seconds."}
+   else if(a==="svsave"){var nm=$("sn").value.trim();if(!nm){$("smsg").textContent="Enter a name.";return}var kind=$("sk").value;
+    await L("saveItem",{name:nm,price:$("sp").value||0,kind:kind,stock:$("ss").value||0,trackStock:kind==="product"});$("smsg").textContent="Saved.";$("sn").value="";svLoad()}
+  }catch(x){var m=$("smsg")||$("tmsg");if(m)m.textContent=x.message}
+ });
+}
+load();
+})();
+</script></body>
+</html>
