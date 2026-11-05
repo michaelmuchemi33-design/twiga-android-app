@@ -1,0 +1,1 @@
+window.TWIGA_CONFIG={supabaseUrl:"https://ztyxxikkposfpxsutnfr.supabase.co",supabaseKey:"sb_publishable_Zex31DUxW6bX3LP6Wlos2Q_pMiZ_JeT",ledgerUrl:"https://twiga-api.twiga-ke.workers.dev"};document.documentElement.classList.add("pre");
