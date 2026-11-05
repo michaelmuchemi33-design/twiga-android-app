@@ -195,3 +195,18 @@ fun UpdateCard() {
         }
     }
 }
+
+@Composable
+fun AiTalkCard() {
+    val context = LocalContext.current
+    Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFFEEFE3)), shape = RoundedCornerShape(20.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("AI receptionist", fontWeight = FontWeight.Bold)
+            Text("Talk to your AI the way a customer would. It uses what you wrote about your business.", fontSize = 12.sp, color = MutedText)
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { context.startActivity(Intent(context, AiCallActivity::class.java)) }
+            ) { Text("Talk to my AI receptionist") }
+        }
+    }
+}
