@@ -85,36 +85,27 @@ footer{max-width:1040px;margin:0 auto;padding:0 20px 36px;color:var(--mute);font
   </div>
 </main>
 <footer>TWIGA, built in Kenya. AI voice by Vapi and ElevenLabs.</footer>
+<script src="/config.js"></script>
 <script type="module">
-import Vapi from "https://esm.sh/@vapi-ai/web@2.7.1";
-const PUBLIC_KEY = "605ebb25-4c52-4e85-bbb7-95aa65e7a2a0", ASSISTANT = "84b009c6-0634-44e2-9861-13d746e82542";
+import { createCall } from "/vapi-call.js";
+const K = window.TWIGA_CONFIG || {};
 const $ = id => document.getElementById(id);
-let vapi = null, live = false, cap = null;
+const PROMPT = "TWIGA Salon, Westlands, Nairobi. Open Monday to Saturday 8am to 7pm, Sunday 10am to 4pm. Services: knotless braids KSh 3,500 (about 4 hours), box braids KSh 3,000 (3 hours), wash and blow-dry KSh 800, gel nails KSh 1,500, men's haircut KSh 500. Pay by M-Pesa or cash. Bookings need a name, phone number and preferred time. Cancel at least 3 hours before. If asked what TWIGA is: it is an AI receptionist app for Kenyan businesses that answers calls, takes orders and bookings, and has a free 7-day trial.";
+let call = null;
 function state(text, on){ $("st").textContent = text; $("chip").classList.toggle("on", !!on); }
 function line(role, text){
   const t = $("tr"); if (t.querySelector(".sub")) t.innerHTML = "";
   const d = document.createElement("div"); d.className = "m " + (role === "user" ? "u" : "a"); d.textContent = text;
   t.appendChild(d); t.scrollTop = t.scrollHeight;
 }
-function fail(msg){ $("err").textContent = msg; state("Ready", false); $("go").disabled = false; $("go").textContent = "Start talking"; live = false; }
-async function start(){
-  $("err").textContent = ""; $("go").disabled = true; state("Connecting", true); $("go").textContent = "Connecting...";
-  try {
-    vapi = new Vapi(PUBLIC_KEY);
-    vapi.on("call-start", () => { live = true; $("go").disabled = false; $("go").textContent = "End call"; state("Listening", true); cap = setTimeout(stop, 180000); });
-    vapi.on("call-end", () => { live = false; clearTimeout(cap); $("go").disabled = false; $("go").textContent = "Start talking"; state("Ready", false); });
-    vapi.on("speech-start", () => state("Speaking", true));
-    vapi.on("speech-end", () => state("Listening", true));
-    vapi.on("message", m => { if (m && m.type === "transcript" && (!m.transcriptType || m.transcriptType === "final")) line(m.role, m.transcript); });
-    vapi.on("error", e => fail("Voice error: " + ((e && (e.errorMsg || e.message)) || "please try again")));
-    await vapi.start(ASSISTANT, {
-      firstMessage: "[cheerfully] Hello! Karibu TWIGA. How can I help you today?",
-      voice: { provider: "11labs", voiceId: $("voice").value, model: "eleven_v3" }
-    });
-  } catch (e) { fail("Could not start: " + ((e && e.message) || "allow the microphone and try again")); }
-}
-function stop(){ try { vapi && vapi.stop(); } catch (e) {} }
-$("go").addEventListener("click", () => live ? stop() : start());
+const names = { connecting: ["Connecting", true], listening: ["Listening", true], speaking: ["Speaking", true], ended: ["Ready", false] };
+function setState(s){ const n = names[s] || [s, false]; state(n[0], n[1]); $("go").disabled = s === "connecting"; $("go").textContent = s === "listening" || s === "speaking" ? "End call" : s === "connecting" ? "Connecting..." : "Start talking"; }
+$("go").addEventListener("click", () => {
+  if (call && call.live) { call.stop(); return; }
+  $("err").textContent = "";
+  call = createCall(K.vapiKey, { state: setState, line, error: e => { $("err").textContent = e; setState("ended"); } });
+  call.start({ name: "TWIGA Salon", prompt: PROMPT, voice: $("voice").value, lang: "en", maxSeconds: 180 });
+});
 </script>
 </body>
 </html>
