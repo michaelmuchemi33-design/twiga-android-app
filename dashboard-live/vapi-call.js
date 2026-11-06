@@ -54,26 +54,39 @@ export function createCall(publicKey, assistantId, hooks = {}) {
           }
         });
         vapi.on("error", e => {
-          live = false; starting = false;
+          live = false;
+          starting = false;
           emit("error", errorText(e));
           emit("state", "ended");
         });
 
         const assistantOverrides = {
-          firstMessage: (options.greeting || "").trim() || undefined,
-          model: { messages: [{ role: "system", content: makeContext(options) }] },
-          voice: { provider: "11labs", voiceId: options.voice || VOICES[0][0] }
+          firstMessage: (options.greeting || "").trim() ||
+            "[cheerfully] Hello! Thank you for calling. How can I help you today?",
+          model: {
+            provider: "openai",
+            model: "gpt-4o",
+            temperature: 0.3,
+            messages: [{ role: "system", content: makeContext(options) }]
+          },
+          voice: {
+            provider: "11labs",
+            voiceId: options.voice || VOICES[0][0],
+            model: "eleven_v3"
+          }
         };
         await vapi.start(assistantId, assistantOverrides);
       } catch (e) {
-        live = false; starting = false;
+        live = false;
+        starting = false;
         emit("error", errorText(e));
         emit("state", "ended");
       }
     },
     stop() {
       try { if (vapi && (live || starting)) vapi.stop(); } catch (_) {}
-      live = false; starting = false;
+      live = false;
+      starting = false;
     }
   };
 }
