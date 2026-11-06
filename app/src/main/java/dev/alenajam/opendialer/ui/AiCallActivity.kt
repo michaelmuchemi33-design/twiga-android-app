@@ -18,6 +18,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import dev.alenajam.opendialer.remote.RemoteDesk
+import org.json.JSONObject
 
 /**
  * Lets the owner talk to their AI receptionist inside the app, the way a customer would.
@@ -41,7 +42,14 @@ class AiCallActivity : ComponentActivity() {
         w.settings.javaScriptEnabled = true
         w.settings.domStorageEnabled = true
         w.settings.mediaPlaybackRequiresUserGesture = false
-        w.webViewClient = WebViewClient()
+        w.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView, url: String?) {
+                val sp = getSharedPreferences("twiga_ai", MODE_PRIVATE)
+                val o = JSONObject().put("prompt", sp.getString("about", "")).put("faq", sp.getString("faq", ""))
+                    .put("rules", sp.getString("rules", "")).put("greeting", sp.getString("greeting", ""))
+                view.evaluateJavascript("window.TWIGA_LOCAL=" + o.toString() + ";", null)
+            }
+        }
         w.webChromeClient = object : WebChromeClient() {
             override fun onPermissionRequest(request: PermissionRequest) {
                 runOnUiThread {
@@ -58,7 +66,8 @@ class AiCallActivity : ComponentActivity() {
 
     private fun load() {
         val t = Uri.encode(RemoteDesk.token(this))
-        val n = Uri.encode(RemoteDesk.business(this).ifBlank { "my business" })
+        val saved = getSharedPreferences("twiga_ai", MODE_PRIVATE).getString("name", "").orEmpty()
+        val n = Uri.encode(saved.ifBlank { RemoteDesk.business(this).ifBlank { "my business" } })
         web?.loadUrl("https://app.twiga.co.ke/ai#t=$t&n=$n")
     }
 
