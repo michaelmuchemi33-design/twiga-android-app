@@ -1,6 +1,7 @@
 package dev.alenajam.opendialer.ui
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.webkit.CookieManager
 import android.webkit.PermissionRequest
@@ -45,6 +46,7 @@ private const val TWIGA_APP_URL = "https://app.twiga.co.ke/"
 fun TwigaDashboardTab() {
     val context = LocalContext.current
     var webView by remember { mutableStateOf<WebView?>(null) }
+    var canGoBack by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(true) }
     var loadError by remember { mutableStateOf(false) }
     var pendingPermission by remember { mutableStateOf<PermissionRequest?>(null) }
@@ -63,8 +65,8 @@ fun TwigaDashboardTab() {
         }
     }
 
-    BackHandler(enabled = webView?.canGoBack() == true) {
-        webView?.goBack()
+    BackHandler(enabled = canGoBack) {
+        webView?.let { view -> if (view.canGoBack()) view.goBack() }
     }
 
     DisposableEffect(Unit) {
@@ -104,6 +106,35 @@ fun TwigaDashboardTab() {
 
                         override fun onPageFinished(view: WebView?, url: String?) {
                             loading = false
+                            canGoBack = view?.canGoBack() == true
+                        }
+
+                        override fun shouldOverrideUrlLoading(
+                            view: WebView?,
+                            request: WebResourceRequest?
+                        ): Boolean {
+                            val uri = request?.url ?: return true
+                            return when (uri.scheme?.lowercase()) {
+                                "tel" -> {
+                                    runCatching { context.startActivity(Intent(Intent.ACTION_DIAL, uri)) }
+                                    true
+                                }
+                                "mailto" -> {
+                                    runCatching { context.startActivity(Intent(Intent.ACTION_SENDTO, uri)) }
+                                    true
+                                }
+                                "sms" -> {
+                                    runCatching { context.startActivity(Intent(Intent.ACTION_SENDTO, uri)) }
+                                    true
+                                }
+                                "https", "http" -> {
+                                    if (uri.host == "wa.me" || uri.host == "api.whatsapp.com") {
+                                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
+                                        true
+                                    } else false
+                                }
+                                else -> true
+                            }
                         }
 
                         override fun onReceivedError(
