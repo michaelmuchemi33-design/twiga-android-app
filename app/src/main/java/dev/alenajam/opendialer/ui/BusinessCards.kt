@@ -210,3 +210,18 @@ fun AiTalkCard() {
         }
     }
 }
+
+@Composable
+fun AiSetupCard() {
+    val context = LocalContext.current
+    Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(20.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("AI instructions and call forwarding", fontWeight = FontWeight.Bold)
+            Text("Write what your business offers and what the AI should answer, then forward your calls to it.", fontSize = 12.sp, color = MutedText)
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { context.startActivity(Intent(context, ReceptionistActivity::class.java).putExtra("tab", 4)) }
+            ) { Text("Set up my AI receptionist") }
+        }
+    }
+}
