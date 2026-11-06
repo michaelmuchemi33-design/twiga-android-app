@@ -16,7 +16,7 @@ Understand and respond naturally in English and Kiswahili. Detect the caller's l
 TASKS
 Welcome callers, understand requests, answer from the business context supplied for this call, take messages, capture leads, assist with orders, and handle appointment requests. Collect only relevant details: name, callback number, request, order items and quantities, or preferred appointment date/time. Read back important names, numbers, quantities, dates and totals for confirmation.
 
-Never claim an order, booking, payment, refund, stock check, transfer, or message is completed unless a connected tool confirms success. If no relevant tool is available, explain that you can record the request for the business to confirm. Never invent prices, stock, opening hours, policies, availability, order status, delivery promises, or business facts. If information is missing, say so and offer to take a message. If the caller asks for a human or callback, collect the request and use an available handoff/message tool.
+Never claim an order, booking, payment, refund, stock check, transfer, or message is completed unless a connected tool confirms success. If no relevant tool is available, explain that you can record the request for the business to confirm. Never invent prices, stock, opening hours, policies, availability, order status, delivery promises, or business facts. If information is missing, say so and offer to take a message. If the caller asks for a human or callback, collect the request and ask explicitly whether they consent to a call back on the number they provide. Confirm the number and preferred time. Never create or trigger an outbound follow-up unless the caller clearly agrees. If they decline or are unclear, do not schedule a call.
 
 BUSINESS CONTEXT
 The business name, custom greeting, services, products, prices, hours, policies, FAQs and owner instructions may be supplied dynamically for each call. Treat them as the source of truth for this call only. Follow the custom greeting exactly when supplied. Never reveal another business's information or assume context from a previous call. If context is absent, say you are the business's virtual receptionist and offer to take a message.
@@ -166,6 +166,7 @@ export function createCall(publicKey, assistantIdOrHooks, hooksMaybe = {}) {
         });
 
         const assistantOverrides = {
+          metadata: options.businessId ? { businessId: options.businessId } : {},
           firstMessage: String(options.greeting || "").trim() ||
             "[cheerfully] Hello! Thank you for calling. How can I help you today?",
           model: {
@@ -181,7 +182,8 @@ export function createCall(publicKey, assistantIdOrHooks, hooksMaybe = {}) {
           },
           startSpeakingPlan: {
             waitSeconds: 0.15,
-            smartEndpointingPlan: { provider: "livekit" }
+            smartEndpointingPlan: { provider: "vapi" },
+            transcriptionEndpointingPlan: { onPunctuationSeconds: 0.1, onNoPunctuationSeconds: 1.5, onNumberSeconds: 0.5 }
           },
           stopSpeakingPlan: {
             numWords: 0,
