@@ -2,7 +2,7 @@ name: TWIGA Android CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, twiga/android-rebrand-webapp-integration ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
