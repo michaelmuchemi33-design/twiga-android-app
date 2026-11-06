@@ -40,6 +40,9 @@ jobs:
             echo "ANDROID_KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}" >> "$GITHUB_ENV"
           fi
 
+      - name: Validate TWIGA dashboard JavaScript
+        run: node scripts/check-twiga-dashboard.cjs
+
       - name: Run tests and build debug APK
         run: |
           chmod +x ./gradlew
