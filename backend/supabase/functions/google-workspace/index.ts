@@ -104,7 +104,8 @@ async function authenticate(req: Request, businessId: string) {
     auth: { persistSession: false, autoRefreshToken: false },
     global: { headers: { authorization } },
   });
-  const { data, error } = await userClient.auth.getUser();
+  const accessToken = authorization.slice("Bearer ".length).trim();
+  const { data, error } = await userClient.auth.getUser(accessToken);
   if (error || !data.user) throw new HttpError(401, "Your TWIGA session has expired. Sign in again.");
   // This query runs with the caller's JWT and existing business_members RLS policy.
   const { data: member, error: memberError } = await userClient
@@ -139,11 +140,12 @@ async function tokenFor(admin: any, connection: Conn): Promise<string> {
   const next = String(refreshed.access_token || "");
   if (!next) throw new HttpError(502, "Google did not return a refreshed access token. Reconnect Google Workspace.");
   const expiresAt = new Date(Date.now() + Math.max(60, Number(refreshed.expires_in || 3600)) * 1000).toISOString();
-  await saveConnection(admin, {
-    business_id: connection.business_id,
+  const { error } = await admin.from("twiga_google_connections").update({
     access_token_ciphertext: (await encrypt(next))!,
     access_expires_at: expiresAt,
-  });
+    updated_at: new Date().toISOString(),
+  }).eq("business_id", connection.business_id);
+  if (error) throw new HttpError(500, "Could not update the refreshed Google token.");
   return next;
 }
 async function connectGoogle(admin: any, userId: string, businessId: string, body: any) {
