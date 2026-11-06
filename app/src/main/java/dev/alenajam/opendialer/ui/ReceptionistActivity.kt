@@ -301,7 +301,7 @@ private fun ReceptionistScreen(onDefaultDialer: () -> Unit) {
                     }
                 }
                 4 -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    item { Text("Twiga AI assistant", fontSize = 25.sp, fontWeight = FontWeight.Bold, color = Ink); Text("Choose the AI brain, voice and call behaviour for your business.", color = Muted) }
+                    item { Text("TWIGA AI receptionist", fontSize = 25.sp, fontWeight = FontWeight.Bold, color = Ink); Text("Choose the AI brain, voice and call behaviour for your business.", color = Muted) }
                     item {
                         Card(colors = CardDefaults.cardColors(containerColor = Color.White)) {
                             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -377,7 +377,7 @@ private fun ReceptionistScreen(onDefaultDialer: () -> Unit) {
                     item { Text("Provider selection is saved locally. Actual AI calls require a configured backend; provider API keys must stay on the server, not in the APK.", color = Muted, fontSize = 12.sp) }
                 }
                 else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    item { Text("Twiga setup", fontSize = 25.sp, fontWeight = FontWeight.Bold, color = Ink); Text("Business profile and secure AI backend connection.", color = Muted) }
+                    item { Text("TWIGA setup", fontSize = 25.sp, fontWeight = FontWeight.Bold, color = Ink); Text("Business profile and secure AI backend connection.", color = Muted) }
                     item {
                         Card(colors = CardDefaults.cardColors(containerColor = Color.White)) {
                             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
