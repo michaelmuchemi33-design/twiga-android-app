@@ -96,7 +96,7 @@ class ReceptionistActivity : ComponentActivity() {
 @Composable
 private fun ReceptionistScreen(onDefaultDialer: () -> Unit) {
     val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("unity_receptionist", Context.MODE_PRIVATE) }
+    val prefs = remember { context.getSharedPreferences("twiga_receptionist", Context.MODE_PRIVATE) }
     var business by remember { mutableStateOf(prefs.getString("business", "") ?: "") }
     var greeting by remember { mutableStateOf(prefs.getString("greeting", "Hello! Thanks for calling. How can I help you today?") ?: "") }
     var endpoint by remember { mutableStateOf(prefs.getString("endpoint", "") ?: "") }
@@ -394,7 +394,7 @@ private fun ReceptionistScreen(onDefaultDialer: () -> Unit) {
                                 Text("Calling status", fontWeight = FontWeight.Bold)
                                 Text("SIM calling: opens Android's dialler for manual confirmation.", color = Muted, fontSize = 12.sp)
                                 Text("AI answering: requires a supported call-audio bridge such as SIP/WebRTC. SIM audio is not universally exposed to apps.", color = Muted, fontSize = 12.sp)
-                                Text("WhatsApp, M-Pesa, cloud sync and Unity ERP: integration points planned; not active in this APK.", color = Muted, fontSize = 12.sp)
+                                Text("WhatsApp and M-Pesa services require their own account setup. This screen does not activate those services by itself.", color = Muted, fontSize = 12.sp)
                             }
                         }
                     }
