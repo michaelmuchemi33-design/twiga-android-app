@@ -1,4 +1,4 @@
-name: Unity AI Receptionist Android CI
+name: TWIGA Android CI
 
 on:
   push:
@@ -51,7 +51,7 @@ jobs:
       - name: Upload debug APK (testing)
         uses: actions/upload-artifact@v4
         with:
-          name: unity-ai-receptionist-debug-apk
+          name: twiga-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 30
@@ -59,7 +59,7 @@ jobs:
       - name: Upload optimized release APK
         uses: actions/upload-artifact@v4
         with:
-          name: unity-ai-receptionist-release-apk
+          name: twiga-release-apk
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 30
@@ -69,13 +69,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cp app/build/outputs/apk/release/app-release.apk unity-ai-receptionist.apk
+          cp app/build/outputs/apk/release/app-release.apk twiga.apk
           CODE=$((400000 + GITHUB_RUN_NUMBER))
           SIZE=$(stat -c%s unity-ai-receptionist.apk)
           printf '{"build": %s, "size": %s, "apk": "https://github.com/%s/releases/download/latest-apk/unity-ai-receptionist.apk"}' "$CODE" "$SIZE" "$GITHUB_REPOSITORY" > version.json
           if gh release view latest-apk >/dev/null 2>&1; then
             gh release upload latest-apk unity-ai-receptionist.apk version.json --clobber
-            gh release edit latest-apk --title "Unity AI Receptionist - Latest Optimized APK" --notes "Optimized release build. build: $CODE. Signed with the permanent TWIGA release key."
+            gh release edit latest-apk --title "TWIGA - Latest Optimized APK" --notes "Optimized TWIGA Android release build. Build: $CODE."
           else
             gh release create latest-apk unity-ai-receptionist.apk version.json --title "Unity AI Receptionist - Latest Optimized APK" --notes "Optimized release build. build: $CODE. Signed with the permanent TWIGA release key." --prerelease
           fi
