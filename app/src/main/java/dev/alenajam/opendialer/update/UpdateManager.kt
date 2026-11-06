@@ -7,6 +7,8 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import android.content.pm.PackageInstaller
 import android.os.Build
 import android.telephony.TelephonyManager
@@ -48,14 +50,53 @@ object UpdateManager {
         val sp = prefs(c)
         val now = System.currentTimeMillis()
         if (now - sp.getLong("last", 0L) < 6 * 3600_000L) return
-        sp.edit().putLong("last", now).apply()
         Thread {
-            val info = runCatching { check(c) }.getOrNull() ?: return@Thread
-            if (!autoEnabled(c)) return@Thread
+            val info = runCatching { check(c) }.getOrNull()
+            if (info == null) {
+                sp.edit().putLong("last", now).apply()
+                return@Thread
+            }
+            if (!autoEnabled(c)) {
+                sp.edit().putLong("last", now).apply()
+                return@Thread
+            }
+            // Never interrupt an active cellular call. Retry on the next app start.
             if (CallTracker.state(c) != TelephonyManager.EXTRA_STATE_IDLE) return@Thread
-            if (!c.packageManager.canRequestPackageInstalls()) return@Thread
+            if (!c.packageManager.canRequestPackageInstalls()) {
+                val lastNotice = sp.getLong("permissionNoticeAt", 0L)
+                if (now - lastNotice > 24 * 3600_000L) {
+                    sp.edit().putLong("permissionNoticeAt", now).apply()
+                    notifyInstallPermissionRequired(c, info)
+                }
+                // Do not consume the six-hour check window; retry after permission is granted.
+                return@Thread
+            }
+            sp.edit().putLong("last", now).apply()
             runCatching { install(c, info) { } }
         }.start()
+    }
+
+    private fun notifyInstallPermissionRequired(c: Context, info: Info) {
+        val manager = c.getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(
+            NotificationChannel("twiga_update", "TWIGA updates", NotificationManager.IMPORTANCE_DEFAULT)
+        )
+        val settings = Intent(
+            Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+            Uri.parse("package:${c.packageName}")
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val pending = PendingIntent.getActivity(
+            c, 91, settings,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = Notification.Builder(c, "twiga_update")
+            .setContentTitle("TWIGA update available")
+            .setContentText("Allow TWIGA to install updates, then reopen the app.")
+            .setSmallIcon(android.R.drawable.stat_sys_download_done)
+            .setContentIntent(pending)
+            .setAutoCancel(true)
+            .build()
+        manager.notify(91, notification)
     }
 
     /** Downloads the APK and hands it to Android's installer. */
