@@ -305,7 +305,7 @@ document.addEventListener("click",function(e){if(e.target.closest("[data-send]")
 addEventListener("hashchange",route);
 R.integrations=function(){
   var ok=window.TWIGA_GOOGLE_GRANTED===true;
-  var state=ok?G("Access granted for this session","ok"):G("Permission not granted","or");
+  var state=ok?G("Run permission test","or"):G("Not connected","or");
   var row=function(title,detail){return '<div class="opt"><div><b>'+title+'</b><span>'+detail+'</span></div>'+state+'</div>'};
   return ["Connect the Google account your business uses. You choose the account and approve each permission on Google.",'<div class="g2">'+
    C("Google Workspace access",'<div class="pb">'+
@@ -398,18 +398,22 @@ window.TWIGA_TEST_GOOGLE=async function(){
  var sheetId=localStorage.getItem(key)||"";
  try{
   if(!sheetId){
+   var search=await api("https://www.googleapis.com/drive/v3/files?q="+encodeURIComponent("name='TWIGA Business Records' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false")+"&pageSize=1&fields=files(id,name)");
+   sheetId=search.files&&search.files[0]&&search.files[0].id||"";
+  }
+  if(!sheetId){
    var sheet=await api("https://sheets.googleapis.com/v4/spreadsheets",{method:"POST",body:JSON.stringify({properties:{title:"TWIGA Business Records"}})});
    sheetId=sheet.spreadsheetId;
    if(!sheetId)throw new Error("Google did not return a spreadsheet ID.");
-   localStorage.setItem(key,sheetId);window.TWIGA_GOOGLE_SHEET_ID=sheetId;
    await api("https://sheets.googleapis.com/v4/spreadsheets/"+encodeURIComponent(sheetId)+"/values/Sheet1!A1:H1?valueInputOption=RAW",{
     method:"PUT",
     body:JSON.stringify({values:[["Exported at","Order ID","Customer","Phone","Type","Total (KSh)","Paid (KSh)","Status"]]})
    });
-  }else{
-   await api("https://sheets.googleapis.com/v4/spreadsheets/"+encodeURIComponent(sheetId)+"?fields=spreadsheetId,properties.title");
   }
-  push("Google Sheets",true,"TWIGA Business Records sheet is created and saved in this browser.");
+  localStorage.setItem(key,sheetId);
+  window.TWIGA_GOOGLE_SHEET_ID=sheetId;
+  await api("https://sheets.googleapis.com/v4/spreadsheets/"+encodeURIComponent(sheetId)+"?fields=spreadsheetId,properties.title");
+  push("Google Sheets",true,"TWIGA Business Records sheet is ready and available for order exports.");
  }catch(e){push("Google Sheets",false,e.message)}
  try{
   if(!sheetId)throw new Error("Create the TWIGA records sheet first.");
