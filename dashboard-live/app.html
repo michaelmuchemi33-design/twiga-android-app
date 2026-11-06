@@ -315,6 +315,7 @@ R.integrations=function(){
     row("Google Drive","Create and manage TWIGA files and files you select.")+
     '<button class="btn pri" data-act="google-connect" style="margin-top:14px">Connect Google Workspace</button>'+
     '<button class="btn" data-act="google-test" style="margin-top:8px">Test Google connections</button>'+
+    '<button class="btn" data-act="google-export-orders" style="margin-top:8px">Sync TWIGA orders to Google Sheets</button>'+
     '<div class="sub" id="googleAccessError" role="alert"></div>'+
     '<div class="pb" id="googleCheckResults" aria-live="polite"></div>'+
     '<p class="sub" style="margin-top:10px">Google access is optional. TWIGA requests only the scopes listed here. Drive access is limited to files created or selected for TWIGA.</p>'+
@@ -346,6 +347,25 @@ window.TWIGA_EXCHANGE_CODE=async function(code){
  var r=await sb.auth.exchangeCodeForSession(code);
  if(r.error){console.error("TWIGA Google OAuth exchange failed",r.error);return false}
  return true
+};
+window.TWIGA_EXPORT_ORDERS=async function(){
+ var token=window.TWIGA_GOOGLE_ACCESS_TOKEN;
+ var sheetId=window.TWIGA_GOOGLE_SHEET_ID||localStorage.getItem("twiga_google_sheet_"+(window.BIZ&&window.BIZ.id||"account"))||"";
+ if(!token)throw new Error("Connect Google Workspace first.");
+ if(!sheetId)throw new Error("Run the Google connection test first to create your TWIGA Business Records sheet.");
+ var result=await L("listOrders",{limit:500});
+ var orders=result.orders||[];
+ var values=[["Exported at","Order ID","Customer","Phone","Type","Total (KSh)","Paid (KSh)","Status"]];
+ orders.forEach(function(o){
+  values.push([
+   o.UpdatedAt||o.Date||new Date().toISOString(),
+   o.OrderId||"",o.Customer||"",o.Phone||"",o.Type||"",
+   Number(o.Total||0),Number(o.Paid||0),o.Status||""
+  ]);
+ });
+ var apiUrl="https://sheets.googleapis.com/v4/spreadsheets/"+encodeURIComponent(sheetId)+"/values/Sheet1!A1:H1000";
+ await googleRequest(apiUrl,"PUT",{values:values});
+ return orders.length;
 };
 window.TWIGA_TEST_GOOGLE=async function(){
  var token=window.TWIGA_GOOGLE_ACCESS_TOKEN;
@@ -379,7 +399,7 @@ window.TWIGA_TEST_GOOGLE=async function(){
    var sheet=await api("https://sheets.googleapis.com/v4/spreadsheets",{method:"POST",body:JSON.stringify({properties:{title:"TWIGA Business Records"}})});
    sheetId=sheet.spreadsheetId;
    if(!sheetId)throw new Error("Google did not return a spreadsheet ID.");
-   localStorage.setItem(key,sheetId);
+   localStorage.setItem(key,sheetId);window.TWIGA_GOOGLE_SHEET_ID=sheetId;
    await api("https://sheets.googleapis.com/v4/spreadsheets/"+encodeURIComponent(sheetId)+"/values/Sheet1!A1:F1?valueInputOption=RAW",{
     method:"PUT",
     body:JSON.stringify({values:[["Created","Customer","Phone","Order","Amount (KSh)","Status"]]})
@@ -442,7 +462,17 @@ document.addEventListener("click",async function(e){
  var b=e.target.closest("[data-act]");if(!b)return;
  var a=b.dataset.act,id=b.dataset.id;
  try{
-  if(a==="google-test"){
+  if(a==="google-export-orders"){
+    var exportButton=b;
+    exportButton.disabled=true;exportButton.textContent="Syncing orders...";
+    var status=$("googleAccessError");
+    try{
+     var total=await window.TWIGA_EXPORT_ORDERS();
+     if(status)status.textContent=total+" order(s) synced to your TWIGA Business Records sheet.";
+    }catch(err){if(status)status.textContent=err.message||"Could not sync orders."}
+    exportButton.disabled=false;exportButton.textContent="Sync TWIGA orders to Google Sheets";
+   }
+   else if(a==="google-test"){
     var testButton=b;
     testButton.disabled=true;testButton.textContent="Testing Google access...";
     try{
@@ -460,7 +490,7 @@ document.addEventListener("click",async function(e){
      "https://www.googleapis.com/auth/drive.file"
     ].join(" ");
     var nativeApp=window.TWIGA_ANDROID_APP===true;
-    var opts={redirectTo:nativeApp?"twiga://auth/callback":location.origin+"/",scopes:scopeSet,queryParams:{access_type:"offline"}};
+    var opts={redirectTo:nativeApp?"twiga://auth/callback":location.origin+"/",scopes:scopeSet,queryParams:{access_type:"offline",include_granted_scopes:"true"}};
     if(a==="google-connect")opts.queryParams.prompt="consent";
     var o=await sb.auth.signInWithOAuth({provider:"google",options:opts});
     if(o.error){var ge=$("lerr")||$("googleAccessError");if(ge)ge.textContent=o.error.message}
