@@ -303,6 +303,23 @@ document.addEventListener("click",function(e){var b=e.target.closest("[data-open
 document.addEventListener("click",function(e){if(e.target.closest("#burger,#more"))document.body.classList.toggle("nav");else if(e.target.closest("#scrim,nav a"))document.body.classList.remove("nav")});
 document.addEventListener("click",function(e){if(e.target.closest("[data-send]")){var t=$("pt").value,s=svc[+$("ps").value],p={"Quotation":"QT-","Payment link":"PL-","Receipt":"RC-"}[t];docs.unshift([p+(2042+docs.length),$("pc").value,t,s[0],s[1],t==="Receipt"?"Paid":"Sent"]);route(1)}});
 addEventListener("hashchange",route);
+R.integrations=function(){
+  var ok=window.TWIGA_GOOGLE_GRANTED===true;
+  var state=ok?G("Access granted for this session","ok"):G("Permission not granted","or");
+  var row=function(title,detail){return '<div class="opt"><div><b>'+title+'</b><span>'+detail+'</span></div>'+state+'</div>'};
+  return ["Connect the Google account your business uses. You choose the account and approve each permission on Google.",'<div class="g2">'+
+   C("Google Workspace access",'<div class="pb">'+
+    row("Google Calendar","Read and create or update appointments.")+
+    row("Google Contacts","Read contacts into your TWIGA customer list.")+
+    row("Google Sheets","Create and manage TWIGA business spreadsheets.")+
+    row("Google Drive","Create and manage TWIGA files and files you select.")+
+    '<button class="btn pri" data-act="google-connect" style="margin-top:14px">Connect Google Workspace</button>'+
+    '<div class="sub" id="googleAccessError" role="alert"></div>'+
+    '<p class="sub" style="margin-top:10px">Google access is optional. TWIGA requests only the scopes listed here. Drive access is limited to files created or selected for TWIGA.</p>'+
+   '</div>')+
+   C("What this enables",'<ul class="tl pb"><li><div class="k">1</div><div><b>Appointments</b><span>Create and update business bookings in Google Calendar.</span></div></li><li><div class="k">2</div><div><b>Customers</b><span>Read Google Contacts to help match callers to saved customers.</span></div></li><li><div class="k">3</div><div><b>Business records</b><span>Use Google Sheets for business records and reports.</span></div></li><li><div class="k">4</div><div><b>Documents</b><span>Work with TWIGA-created or user-selected Google Drive files.</span></div></li></ul>')+
+  '</div>'];
+};
 render();route();
 </script>
 <script>
@@ -311,6 +328,23 @@ var K=window.TWIGA_CONFIG||{},pre=function(){document.documentElement.classList.
 setTimeout(pre,7000);
 if(!K.supabaseUrl||!window.supabase){R.phone=function(){return["Sign in to use the dialer.",""]};pre();return}
 var sb=window.sb=supabase.createClient(K.supabaseUrl,K.supabaseKey,{auth:{flowType:"pkce"}});
+window.TWIGA_GOOGLE_GRANTED=false;
+window.TWIGA_GOOGLE_ACCESS_TOKEN=null;
+sb.auth.onAuthStateChange(function(event,session){
+ if(event==="SIGNED_OUT"){
+  window.TWIGA_GOOGLE_GRANTED=false;
+  window.TWIGA_GOOGLE_ACCESS_TOKEN=null;
+ }
+ if(session&&session.provider_token){
+  window.TWIGA_GOOGLE_GRANTED=true;
+  window.TWIGA_GOOGLE_ACCESS_TOKEN=session.provider_token;
+ }
+});
+window.TWIGA_EXCHANGE_CODE=async function(code){
+ var r=await sb.auth.exchangeCodeForSession(code);
+ if(r.error){console.error("TWIGA Google OAuth exchange failed",r.error);return false}
+ return true
+};
 window.SESS=null;window.BIZ=null;window.READY=false;window.UF="";
 var TX="",TYPES=[["salon","Salon or barber"],["shop","Shop or retail"],["clinic","Clinic"],["restaurant","Restaurant"],["repair","Repair or technician"],["legal","Law firm"],["realestate","Real estate"],["general","Other"]];
 var opt=function(a){return a.map(function(x){return '<option value="'+x[0]+'">'+x[1]+'</option>'}).join("")};
@@ -356,7 +390,19 @@ document.addEventListener("click",async function(e){
  var b=e.target.closest("[data-act]");if(!b)return;
  var a=b.dataset.act,id=b.dataset.id;
  try{
-  if(a==="g"){var o=await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+"/"}});if(o.error)$("lerr").textContent=o.error.message}
+  if(a==="g"||a==="google-connect"){
+    var scopeSet=[
+     "https://www.googleapis.com/auth/calendar.events",
+     "https://www.googleapis.com/auth/contacts.readonly",
+     "https://www.googleapis.com/auth/spreadsheets",
+     "https://www.googleapis.com/auth/drive.file"
+    ].join(" ");
+    var nativeApp=window.TWIGA_ANDROID_APP===true;
+    var opts={redirectTo:nativeApp?"twiga://auth/callback":location.origin+"/",scopes:scopeSet,queryParams:{access_type:"offline"}};
+    if(a==="google-connect")opts.queryParams.prompt="consent";
+    var o=await sb.auth.signInWithOAuth({provider:"google",options:opts});
+    if(o.error){var ge=$("lerr")||$("googleAccessError");if(ge)ge.textContent=o.error.message}
+   }
   else if(a==="out"){await sb.auth.signOut();load()}
   else if(a==="mkbiz"){var n=$("bn").value.trim();if(n.length<2){$("serr").textContent="Enter your business name.";return}var r=await sb.from("businesses").insert({name:n,business_type:$("bt").value});if(r.error){$("serr").textContent=r.error.message;return}load()}
   else if(a==="mk"){if(!TX)TX=crypto.randomUUID();var pm=$("om").value,j=await L("createOrder",{txn:TX,customer:$("oc").value,phone:$("op").value,type:$("ot").value,method:pm,paid:pm!=="Pay later",items:[{name:$("oi").value,qty:$("oq").value,unitPrice:$("opr").value}]});TX="";msg("Saved "+j.orderId+", KES "+j.total.toLocaleString());list()}
