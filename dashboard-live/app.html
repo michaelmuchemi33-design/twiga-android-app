@@ -363,7 +363,7 @@ window.TWIGA_EXPORT_ORDERS=async function(){
    Number(o.Total||0),Number(o.Paid||0),o.Status||""
   ]);
  });
- var apiUrl="https://sheets.googleapis.com/v4/spreadsheets/"+encodeURIComponent(sheetId)+"/values/Sheet1!A1:H1000";
+ var apiUrl="https://sheets.googleapis.com/v4/spreadsheets/"+encodeURIComponent(sheetId)+"/values/Sheet1!A1:H1000?valueInputOption=RAW";
  var response=await fetch(apiUrl,{method:"PUT",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({values:values})});
  var payload={};try{payload=await response.json()}catch(e){}
  if(!response.ok)throw new Error(payload.error&&payload.error.message||"Google Sheets returned HTTP "+response.status);
@@ -402,9 +402,9 @@ window.TWIGA_TEST_GOOGLE=async function(){
    sheetId=sheet.spreadsheetId;
    if(!sheetId)throw new Error("Google did not return a spreadsheet ID.");
    localStorage.setItem(key,sheetId);window.TWIGA_GOOGLE_SHEET_ID=sheetId;
-   await api("https://sheets.googleapis.com/v4/spreadsheets/"+encodeURIComponent(sheetId)+"/values/Sheet1!A1:F1?valueInputOption=RAW",{
+   await api("https://sheets.googleapis.com/v4/spreadsheets/"+encodeURIComponent(sheetId)+"/values/Sheet1!A1:H1?valueInputOption=RAW",{
     method:"PUT",
-    body:JSON.stringify({values:[["Created","Customer","Phone","Order","Amount (KSh)","Status"]]})
+    body:JSON.stringify({values:[["Exported at","Order ID","Customer","Phone","Type","Total (KSh)","Paid (KSh)","Status"]]})
    });
   }else{
    await api("https://sheets.googleapis.com/v4/spreadsheets/"+encodeURIComponent(sheetId)+"?fields=spreadsheetId,properties.title");
