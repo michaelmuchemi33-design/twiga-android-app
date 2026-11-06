@@ -110,7 +110,7 @@ private fun ReceptionistScreen(onDefaultDialer: () -> Unit) {
     var callMode by remember { mutableStateOf(prefs.getString("call_mode", "Ask me per call") ?: "Ask me per call") }
     var followupText by remember { mutableStateOf("") }
     var followups by remember { mutableStateOf(prefs.getString("followups_v1", "[]") ?: "[]") }
-    var tab by remember { mutableIntStateOf(0) }
+    var tab by remember { mutableIntStateOf((context as? android.app.Activity)?.intent?.getIntExtra("tab", 0) ?: 0) }
     var customers by remember { mutableStateOf(readCustomers(prefs)) }
     var orders by remember { mutableStateOf(readOrders(prefs)) }
     var calls by remember { mutableStateOf(readCalls(prefs)) }
@@ -300,7 +300,8 @@ private fun ReceptionistScreen(onDefaultDialer: () -> Unit) {
                         }
                     }
                 }
-                4 -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                4 -> AiReceptionistTab()
+                99 -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     item { Text("Twiga AI assistant", fontSize = 25.sp, fontWeight = FontWeight.Bold, color = Ink); Text("Choose the AI brain, voice and call behaviour for your business.", color = Muted) }
                     item {
                         Card(colors = CardDefaults.cardColors(containerColor = Color.White)) {
