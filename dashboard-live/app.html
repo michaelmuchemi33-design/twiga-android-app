@@ -625,6 +625,108 @@ if(K.mode==="live"){
   if(!$("aif").value.trim())$("aif").value=t.faq;
   if(!$("air").value.trim())$("air").value=t.rules;
   $("aic").textContent=$("aip").value.length+" / 20000";$("aimsg").textContent="Template added to the empty boxes. Replace the [brackets] with your details, then Save.";$("aimsg").style.color="var(--ok)"})}
+
+if(K.mode==="live"){
+ function googleAccessToken(){return window.TWIGA_GOOGLE_ACCESS_TOKEN||""}
+ async function googleRequest(url,method,body){
+  var token=googleAccessToken();
+  if(!token)throw new Error("Connect Google Workspace first.");
+  var opt={method:method||"GET",headers:{"Authorization":"Bearer "+token}};
+  if(body){opt.headers["Content-Type"]="application/json";opt.body=JSON.stringify(body)}
+  var response=await fetch(url,opt),data={};
+  try{data=await response.json()}catch(e){}
+  if(!response.ok)throw new Error(data.error&&data.error.message||"Google Calendar returned HTTP "+response.status);
+  return data;
+ }
+ function gcalWhen(ev){
+  var raw=ev.start&&(ev.start.dateTime||ev.start.date);
+  if(!raw)return "Time not set";
+  var d=new Date(raw);
+  if(ev.start.date)return d.toLocaleDateString("en-KE",{weekday:"short",day:"numeric",month:"short"});
+  return d.toLocaleString("en-KE",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
+ }
+ async function loadGoogleAppointments(){
+  var box=$("gcalEvents");
+  if(!box)return;
+  if(!googleAccessToken()){
+   box.innerHTML='<div class="sub">Connect Google Workspace to load real appointments from your calendar.</div><a class="btn pri" href="#integrations">Connect Google</a>';
+   return;
+  }
+  box.textContent="Loading your Google Calendar...";
+  try{
+   var now=new Date(),until=new Date(now.getTime()+30*86400000);
+   var url="https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&maxResults=100&timeMin="+encodeURIComponent(now.toISOString())+"&timeMax="+encodeURIComponent(until.toISOString());
+   var data=await googleRequest(url,"GET");
+   var rows=data.items||[];
+   if(!rows.length){box.innerHTML='<div class="sub">No upcoming events in your primary Google Calendar for the next 30 days.</div>';return}
+   box.innerHTML=rows.map(function(ev){
+    var link=ev.htmlLink?'<a class="lk" target="_blank" rel="noopener" href="'+esc(ev.htmlLink)+'">Open in Google Calendar</a>':"";
+    var detail=[ev.location,ev.description].filter(Boolean).join(" · ");
+    return '<div class="opt"><div><b>'+esc(ev.summary||"Untitled appointment")+'</b><span>'+esc(gcalWhen(ev))+(detail?" · "+esc(detail.slice(0,180)):"")+'</span>'+link+'</div>'+G(ev.status==="cancelled"?"Cancelled":"In calendar",ev.status==="cancelled"?"bad":"ok")+'</div>';
+   }).join("");
+  }catch(e){
+   box.innerHTML='<div class="sub" style="color:var(--bad)">'+esc(e.message)+'</div><a class="btn" href="#integrations">Check Google access</a>';
+  }
+ }
+ function appointmentForm(){
+  var start=new Date(Date.now()+60*60*1000);
+  start.setMinutes(Math.ceil(start.getMinutes()/15)*15,0,0);
+  var local=new Date(start.getTime()-start.getTimezoneOffset()*60000).toISOString().slice(0,16);
+  return '<div class="pb"><label>Customer name<br><input id="gcalCustomer" type="text" maxlength="120" style="width:100%" required></label>'+
+   '<label>Customer phone (optional)<br><input id="gcalPhone" type="tel" maxlength="30" style="width:100%"></label>'+
+   '<label>Service or appointment title<br><input id="gcalService" type="text" maxlength="160" style="width:100%" required></label>'+
+   '<label>Date and time<br><input id="gcalStart" type="datetime-local" value="'+local+'" style="width:100%" required></label>'+
+   '<label>Duration (minutes)<br><input id="gcalDuration" type="number" min="15" max="720" step="15" value="60" style="width:100%"></label>'+
+   '<label>Notes (optional)<br><textarea id="gcalNotes" rows="3" maxlength="1500" style="width:100%"></textarea></label>'+
+   '<button class="btn pri" data-act="google-create-appointment">Save to Google Calendar</button>'+
+   '<div id="gcalSaveMessage" class="sub" role="status"></div></div>';
+ }
+ function googleCalendarPage(title,description){
+  setTimeout(loadGoogleAppointments,0);
+  return [description,'<div class="g2">'+C("New appointment",appointmentForm())+
+   C(title,'<div class="pb"><button class="btn sm" data-act="google-refresh-calendar">Refresh</button><div id="gcalEvents" style="margin-top:12px" class="sub">Loading your Google Calendar...</div></div>')+
+   '</div>'];
+ }
+ R.appointments=function(){return googleCalendarPage("Upcoming appointments","Appointments are read from and saved to your primary Google Calendar. Changes appear in Google Calendar.");};
+ R.calendar=function(){return googleCalendarPage("Calendar agenda","Your real Google Calendar events for the next 30 days.");};
+ document.addEventListener("click",async function(e){
+  var b=e.target.closest('[data-act="google-create-appointment"]');
+  if(b){
+   var message=$("gcalSaveMessage");
+   try{
+    var customer=($("gcalCustomer").value||"").trim(),service=($("gcalService").value||"").trim();
+    var startText=$("gcalStart").value,duration=Number($("gcalDuration").value||60);
+    if(!customer||!service||!startText)throw new Error("Enter the customer, service and appointment date.");
+    if(!Number.isFinite(duration)||duration<15||duration>720)throw new Error("Appointment duration must be between 15 and 720 minutes.");
+    var start=new Date(startText);
+    if(Number.isNaN(start.getTime())||start.getTime()<=Date.now())throw new Error("Choose a future date and time.");
+    var end=new Date(start.getTime()+duration*60000);
+    var phone=($("gcalPhone").value||"").trim(),notes=($("gcalNotes").value||"").trim();
+    var event={
+     summary:service+" — "+customer,
+     description:"Customer: "+customer+(phone?"\nPhone: "+phone:"")+(notes?"\nNotes: "+notes:"")+
+      "\nCreated in TWIGA",
+     start:{dateTime:start.toISOString(),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone||"Africa/Nairobi"},
+     end:{dateTime:end.toISOString(),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone||"Africa/Nairobi"}
+    };
+    b.disabled=true;b.textContent="Saving...";
+    await googleRequest("https://www.googleapis.com/calendar/v3/calendars/primary/events","POST",event);
+    if(message)message.textContent="Appointment saved to Google Calendar.";
+    $("gcalCustomer").value="";$("gcalPhone").value="";$("gcalService").value="";$("gcalNotes").value="";
+    await loadGoogleAppointments();
+   }catch(err){if(message)message.textContent=err.message||"Could not save the appointment."}
+   finally{b.disabled=false;b.textContent="Save to Google Calendar"}
+   return;
+  }
+  if(e.target.closest('[data-act="google-refresh-calendar"]'))loadGoogleAppointments();
+ });
+ V.appointments="Appointments";V.calendar="Calendar";V.integrations="Google integrations";
+ IC.appointments="calendar-check";IC.calendar="calendar-days";IC.integrations="plug";
+ $("nav").innerHTML=Object.keys(V).map(function(k){
+  return '<a href="#'+k+'"><span class="ni"><i data-lucide="'+(IC[k]||"circle")+'"></i></span><span style="flex:1">'+V[k]+'</span></a>';
+ }).join("");
+ $("tabbar").innerHTML='<a href="#overview"><i data-lucide="layout-dashboard"></i>Home</a><a href="#appointments"><i data-lucide="calendar-check"></i>Appointments</a><a href="#ai"><i data-lucide="bot"></i>AI</a><a href="#orders"><i data-lucide="shopping-bag"></i>Orders</a><button id="more"><i data-lucide="menu"></i>More</button>';
+}
 load();
 })();
 </script></body>
