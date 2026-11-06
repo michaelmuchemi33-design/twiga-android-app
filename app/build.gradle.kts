@@ -29,7 +29,7 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.unity.receptionist"
+        applicationId = "ke.co.twiga.receptionist"
         minSdk = 29
         targetSdk = 36
         versionCode = appVersionCode
