@@ -83,6 +83,12 @@ fun AiToggleAction() {
 
 /** The business tab is the live TWIGA app, not a parallel sample dashboard. */
 @Composable
-fun BusinessTab() {
-    TwigaDashboardTab()
+fun BusinessTab(
+    authCallback: Uri? = null,
+    onAuthCallbackConsumed: () -> Unit = {}
+) {
+    TwigaDashboardTab(
+        authCallback = authCallback,
+        onAuthCallbackConsumed = onAuthCallbackConsumed
+    )
 }
