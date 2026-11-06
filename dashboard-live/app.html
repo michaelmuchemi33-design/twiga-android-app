@@ -462,7 +462,13 @@ document.addEventListener("click",async function(e){
  var b=e.target.closest("[data-act]");if(!b)return;
  var a=b.dataset.act,id=b.dataset.id;
  try{
-  if(a==="google-export-orders"){
+  if(a==="google-load-contacts"){
+    var contactsButton=b;
+    contactsButton.disabled=true;contactsButton.textContent="Loading contacts...";
+    await loadGoogleContacts();
+    contactsButton.disabled=false;contactsButton.textContent="Refresh Google Contacts";
+   }
+   else if(a==="google-export-orders"){
     var exportButton=b;
     exportButton.disabled=true;exportButton.textContent="Syncing orders...";
     var status=$("googleAccessError");
@@ -698,6 +704,43 @@ if(K.mode==="live"){
    box.innerHTML='<div class="sub" style="color:var(--bad)">'+esc(e.message)+'</div><a class="btn" href="#integrations">Check Google access</a>';
   }
  }
+ async function loadGoogleContacts(){
+  var box=$("googleContactsList");
+  if(!box)return;
+  if(!googleAccessToken()){
+   box.innerHTML='<div class="sub">Connect Google Workspace to read your Google Contacts.</div><a class="btn pri" href="#integrations">Connect Google</a>';
+   return;
+  }
+  box.textContent="Loading Google Contacts...";
+  try{
+   var contacts=[],next="";
+   for(var page=0;page<5;page++){
+    var url="https://people.googleapis.com/v1/people/me/connections?pageSize=100&personFields=names,emailAddresses,phoneNumbers";
+    if(next)url+="&pageToken="+encodeURIComponent(next);
+    var data=await googleRequest(url,"GET");
+    contacts=contacts.concat(data.connections||[]);
+    next=data.nextPageToken||"";
+    if(!next)break;
+   }
+   var rows=contacts.map(function(p){
+    var name=(p.names&&p.names[0]&&p.names[0].displayName)||"Unnamed contact";
+    var phone=(p.phoneNumbers&&p.phoneNumbers[0]&&p.phoneNumbers[0].value)||"";
+    var email=(p.emailAddresses&&p.emailAddresses[0]&&p.emailAddresses[0].value)||"";
+    return [name,phone,email];
+   });
+   rows.sort(function(a,b){return a[0].localeCompare(b[0])});
+   box.innerHTML=rows.length?T(["Name","Phone","Email"],rows.map(function(x){return x.map(esc)})):'<div class="sub">No Google contacts were returned.</div>';
+   var note=$("googleContactsStatus");
+   if(note)note.textContent="Loaded "+rows.length+" contact(s)"+(next?". Showing the first 500.":"")+" from Google Contacts. This view is read-only.";
+  }catch(e){box.innerHTML='<div class="sub" style="color:var(--bad)">'+esc(e.message)+'</div>'}
+ }
+ R.customers=function(){
+  setTimeout(cuLoad,0);
+  return ["People saved in TWIGA and contacts available from your Google account.",'<div class="g2">'+
+   C("TWIGA customers",'<div id="cu" class="pb sub">Loading...</div>')+
+   C("Google Contacts",'<div class="pb"><div class="sub" id="googleContactsStatus">Google contact access is optional and read-only.</div><button class="btn" data-act="google-load-contacts">Load Google Contacts</button><div id="googleContactsList" style="margin-top:12px" class="sub"></div></div>')+
+   '</div>'];
+ };
  function appointmentForm(){
   var start=new Date(Date.now()+60*60*1000);
   start.setMinutes(Math.ceil(start.getMinutes()/15)*15,0,0);
