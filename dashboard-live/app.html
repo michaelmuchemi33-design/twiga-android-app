@@ -630,21 +630,31 @@ async function aiToggle(){
  async function ovLoad(){
   if(!$("ovs"))return;
   var since=new Date();since.setHours(0,0,0,0);
-  var ev=await sb.from("call_events").select("direction,number,state,duration_s,ai_on,updated_at").eq("business_id",BIZ.id).order("updated_at",{ascending:false}).limit(100),rows=ev.data||[];
+  var phone=await sb.from("call_events").select("direction,number,state,duration_s,ai_on,updated_at").eq("business_id",BIZ.id).order("updated_at",{ascending:false}).limit(100);
+  var web=await sb.from("twiga_call_records").select("direction,from_number,to_number,status,duration_seconds,started_at,ended_at,channel").eq("business_id",BIZ.id).order("started_at",{ascending:false}).limit(100);
+  var rows=(phone.data||[]).map(function(e){return{direction:e.direction,number:e.number,state:e.state,duration_s:e.duration_s,ai_on:e.ai_on,updated_at:e.updated_at}});
+  (web.data||[]).forEach(function(e){rows.push({direction:e.direction==="inbound"?"in":"out",number:e.direction==="outbound"?e.to_number:e.from_number,state:e.status==="missed"?"missed":e.status==="in-progress"?"active":"ended",duration_s:e.duration_seconds,ai_on:true,updated_at:e.started_at||e.ended_at})});
+  rows.sort(function(a,b){return new Date(b.updated_at||0)-new Date(a.updated_at||0)});
   var today=rows.filter(function(e){return new Date(e.updated_at)>=since}),missed=today.filter(function(e){return e.state==="missed"}).length;
   var dv=await sb.from("devices").select("id").eq("business_id",BIZ.id).limit(1),paired=!!(dv.data&&dv.data[0]);
   var ba=await sb.from("business_ai").select("prompt").eq("business_id",BIZ.id).maybeSingle(),hasAi=!!(ba.data&&ba.data.prompt);
-  var s={ordersToday:0,revenueToday:0},items=0;
-  if(K.ledgerUrl){try{s=await L("summary");items=(await L("listItems")).items.length}catch(x){}}
+  var totals={ordersToday:0,revenueToday:0},items=0;
+  if(K.ledgerUrl){try{totals=await L("summary");items=(await L("listItems")).items.length}catch(x){}}
   if(!$("ovs"))return;
-  $("ovs").innerHTML=S("Calls today",today.length)+S("Missed",missed)+S("Orders today",s.ordersToday||0)+S("Sales today (KSh)",Number(s.revenueToday||0).toLocaleString());
+  $("ovs").innerHTML=S("Calls today",today.length)+S("Missed",missed)+S("Orders today",totals.ordersToday||0)+S("Sales today (KSh)",Number(totals.revenueToday||0).toLocaleString());
   var st=[["Pair your phone",paired,"#phone"],["Describe your business to the AI",hasAi,"#ai"],["Add your items and prices",items>0,"#services"],["Run the testing zone",false,"#test"]];
   $("ovg").innerHTML=st.map(function(x){return '<li><div class="k" style="'+(x[1]?"":"background:var(--soft);color:var(--mute);border:1px dashed var(--mute)")+'"><i data-lucide="'+(x[1]?"check":"circle")+'"></i></div><div><b><a href="'+x[2]+'" style="color:inherit">'+x[0]+'</a></b><span>'+(x[1]?"Done":"To do")+'</span></div></li>'}).join("");
-  $("ovc").outerHTML='<div id="ovc">'+tbl(["Time","Call","Number","Result"],rows.slice(0,6).map(function(e){return[new Date(e.updated_at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),e.direction==="in"?"In":"Out",esc(e.number||"Unknown"),G(ST[e.state][0],ST[e.state][1])+(e.ai_on?" "+G("AI on","or"):"")]}),"No calls yet. Calls on your paired phone appear here.")+'</div>';
+  $("ovc").outerHTML='<div id="ovc">'+tbl(["Time","Call","Number","Result"],rows.slice(0,6).map(function(e){var state=ST[e.state]||["Unknown","or"];return[new Date(e.updated_at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),e.direction==="in"||e.direction==="inbound"?"In":"Out",esc(e.number||"Unknown"),G(state[0],state[1])+(e.ai_on?" "+G("AI on","or"):"")]}),"No calls recorded yet.")+'</div>';
   if(window.lucide)lucide.createIcons()}
- R.history=function(){setTimeout(hiLoad,0);return["Every call on your paired phone.",C("Calls",'<div id="hi" class="pb sub">Loading...</div>')]};
- async function hiLoad(){var ev=await sb.from("call_events").select("direction,number,state,duration_s,ai_on,updated_at").eq("business_id",BIZ.id).order("updated_at",{ascending:false}).limit(100),rows=ev.data||[];if(!$("hi"))return;
-  $("hi").outerHTML='<div id="hi">'+tbl(["When","Call","Number","Result","Length"],rows.map(function(e){return[new Date(e.updated_at).toLocaleString([],{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}),e.direction==="in"?"In":"Out",esc(e.number||"Unknown"),G(ST[e.state][0],ST[e.state][1])+(e.ai_on?" "+G("AI on","or"):""),dur(e.duration_s)]}),"No calls yet.")+'</div>'}
+ R.history=function(){setTimeout(hiLoad,0);return["Every call recorded for this business, including Vapi web tests and paired-phone events.",C("Calls",'<div id="hi" class="pb sub">Loading...</div>')]};
+ async function hiLoad(){
+  var p=await sb.from("call_events").select("direction,number,state,duration_s,ai_on,updated_at").eq("business_id",BIZ.id).order("updated_at",{ascending:false}).limit(100);
+  var w=await sb.from("twiga_call_records").select("direction,from_number,to_number,status,duration_seconds,channel,started_at,ended_at").eq("business_id",BIZ.id).order("started_at",{ascending:false}).limit(100);
+  var rows=(p.data||[]).map(function(e){return{direction:e.direction,number:e.number,state:e.state,duration_s:e.duration_s,ai_on:e.ai_on,at:e.updated_at,channel:"Paired phone"}});
+  (w.data||[]).forEach(function(e){rows.push({direction:e.direction==="inbound"?"in":"out",number:e.direction==="outbound"?e.to_number:e.from_number,state:e.status==="missed"?"missed":e.status==="in-progress"?"active":"ended",duration_s:e.duration_seconds,ai_on:true,at:e.started_at||e.ended_at,channel:e.channel||"Vapi"})});
+  rows.sort(function(a,b){return new Date(b.at||0)-new Date(a.at||0)});
+  if(!$("hi"))return;
+  $("hi").outerHTML='<div id="hi">'+tbl(["When","Call","Number","Source","Result","Length"],rows.map(function(e){var state=ST[e.state]||["Unknown","or"];return[new Date(e.at).toLocaleString([],{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}),e.direction==="in"||e.direction==="inbound"?"In":"Out",esc(e.number||"Unknown"),esc(e.channel),G(state[0],state[1])+(e.ai_on?" "+G("AI on","or"):""),dur(e.duration_s)]}),"No calls yet.")+'</div>'}
  R.ai=function(){setTimeout(loadAi,0);return["Describe your business once. The AI uses it on every call.",PC+C("Try your AI receptionist",AIBOX)]};
  R.services=function(){setTimeout(svLoad,0);return["The things you sell or book. Orders use these prices.",'<div class="g2">'+C("Add an item",'<div class="pb"><label>Name<br><input type="text" id="sn" style="width:100%"></label><label>Price (KSh)<br><input type="number" id="sp" min="0" style="width:100%"></label><label>Type<br><select id="sk" style="width:100%"><option value="service">Service</option><option value="product">Product with stock</option></select></label><label>Stock (products only)<br><input type="number" id="ss" min="0" value="0" style="width:100%"></label><button class="btn pri" data-act="svsave">Save item</button><div class="sub" id="smsg"></div></div>')+C("Your items",'<div id="sl" class="pb sub">Loading...</div>')+'</div>']};
  async function svLoad(){try{var it=(await L("listItems")).items;if($("sl"))$("sl").outerHTML='<div id="sl">'+tbl(["Name","Type","Price","Stock"],it.map(function(i){return[esc(i.Name),esc(i.Kind),Number(i.Price).toLocaleString(),i.TrackStock?i.Stock:"-"]}),"No items yet. Add your first one.")+'</div>'}catch(x){if($("sl"))$("sl").textContent=x.message}}
@@ -906,7 +916,10 @@ R.campaigns=function(){return["Follow-up rules are prepared, but automated outbo
 R.staff=function(){return["Add real team details before enabling transfers. No demo phone numbers are configured.",C("Team routing",'<div class="pb sub">Staff names, working hours and transfer numbers are not yet stored in a verified team directory. Add them only when the team-management backend is connected.</div>')]};
 R.reports=function(){return["Live figures from this business workspace, not sample numbers.",'<div class="stats" id="twigaRealReports"><div class="stat"><span>Calls</span><b>—</b></div><div class="stat"><span>Follow-ups</span><b>—</b></div><div class="stat"><span>Completed</span><b>—</b></div><div class="stat"><span>Outbound route</span><b>—</b></div></div>']};
 async function loadTwigaReports(){var e=$("twigaRealReports");if(!e)return;try{var c=await sb.from("twiga_call_records").select("id",{count:"exact",head:true}).eq("business_id",BIZ.id);var f=await sb.from("twiga_followups").select("id,status",{count:"exact"}).eq("business_id",BIZ.id);var l=await sb.from("twiga_phone_lines").select("outbound_status").eq("business_id",BIZ.id);var rows=f.data||[];e.innerHTML=S("Saved web calls",c.count||0)+S("Follow-ups",f.count||0)+S("Completed",rows.filter(function(x){return x.status==="completed"}).length)+S("Outbound route",l.data&&l.data.some(function(x){return x.outbound_status==="active"})?"Active":"Not verified")}catch(x){e.textContent=x.message||"Could not load reports."}}
-var oldReports=R.reports;R.reports=function(){setTimeout(loadTwigaReports,0);return oldReports()};
+R.reports=function(){setTimeout(loadTwigaReports,0);return["Live figures from this business workspace, not sample numbers.",'<div class="stats" id="twigaRealReports">'+S("Saved web calls","—")+S("Follow-ups","—")+S("Completed","—")+S("Outbound route","—")+"</div>"]};
+
+var twigaGoogleIntegrationPage=R.integrations;
+R.integrations=function(){var page=twigaGoogleIntegrationPage();setTimeout(loadTwigaIntegrations,0);page[1]+=C("TWIGA voice and phone status",'<div id="twigaIntegrationList" class="pb sub">Checking connections…</div><a class="btn" href="/line-setup">Set up existing phone line</a>');return page};
 async function loadTwigaLiveCalls(){
  if(!BIZ)return;
  try{
