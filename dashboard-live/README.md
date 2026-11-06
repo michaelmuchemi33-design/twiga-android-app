@@ -8,8 +8,7 @@ The dashboard requests these Google OAuth scopes when the business owner chooses
 
 - Calendar: `https://www.googleapis.com/auth/calendar.events`
 - Contacts: `https://www.googleapis.com/auth/contacts.readonly`
-- Sheets: `https://www.googleapis.com/auth/spreadsheets`
-- Drive: `https://www.googleapis.com/auth/drive.file` (only files created or selected for TWIGA)
+- Sheets and Drive: `https://www.googleapis.com/auth/drive.file` (TWIGA-created or app-selected files only)
 
 In Google Cloud, enable Google Calendar API, People API, Google Sheets API and Google Drive API. Configure the OAuth consent screen, add the exact scopes, add the account as a test user while testing, and complete Google's verification before public rollout where required.
 
