@@ -623,7 +623,7 @@ async function aiToggle(){
     }catch(error){$("aiErr").textContent="Call ended, but its call log could not be saved: "+(error.message||"Unknown error")}
    }
   });
-  CALL.start({name:BIZ.name,prompt:x.prompt,faq:x.faq,rules:x.rules,greeting:x.greeting,voice:$("aiVoice").value,lang:"auto",maxSeconds:300})}
+  CALL.start({businessId:BIZ.id,name:BIZ.name,prompt:x.prompt,faq:x.faq,rules:x.rules,greeting:x.greeting,voice:$("aiVoice").value,lang:"auto",maxSeconds:300})}
  var chk=function(ok,n,d){return '<li><div class="k" style="'+(ok?"":"background:var(--badsoft);color:var(--bad)")+'"><i data-lucide="'+(ok?"check":"x")+'"></i></div><div><b>'+n+'</b><span>'+esc(d)+'</span></div></li>'};
  function tbl(h,r,e){return r.length?T(h,r):'<div class="pb sub">'+e+'</div>'}
  R.overview=function(){setTimeout(ovLoad,0);return["Everything here is real. Numbers start at zero until you take calls and orders.",'<div class="stats" id="ovs">'+S("Calls today","-")+S("Missed","-")+S("Orders today","-")+S("Sales today (KSh)","-")+'</div><div class="g2">'+C("Get started",'<ul class="tl pb" id="ovg"></ul>')+C("Recent calls",'<div id="ovc" class="pb sub">Loading...</div>')+'</div>']};
