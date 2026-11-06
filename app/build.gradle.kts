@@ -8,12 +8,6 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-// Firebase is used for production telemetry, but local debug builds should not
-// require credentials that are intentionally excluded from source control.
-if (file("google-services.json").isFile) {
-    apply(plugin = "com.google.gms.google-services")
-}
-
 val appVersionName = providers.gradleProperty("appVersionName").orNull
     ?: error("appVersionName must be set in gradle.properties")
 require(Regex("""(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)""").matches(appVersionName)) {
@@ -104,10 +98,6 @@ tasks.register("validateReleaseVersion") {
 }
 
 dependencies {
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.crashlytics)
-    implementation(libs.firebase.analytics)
-
     implementation(project(":feature:appShell"))
     implementation(project(":feature:calls"))
     implementation(project(":feature:callDetail"))
