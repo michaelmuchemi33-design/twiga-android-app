@@ -16,6 +16,12 @@ type Conn = {
 const env = (name: string) => Deno.env.get(name) ?? "";
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+
+function asArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
+}
 const REQUIRED_SCOPES = [
   "https://www.googleapis.com/auth/calendar.events.owned",
   "https://www.googleapis.com/auth/contacts.readonly",
@@ -40,20 +46,20 @@ async function getCryptoKey(): Promise<CryptoKey> {
   if (cryptoKey) return cryptoKey;
   const raw = unb64(env("GOOGLE_TOKEN_ENCRYPTION_KEY"));
   if (raw.length !== 32) throw new HttpError(500, "GOOGLE_TOKEN_ENCRYPTION_KEY must be a base64-encoded 32-byte key.");
-  cryptoKey = await crypto.subtle.importKey("raw", raw, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+  cryptoKey = await crypto.subtle.importKey("raw", asArrayBuffer(raw), { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
   return cryptoKey;
 }
 async function encrypt(value: string | null): Promise<string | null> {
   if (!value) return null;
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const cipher = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await getCryptoKey(), encoder.encode(value));
+  const cipher = await crypto.subtle.encrypt({ name: "AES-GCM", iv: asArrayBuffer(iv) }, await getCryptoKey(), asArrayBuffer(encoder.encode(value)));
   return "v1." + b64(iv) + "." + b64(new Uint8Array(cipher));
 }
 async function decrypt(value: string | null): Promise<string | null> {
   if (!value) return null;
   const [version, iv, cipher] = value.split(".");
   if (version !== "v1" || !iv || !cipher) throw new HttpError(500, "Stored Google token has an unsupported format.");
-  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(iv) }, await getCryptoKey(), unb64(cipher));
+  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: asArrayBuffer(unb64(iv)) }, await getCryptoKey(), asArrayBuffer(unb64(cipher)));
   return decoder.decode(plain);
 }
 
