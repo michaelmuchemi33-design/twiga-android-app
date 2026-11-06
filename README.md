@@ -34,9 +34,9 @@ The TWIGA dashboard requests the following Google permissions when the owner sel
 
 | Service | OAuth scope | Access |
 |---|---|---|
-| Google Calendar | `calendar.events` | Read and manage calendar events |
+| Google Calendar | `calendar.events.owned` | Read and manage events on calendars owned by the user |
 | Google Contacts | `contacts.readonly` | Read Google contacts |
-| Google Sheets | `drive.file` | Create and manage TWIGA-owned business spreadsheets |
+| Google Sheets | `spreadsheets` | Read and write the user's spreadsheets |
 | Google Drive | `drive.file` | Work with files created or selected for TWIGA |
 
 To enable this for your Google project:
@@ -49,7 +49,7 @@ To enable this for your Google project:
 
 Google Sheets and Drive share the limited `drive.file` permission: TWIGA can create and update its own records sheet and files selected for the app, rather than browse every file in the owner's Drive. The Android TWIGA tab opens Google's authorization page in the system browser, then returns the authorization code to the live dashboard through the `twiga://auth/callback` app link. Google sign-in must not be embedded inside Android WebView.
 
-Google provider access tokens are currently session-scoped. Before relying on background synchronization, the live backend still needs a protected token vault that stores and refreshes each business owner's Google provider tokens. Do not put Google client secrets or refresh tokens in the APK. The contacts scope above is read-only; two-way write access to Google Contacts requires the broader `contacts` scope and an updated consent/verification review.
+Google provider access and refresh tokens are handled by the Supabase Edge Function `google-workspace` and stored encrypted in the server-side `twiga_google_connections` table. Apply the migration, configure the function secrets and deploy the function before customer use. Never put Google client secrets or refresh tokens in the APK or browser local storage. The contacts scope above is read-only; two-way write access to Google Contacts requires the broader `contacts` scope and an updated consent/verification review.
 
 ## Upstream notices
 
