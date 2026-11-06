@@ -322,7 +322,8 @@ R.integrations=function(){
    '<div class="pb" id="googleCheckResults" aria-live="polite"></div>'+
    '<p class="sub" style="margin-top:10px">Google access is optional. Drive access is limited by Google to TWIGA-created or selected files.</p>'+
   '</div>')+
-  C("What this enables",'<ul class="tl pb"><li><div class="k">1</div><div><b>Appointments</b><span>Create and view bookings in Google Calendar.</span></div></li><li><div class="k">2</div><div><b>Customers</b><span>Read Google Contacts to help match callers to saved customers.</span></div></li><li><div class="k">3</div><div><b>Business records</b><span>Export orders to a business spreadsheet.</span></div></li><li><div class="k">4</div><div><b>Documents</b><span>Verify and open TWIGA records stored in Google Drive.</span></div></li></ul>')+
+  C("What this enables",'<ul class="tl pb"><li><div class="k">1</div><div><b>Appointments</b><span>Create, reschedule and cancel bookings in Google Calendar.</span></div></li><li><div class="k">2</div><div><b>Customers</b><span>Read Google Contacts to help match callers to saved customers.</span></div></li><li><div class="k">3</div><div><b>Business records</b><span>Export orders to a business spreadsheet automatically after order changes.</span></div></li><li><div class="k">4</div><div><b>Documents</b><span>View TWIGA-created or selected Google Drive files.</span></div></li></ul>')+
+  C("Google Drive files",'<div class="pb"><button class="btn sm" data-act="google-load-drive">Load Google Drive files</button><div id="googleDriveFiles" class="sub" style="margin-top:10px">Files created by or selected for TWIGA will appear here.</div></div>')+
  '</div>'];
 };
 render();route();
@@ -410,6 +411,11 @@ async function refreshGoogleConnectionState(){
  }catch(error){status={connected:false,error:error.message||"Could not check Google Workspace."}}
  window.TWIGA_GOOGLE_STATUS=status;window.TWIGA_GOOGLE_GRANTED=!!status.connected;window.TWIGA_GOOGLE_ACCESS_TOKEN=null;
 }
+async function syncOrdersToGoogleQuietly(){
+ if(!window.TWIGA_GOOGLE_GRANTED||!BIZ)return;
+ try{var result=await L("listOrders",{limit:1000});await googleWorkspaceCall("sheets.export-orders",{orders:result.orders||[]})}
+ catch(error){console.warn("TWIGA Google Sheets sync failed:",error.message||error)}
+}
 async function list(){try{var o=(await L("listOrders",{limit:60})).orders;
  $("ol").innerHTML=o.length?T(["Order","Customer","Total","Paid","Status",""],o.map(function(x){var due=Number(x.Paid)<Number(x.Total)&&x.Status!=="Quote"&&x.Status!=="Cancelled",open=["Completed","Paid","Cancelled"].indexOf(x.Status)<0;
   return[esc(x.OrderId)+'<div class="sub">'+esc(x.Type)+'</div>',esc(x.Customer),Number(x.Total).toLocaleString(),Number(x.Paid).toLocaleString(),G(esc(x.Status),x.Status==="Paid"||x.Status==="Completed"?"ok":x.Status==="Cancelled"?"bad":"or"),
@@ -430,6 +436,10 @@ document.addEventListener("click",async function(e){
     contactsButton.disabled=true;contactsButton.textContent="Loading contacts...";
     await loadGoogleContacts();
     contactsButton.disabled=false;contactsButton.textContent="Refresh Google Contacts";
+   }
+   else if(a==="google-load-drive"){
+    var driveButton=b;driveButton.disabled=true;driveButton.textContent="Loading files...";
+    try{await window.TWIGA_LOAD_GOOGLE_DRIVE()}finally{driveButton.disabled=false;driveButton.textContent="Refresh Google Drive files"}
    }
    else if(a==="google-export-orders"){
     var exportButton=b;
@@ -491,21 +501,21 @@ document.addEventListener("click",async function(e){
     var payment=await L("stkStart",{orderId:j.orderId,phone:phone});msg(payment.message||"M-Pesa payment prompt sent.");
     list();
     for(var pi=0;pi<12;pi++){await new Promise(function(resolve){setTimeout(resolve,5000)});var check=await L("stkCheck",{paymentId:payment.paymentId});
-     if(check.status==="SUCCESS"){msg("Payment confirmed. Receipt "+(check.receipt||""));list();break}
+     if(check.status==="SUCCESS"){msg("Payment confirmed. Receipt "+(check.receipt||""));list();syncOrdersToGoogleQuietly();break}
      if(["FAILED","CANCELLED","EXPIRED","REVERSED","REVIEW"].indexOf(check.status)>=0){msg(check.message||"Payment not completed. The order remains unpaid.",1);break}
      if(pi===11)msg("Payment is still pending. Refresh the order list to check again.");
     }
    }else msg("Saved "+j.orderId+", KSh "+Number(j.total||0).toLocaleString()+(paid?". Paid by "+pm:". Payment pending."));
-   list();b.disabled=false;b.textContent="Save order";
+   list();syncOrdersToGoogleQuietly();b.disabled=false;b.textContent="Save order";
   }
-  else if(a==="paid"){await L("updateOrder",{orderId:id,paid:true,method:"Cash"});list()}
-  else if(a==="done"){await L("updateOrder",{orderId:id,status:"Completed"});list()}
-  else if(a==="cancel"){if(confirm("Cancel order "+id+"?")){await L("updateOrder",{orderId:id,status:"Cancelled"});list()}}
+  else if(a==="paid"){await L("updateOrder",{orderId:id,paid:true,method:"Cash"});list();syncOrdersToGoogleQuietly()}
+  else if(a==="done"){await L("updateOrder",{orderId:id,status:"Completed"});list();syncOrdersToGoogleQuietly()}
+  else if(a==="cancel"){if(confirm("Cancel order "+id+"?")){await L("updateOrder",{orderId:id,status:"Cancelled"});list();syncOrdersToGoogleQuietly()}}
   else if(a==="stk"){var s=await L("stkStart",{orderId:id,phone:b.dataset.ph});msg(s.message);
    for(var i=0;i<12;i++){await new Promise(function(r){setTimeout(r,5000)});var c=await L("stkCheck",{paymentId:s.paymentId});
     if(c.status==="SUCCESS"){msg("Paid. Receipt "+(c.receipt||""));list();break}
     if(["FAILED","CANCELLED","EXPIRED","REVERSED","REVIEW"].indexOf(c.status)>=0){msg(c.message||"Payment not completed",1);break}}}
- }catch(err){msg(err.message,1)}
+ }catch(err){msg(err.message,1);if(typeof a!=="undefined"&&a==="mk"&&typeof b!=="undefined"){b.disabled=false;b.textContent="Save order";list()}}
 });
 var DEV=null,PT=null,NUM="",CMD=null,EV=[],AIT=0,PAIR="";
 var ST={ringing:["Ringing","or"],active:["On call","ok"],ended:["Ended","gr"],missed:["Missed","bad"]};
@@ -664,6 +674,8 @@ if(K.mode==="live"){
   var target=new URL(url),verb=(method||"GET").toUpperCase(),path=target.pathname;
   if(path.indexOf("/calendar/v3/calendars/primary/events")>=0){
    if(verb==="POST")return (await googleWorkspaceCall("calendar.create",{event:body})).event;
+   if(verb==="PATCH")return (await googleWorkspaceCall("calendar.update",{eventId:decodeURIComponent(path.split("/").pop()),event:body})).event;
+   if(verb==="DELETE")return googleWorkspaceCall("calendar.delete",{eventId:decodeURIComponent(path.split("/").pop())});
    return googleWorkspaceCall("calendar.list",{timeMin:target.searchParams.get("timeMin"),timeMax:target.searchParams.get("timeMax")});
   }
   if(target.hostname==="people.googleapis.com")return googleWorkspaceCall("contacts.list",{pageSize:Number(target.searchParams.get("pageSize")||100),pageToken:target.searchParams.get("pageToken")||null});
@@ -690,10 +702,12 @@ if(K.mode==="live"){
    var data=await googleRequest(url,"GET");
    var rows=data.items||[];
    if(!rows.length){box.innerHTML='<div class="sub">No upcoming events in your primary Google Calendar for the next 30 days.</div>';return}
+   window.TWIGA_CALENDAR_EVENTS=rows;
    box.innerHTML=rows.map(function(ev){
     var link=ev.htmlLink?'<a class="lk" target="_blank" rel="noopener" href="'+esc(ev.htmlLink)+'">Open in Google Calendar</a>':"";
     var detail=[ev.location,ev.description].filter(Boolean).join(" · ");
-    return '<div class="opt"><div><b>'+esc(ev.summary||"Untitled appointment")+'</b><span>'+esc(gcalWhen(ev))+(detail?" · "+esc(detail.slice(0,180)):"")+'</span>'+link+'</div>'+G(ev.status==="cancelled"?"Cancelled":"In calendar",ev.status==="cancelled"?"bad":"ok")+'</div>';
+    var actions=ev.status==="cancelled"?"":'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button class="btn sm" data-act="google-edit-event" data-id="'+esc(ev.id)+'">Reschedule</button><button class="btn sm" data-act="google-cancel-event" data-id="'+esc(ev.id)+'">Cancel</button></div>';
+    return '<div class="opt"><div><b>'+esc(ev.summary||"Untitled appointment")+'</b><span>'+esc(gcalWhen(ev))+(detail?" · "+esc(detail.slice(0,180)):"")+'</span>'+link+actions+'</div>'+G(ev.status==="cancelled"?"Cancelled":"In calendar",ev.status==="cancelled"?"bad":"ok")+'</div>';
    }).join("");
   }catch(e){
    box.innerHTML='<div class="sub" style="color:var(--bad)">'+esc(e.message)+'</div><a class="btn" href="#integrations">Check Google access</a>';
@@ -729,6 +743,19 @@ if(K.mode==="live"){
    if(note)note.textContent="Loaded "+rows.length+" contact(s)"+(next?". Showing the first 500.":"")+" from Google Contacts. This view is read-only.";
   }catch(e){box.innerHTML='<div class="sub" style="color:var(--bad)">'+esc(e.message)+'</div>'}
  }
+ async function loadGoogleDriveFiles(){
+  var box=$("googleDriveFiles");if(!box)return;
+  if(!googleAccessToken()){box.textContent="Connect Google Workspace first.";return}
+  box.textContent="Loading Google Drive files...";
+  try{
+   var result=await googleWorkspaceCall("drive.list"),files=result.files||[];
+   box.innerHTML=files.length?files.map(function(file){
+    var href=file.webViewLink&&/^https:\/\//i.test(file.webViewLink)?'<a class="lk" target="_blank" rel="noopener" href="'+esc(file.webViewLink)+'">Open</a>':"";
+    return '<div class="opt"><div><b>'+esc(file.name||"Untitled file")+'</b><span>'+esc(file.mimeType||"Google Drive file")+'</span></div>'+href+'</div>';
+   }).join(""):'<div class="sub">No files created or selected for TWIGA are visible yet. Create the TWIGA records sheet or open a file with TWIGA from Google Drive.</div>';
+  }catch(error){box.innerHTML='<div class="sub" style="color:var(--bad)">'+esc(error.message)+'</div>'}
+ }
+ window.TWIGA_LOAD_GOOGLE_DRIVE=loadGoogleDriveFiles;
  R.customers=function(){
   setTimeout(cuLoad,0);
   return ["People saved in TWIGA and contacts available from your Google account.",'<div class="g2">'+
@@ -778,12 +805,46 @@ if(K.mode==="live"){
      end:{dateTime:end.toISOString(),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone||"Africa/Nairobi"}
     };
     b.disabled=true;b.textContent="Saving...";
-    await googleRequest("https://www.googleapis.com/calendar/v3/calendars/primary/events","POST",event);
-    if(message)message.textContent="Appointment saved to Google Calendar.";
-    $("gcalCustomer").value="";$("gcalPhone").value="";$("gcalService").value="";$("gcalNotes").value="";
+    var editingId=window.TWIGA_EDITING_EVENT_ID||"";
+    if(editingId)await googleRequest("https://www.googleapis.com/calendar/v3/calendars/primary/events/"+encodeURIComponent(editingId),"PATCH",event);
+    else await googleRequest("https://www.googleapis.com/calendar/v3/calendars/primary/events","POST",event);
+    window.TWIGA_EDITING_EVENT_ID="";
+    if(message)message.textContent=editingId?"Appointment updated in Google Calendar.":"Appointment saved to Google Calendar.";
+    $("gcalCustomer").value="";$("gcalPhone").value="";$("gcalService").value="";$("gcalNotes").value="";$("gcalStart").value="";
     await loadGoogleAppointments();
    }catch(err){if(message)message.textContent=err.message||"Could not save the appointment."}
    finally{b.disabled=false;b.textContent="Save to Google Calendar"}
+   return;
+  }
+  var editButton=e.target.closest('[data-act="google-edit-event"]');
+  if(editButton){
+   var found=(window.TWIGA_CALENDAR_EVENTS||[]).find(function(item){return item.id===editButton.dataset.id});
+   if(!found)return;
+   var parts=String(found.summary||"Appointment").split(" — ");
+   $("gcalService").value=parts.length>1?parts.slice(0,-1).join(" — "):found.summary||"Appointment";
+   $("gcalCustomer").value=parts.length>1?parts[parts.length-1]:"";
+   $("gcalPhone").value="";
+   $("gcalNotes").value=found.description||"";
+   var begin=found.start&&(found.start.dateTime||found.start.date+"T09:00:00");
+   var finish=found.end&&(found.end.dateTime||found.end.date+"T10:00:00");
+   var startDate=new Date(begin),endDate=new Date(finish);
+   if(!Number.isNaN(startDate.getTime())){
+    var localStart=new Date(startDate.getTime()-startDate.getTimezoneOffset()*60000);
+    $("gcalStart").value=localStart.toISOString().slice(0,16);
+    $("gcalDuration").value=Math.max(15,Math.min(720,Math.round((endDate-startDate)/60000)||60));
+   }
+   window.TWIGA_EDITING_EVENT_ID=found.id;
+   var saveButton=document.querySelector('[data-act="google-create-appointment"]');
+   if(saveButton)saveButton.textContent="Update appointment";
+   var message=$("gcalSaveMessage");if(message)message.textContent="Editing an existing calendar event.";
+   location.hash="#appointments";return;
+  }
+  var cancelButton=e.target.closest('[data-act="google-cancel-event"]');
+  if(cancelButton){
+   if(!confirm("Cancel this Google Calendar appointment?"))return;
+   var status=$("gcalSaveMessage");
+   try{await googleWorkspaceCall("calendar.delete",{eventId:cancelButton.dataset.id});if(status)status.textContent="Appointment cancelled.";await loadGoogleAppointments()}
+   catch(error){if(status)status.textContent=error.message||"Could not cancel appointment."}
    return;
   }
   if(e.target.closest('[data-act="google-refresh-calendar"]'))loadGoogleAppointments();
