@@ -1,17 +1,17 @@
 # TWIGA live workspace
 
-Deployed at https://app.twiga.co.ke (Vercel project `twiga-live`). No sample data. `ai.html` is the page the Android app opens for the AI receptionist test. `vapi-call.js` builds the AI call from the business prompt. Public settings only in `config.js`.
+Deployed at https://app.twiga.co.ke (Vercel project `twiga-live`). The website visual redesign is intentionally pending during this integration phase; existing TWIGA screens remain in place while workflows are connected.
 
-## Google Workspace authorization
+## Google Workspace
 
-The dashboard requests these Google OAuth scopes when the business owner chooses **Connect Google Workspace**:
+The dashboard requests Calendar, Contacts, Sheets and restricted Drive file scopes. Google API calls are routed through the authenticated Supabase Edge Function `google-workspace`, rather than directly from the browser. Google access and refresh tokens are stored encrypted in `twiga_google_connections` and refreshed server-side.
 
-- Calendar: `https://www.googleapis.com/auth/calendar.events`
-- Contacts: `https://www.googleapis.com/auth/contacts.readonly`
-- Sheets and Drive: `https://www.googleapis.com/auth/drive.file` (TWIGA-created or app-selected files only)
+Deployment prerequisites and commands are in [Google Workspace integration deployment](../docs/GOOGLE-WORKSPACE-INTEGRATION.md). Apply the migration and deploy the Edge Function before customer use of Google connection, calendar, contacts or Sheets export.
 
-In Google Cloud, enable Google Calendar API, People API, Google Sheets API and Google Drive API. Configure the OAuth consent screen, add the exact scopes, add the account as a test user while testing, and complete Google's verification before public rollout where required.
+## Existing business workflows
 
-In Supabase Auth > URL Configuration, add `twiga://auth/callback` to the Additional Redirect URLs list for the Android OAuth handoff. Keep the Supabase Google provider callback URL configured as the redirect URI in Google Cloud.
+Orders, items/pricing, customer records, call logs and phone commands use the existing TWIGA ledger/Supabase services. The order form supports multiple line items, validates quantities and prices, keeps M-Pesa orders unpaid until payment confirmation, and supports completion/cancellation. M-Pesa still depends on the configured external ledger Worker and Safaricom Daraja credentials.
 
-Google access tokens are currently held only in the active web session. Production background sync must first store and refresh provider tokens through a protected server-side token vault; do not persist Google refresh tokens in the APK or in browser local storage.
+## Voice
+
+`ai.html` is the Vapi WebRTC microphone test. It does not bridge normal Safaricom/Airtel cellular-call audio. `vapi-call.js` builds the AI call from the business prompt. Keep private provider credentials and privileged keys on the server; only browser-safe public settings belong in `config.js`.
