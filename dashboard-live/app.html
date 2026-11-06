@@ -491,9 +491,9 @@ document.addEventListener("click",async function(e){
    if(!customer)throw new Error("Enter the customer name.");
    if(!items.length)throw new Error("Add at least one item or service.");
    if(items.some(function(x){return !Number.isInteger(x.qty)||x.qty<1||!Number.isFinite(x.unitPrice)||x.unitPrice<0}))throw new Error("Check each item's quantity and price.");
-   if(pm==="M-Pesa"&&!/^(?:0[17][0-9]{8}|254[17][0-9]{8})$/.test(phone.replace(/[\\s-]/g,"")))throw new Error("Enter a valid Kenyan mobile number for the M-Pesa prompt.");
+   if(pm==="M-Pesa"&&!/^(?:0[17][0-9]{8}|254[17][0-9]{8})$/.test(phone.replace(/[\s-]/g,"").replace(/^\+/,"")))throw new Error("Enter a valid Kenyan mobile number for the M-Pesa prompt.");
    if(!TX)TX=crypto.randomUUID();b.disabled=true;b.textContent="Saving order...";
-   var paid=pm==="Cash"||pm==="Card";
+   var paid=pm==="Cash";
    var j=await L("createOrder",{txn:TX,customer:customer,phone:phone,type:$("ot").value,method:pm,paid:paid,items:items});
    TX="";$("oc").value="";$("op").value="";$("orderLines").innerHTML=orderLineHtml();
    if(pm==="M-Pesa"){
