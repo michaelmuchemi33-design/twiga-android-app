@@ -609,6 +609,9 @@ if(K.mode==="live"){
  function aiMetric(m){$("aiConnect").textContent=m.connectMs==null?"—":m.connectMs+" ms";$("aiFirst").textContent=m.firstResponseMs==null?"—":m.firstResponseMs+" ms";$("aiLast").textContent=m.lastResponseMs==null?"—":m.lastResponseMs+" ms";$("aiTurns").textContent=(m.turnCount||0)+" assistant turns"}
 async function aiToggle(){
   if(CALL&&(CALL.live||CALL.connecting)){CALL.stop();return}
+  var sr=await sb.from("twiga_subscriptions").select("status,trial_ends_at,current_period_end,grace_period_ends_at").eq("business_id",BIZ.id).maybeSingle(),sub=sr.data,now=Date.now();
+  var active=sub&&(sub.status==="active"||(sub.status==="trialing"&&Date.parse(sub.trial_ends_at)>now)||(sub.status==="past_due"&&sub.grace_period_ends_at&&Date.parse(sub.grace_period_ends_at)>now));
+  if(!active){$("aiErr").innerHTML='Your trial has ended or this workspace is inactive. <a href="/billing">Activate TWIGA to continue</a>.';return}
   var mod=await import("/vapi-call.js"),d=await sb.from("business_ai").select("prompt,greeting,faq,rules").eq("business_id",BIZ.id).maybeSingle(),x=d.data||{};
   $("aiErr").textContent="";$("aiTr").innerHTML="";$("aiTr").dataset.f="1";AI_LINES=[];aiMetric({});
   CALL=mod.createCall(K.vapiKey,K.vapiAssistantId,{
