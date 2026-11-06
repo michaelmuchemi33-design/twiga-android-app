@@ -1,0 +1,4 @@
+project_id = "twiga-backend"
+
+[functions.google-workspace]
+verify_jwt = true
