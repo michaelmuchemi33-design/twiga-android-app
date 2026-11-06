@@ -387,12 +387,12 @@ window.TWIGA_TEST_GOOGLE=async function(){
   }else{
    await api("https://sheets.googleapis.com/v4/spreadsheets/"+encodeURIComponent(sheetId)+"?fields=spreadsheetId,properties.title");
   }
-  push("Google Sheets",true,'TWIGA records sheet ready: <a target="_blank" rel="noopener" href="https://docs.google.com/spreadsheets/d/'+encodeURIComponent(sheetId)+'/edit">Open sheet</a>');
+  push("Google Sheets",true,"TWIGA Business Records sheet is created and saved in this browser.");
  }catch(e){push("Google Sheets",false,e.message)}
  try{
   if(!sheetId)throw new Error("Create the TWIGA records sheet first.");
   var file=await api("https://www.googleapis.com/drive/v3/files/"+encodeURIComponent(sheetId)+"?fields=id,name,mimeType");
-  push("Google Drive",true,"TWIGA file access verified for "+esc(file.name||"the records sheet")+".");
+  push("Google Drive",true,"Drive access verified for the TWIGA records file.");
  }catch(e){push("Google Drive",false,e.message)}
  return out
 };
@@ -448,7 +448,7 @@ document.addEventListener("click",async function(e){
     try{
      var checks=await window.TWIGA_TEST_GOOGLE();
      var target=$("googleCheckResults");
-     if(target)target.innerHTML=checks.map(function(x){return '<div class="opt"><div><b>'+esc(x.name)+'</b><span>'+esc(x.detail).replace(/&lt;a /g,'<a ').replace(/&gt;/g,'>')+'</span></div>'+G(x.ok?"Ready":"Needs access",x.ok?"ok":"bad")+'</div>'}).join("");
+     if(target)target.innerHTML=checks.map(function(x){return '<div class="opt"><div><b>'+esc(x.name)+'</b><span>'+esc(x.detail)+'</span></div>'+G(x.ok?"Ready":"Needs access",x.ok?"ok":"bad")+'</div>'}).join("");
     }catch(err){var target=$("googleCheckResults");if(target)target.textContent=err.message||"Google test failed."}
     testButton.disabled=false;testButton.textContent="Test Google connections";
    }
