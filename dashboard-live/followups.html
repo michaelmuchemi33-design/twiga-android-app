@@ -1,0 +1,43 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>TWIGA follow-ups</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>*{box-sizing:border-box}body{margin:0;padding:24px 16px;background:#f7f7f5;color:#171717;font:15px/1.5 "DM Sans",system-ui,sans-serif}main{max-width:760px;margin:4vh auto}.card{background:white;border:1px solid #e5e5e5;border-radius:20px;padding:22px;margin:16px 0}h1{font-size:27px;margin:0 0 8px}.muted{color:#667085;font-size:13px}label{display:block;font-weight:700;margin:12px 0 6px}input,select,textarea{width:100%;padding:12px;border:1px solid #ccc;border-radius:12px;font:inherit;background:white}button,.btn{border:0;border-radius:99px;padding:11px 16px;background:#f47721;color:white;font:700 14px inherit;text-decoration:none;cursor:pointer}button:disabled{opacity:.5}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.task{padding:14px 0;border-bottom:1px solid #eee}.task:last-child{border:0}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.secondary{background:#171717}.warning{background:#fff4e9;color:#78400e;border-radius:12px;padding:12px;margin-top:12px}</style></head><body><main>
+<h1>Customer follow-ups</h1><p class="muted" id="business">Loading your business…</p>
+<section class="card"><b>Create a follow-up</b><form id="form">
+<div class="row"><div><label for="customer">Customer name</label><input id="customer" maxlength="120" placeholder="Customer name"></div><div><label for="phone">Phone number</label><input id="phone" maxlength="30" required placeholder="+2547…"></div></div>
+<label for="task">What needs to happen?</label><textarea id="task" rows="2" maxlength="800" required placeholder="Call back about an appointment…"></textarea>
+<div class="row"><div><label for="due">When</label><input id="due" type="datetime-local" required></div><div><label for="consent">Contact permission</label><select id="consent"><option value="unknown">Not recorded yet</option><option value="opted_in">Customer opted in</option><option value="opted_out">Customer opted out</option><option value="not_required">Manual/internal task</option></select></div></div>
+<button id="save">Save follow-up</button></form><div class="muted" id="message" role="status"></div>
+<div class="warning">This queue stores and schedules work for your team. Automatic AI outbound calling stays disabled until your existing line has a verified provider route and the customer has the required contact permission.</div></section>
+<section class="card"><b>Follow-up queue</b><div id="list" class="muted">Loading…</div></section>
+<p class="muted"><a href="/app#followups">Back to dashboard</a> · <a href="/line-setup">Connect your business line</a></p>
+</main><script src="/config.js"></script><script type="module">
+import {sb,getWorkspace,esc,fmtDate} from "./workspace-client.js";
+const $=id=>document.getElementById(id);let w=null;
+function norm(v){let n=v.replace(/[\s()-]/g,"");if(/^0[17]\d{8}$/.test(n))n="+254"+n.slice(1);if(/^254[17]\d{8}$/.test(n))n="+"+n;return n;}
+function setDefaultDue(){const d=new Date(Date.now()+24*3600000);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());$("due").value=d.toISOString().slice(0,16);}
+async function load(){
+ const {data,error}=await sb.from("twiga_followups").select("id,customer_name,phone_number,task,channel,due_at,status,consent_status,attempt_count").eq("business_id",w.business.id).order("due_at",{ascending:true}).limit(100);
+ if(error)throw error;
+ $("list").innerHTML=data.length?data.map(x=>'<div class="task"><b>'+esc(x.customer_name||x.phone_number)+'</b><div class="muted">'+esc(x.phone_number)+' · '+esc(x.channel)+' · '+esc(x.status)+'</div><p>'+esc(x.task)+'</p><div class="muted">Due: '+esc(fmtDate(x.due_at))+' · Permission: '+esc(x.consent_status)+' · Attempts: '+x.attempt_count+'</div><div class="actions">'+(x.status!=="completed"&&x.status!=="cancelled"&&x.status!=="opted_out"?'<button data-done="'+x.id+'">Mark complete</button><button class="secondary" data-cancel="'+x.id+'">Cancel</button>':'')+'</div></div>').join(""):"No follow-ups yet.";
+}
+async function init(){try{w=await getWorkspace();if(!w.session){$("business").innerHTML='<a href="/app#login">Sign in</a> to continue.';$("form").hidden=true;return;}if(!w.business){$("business").innerHTML='<a href="/start">Create a workspace</a> first.';$("form").hidden=true;return;} $("business").textContent="Business: "+w.business.name;setDefaultDue();await load();}catch(e){$("message").textContent=e.message;}}
+$("form").addEventListener("submit",async e=>{
+ e.preventDefault();const phone=norm($("phone").value.trim()),due=new Date($("due").value);
+ if(!/^\+254[17]\d{8}$/.test(phone)){$("message").textContent="Enter a valid Kenyan mobile number.";return;}
+ if(Number.isNaN(due.getTime())){$("message").textContent="Choose a valid follow-up time.";return;}
+ const consent=$("consent").value;$("save").disabled=true;
+ try{
+  const {error}=await sb.from("twiga_followups").insert({business_id:w.business.id,created_by:w.session.user.id,customer_name:$("customer").value.trim()||null,phone_number:phone,task:$("task").value.trim(),channel:"phone",due_at:due.toISOString(),consent_status:consent,status:consent==="opted_out"?"opted_out":"pending"});
+  if(error)throw error;$("message").textContent="Follow-up saved."; $("form").reset();setDefaultDue();await load();
+ }catch(error){$("message").textContent=error.message||"Could not save follow-up.";}
+ finally{$("save").disabled=false;}
+});
+document.addEventListener("click",async e=>{
+ const done=e.target.closest("[data-done]"),cancel=e.target.closest("[data-cancel]");if(!done&&!cancel)return;
+ const id=(done||cancel).dataset.done||(done||cancel).dataset.cancel;
+ const update=done?{status:"completed",completed_at:new Date().toISOString()}:{status:"cancelled"};
+ const {error}=await sb.from("twiga_followups").update(update).eq("id",id).eq("business_id",w.business.id);
+ if(error){$("message").textContent=error.message;return;}await load();
+});
+init();
+</script></body></html>
