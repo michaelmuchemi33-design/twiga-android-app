@@ -47,7 +47,7 @@ function showSignIn() {
   });
 }
 function showExisting(business) {
-  const trialText=business.status==="TRIAL"?"Your free-trial workspace is ready.":"Your existing workspace is ready.";
+  const trialText=business.status==="TRIAL"?"Your free-trial workspace is ready.":business.status==="INACTIVE"?"This workspace is inactive or its trial has ended. Open billing to reactivate it.":"Your existing workspace is ready.";
   $("content").innerHTML='<h2>'+esc(business.name)+'</h2><p class="muted">'+trialText+'</p><p class="small">Status: <b>'+esc(business.status)+'</b><br>Paid through: '+esc(business.paid_through||"Not set")+'</p><a class="button" href="/app#overview">Continue to dashboard</a><a class="button outline" href="/billing">View plan and billing</a>';
   message("Signed in as "+(currentSession.user.email||"your Google account"),"good");
 }
