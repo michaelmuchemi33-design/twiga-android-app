@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Start your TWIGA free trial</title>
+<meta name="description" content="Create your TWIGA business workspace and start your 7-day AI receptionist trial.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--orange:#f47721;--ink:#171717;--muted:#687078;--line:#e7e7e7;--soft:#f7f7f5}
+*{box-sizing:border-box}body{margin:0;background:var(--soft);color:var(--ink);font:15px/1.55 "DM Sans",system-ui,sans-serif;padding:22px 16px;min-height:100vh}
+main{max-width:560px;margin:5vh auto}.brand{font-weight:800;letter-spacing:.12em;font-size:21px}.mark{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:10px;background:var(--orange);color:#fff;margin-right:8px}
+.card{background:#fff;border:1px solid var(--line);border-radius:22px;padding:26px;box-shadow:0 10px 35px #00000008;margin-top:22px}
+h1{font-size:30px;line-height:1.15;margin:20px 0 10px;letter-spacing:-.04em}.muted{color:var(--muted)}.small{font-size:13px}
+label{display:block;font-weight:700;margin:14px 0 6px}input,select{width:100%;padding:13px 14px;border:1px solid #d8d8d8;border-radius:12px;font:inherit;background:#fff}
+button,.button{display:inline-flex;justify-content:center;align-items:center;gap:8px;width:100%;border:0;border-radius:99px;padding:14px 18px;background:var(--orange);color:#fff;font:700 15px inherit;text-decoration:none;cursor:pointer;margin-top:14px}
+button:disabled{opacity:.55;cursor:wait}.outline{background:#fff;color:var(--ink);border:1px solid var(--line)}.status{margin-top:14px;padding:12px 14px;border-radius:12px;background:#f8f4ef;color:#5b4635;white-space:pre-wrap}.good{background:#eef8f0;color:#245b31}.error{background:#fff0ed;color:#8d2d1b}
+ul{padding-left:20px;color:var(--muted)}.pill{display:inline-block;background:#fff1e5;color:#a74d0a;border-radius:99px;padding:5px 10px;font-size:12px;font-weight:800}
+footer{margin:18px 0;text-align:center;color:var(--muted);font-size:12px}
+</style></head><body>
+<main>
+  <div class="brand"><span class="mark">T</span>TWIGA</div>
+  <section class="card">
+    <span class="pill">7-DAY FREE TRIAL</span>
+    <h1>Let TWIGA answer while you run your business.</h1>
+    <p class="muted">Create your private workspace, teach the receptionist about your business, then connect the phone route that your carrier supports.</p>
+    <ul><li>One workspace for your business and team.</li><li>Set your greeting, services, prices and FAQs.</li><li>Test English and Kiswahili voice conversations.</li></ul>
+    <div id="content"><button id="google">Continue with Google</button><p class="small muted">Your Google account is used to sign in. You choose separately whether to connect Calendar, Contacts, Sheets and Drive.</p></div>
+    <div id="message" class="status" hidden role="status"></div>
+  </section>
+  <footer><a href="https://twiga.co.ke" class="muted">TWIGA home</a> · <a href="mailto:support@twiga.co.ke" class="muted">Support</a></footer>
+</main>
+<script src="/config.js"></script>
+<script type="module">
+import { sb, getWorkspace, esc, fmtDate, appUrl } from "./workspace-client.js";
+const $ = id => document.getElementById(id);
+const TYPES = ["Salon / Barbershop","Clinic / Dental","Repair / Service","Retail / Shop","Restaurant / Cafe","Professional services","Other"];
+let currentSession = null;
+
+function message(text, kind="") {
+  const el=$("message"); el.hidden=!text; el.className="status "+kind; el.textContent=text;
+}
+function showSignIn() {
+  $("content").innerHTML='<button id="google">Continue with Google</button><p class="small muted">No password to remember. Your Google account is used only to sign in; business data stays in your TWIGA workspace.</p>';
+  $("google").addEventListener("click", async () => {
+    $("google").disabled=true; message("Opening secure Google sign-in…");
+    const {error}=await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+"/start",queryParams:{access_type:"offline",prompt:"select_account"}}});
+    if(error){message(error.message,"error");$("google").disabled=false;}
+  });
+}
+function showExisting(business) {
+  const trialText=business.status==="TRIAL"?"Your free-trial workspace is ready.":"Your existing workspace is ready.";
+  $("content").innerHTML='<h2>'+esc(business.name)+'</h2><p class="muted">'+trialText+'</p><p class="small">Status: <b>'+esc(business.status)+'</b><br>Paid through: '+esc(business.paid_through||"Not set")+'</p><a class="button" href="/app#overview">Continue to dashboard</a><a class="button outline" href="/billing">View plan and billing</a>';
+  message("Signed in as "+(currentSession.user.email||"your Google account"),"good");
+}
+function showCreateForm() {
+  $("content").innerHTML='<h2>Create your workspace</h2><p class="muted">Your 7-day trial starts when your first business workspace is created.</p><form id="create"><label for="name">Business name</label><input id="name" name="name" maxlength="120" required placeholder="e.g. NILA Salon"><label for="type">Business type</label><select id="type" name="type">'+TYPES.map((t,i)=>'<option value="'+esc(t)+'">'+esc(t)+'</option>').join("")+'</select><button id="createButton" type="submit">Create my free-trial workspace</button></form><button class="outline" id="signout">Sign out</button>';
+  $("create").addEventListener("submit", createWorkspace);
+  $("signout").addEventListener("click", async()=>{await sb.auth.signOut();currentSession=null;showSignIn();message("Signed out.");});
+}
+async function createWorkspace(event) {
+  event.preventDefault();
+  const button=$("createButton"),name=$("name").value.trim(),type=$("type").value;
+  if(name.length<2){message("Enter your business name.","error");return;}
+  button.disabled=true;button.textContent="Creating private workspace…";message("Setting up your trial and business profile…");
+  try {
+    const {data:business,error}=await sb.from("businesses").insert({name,business_type:type}).select("id,name,business_type,status,paid_through").single();
+    if(error)throw error;
+    const {data:member,error:memberError}=await sb.from("business_members").select("role,business_id").eq("business_id",business.id).maybeSingle();
+    if(memberError)throw memberError;
+    if(!member)throw new Error("The business was created but its owner membership was not confirmed. Contact support before creating another workspace.");
+    const {data:sub}=await sb.from("twiga_subscriptions").select("status,trial_ends_at,amount,currency").eq("business_id",business.id).maybeSingle();
+    const trial=sub?.status==="trialing";
+    $("content").innerHTML='<span class="pill">'+(trial?"TRIAL ACTIVE":"ACTIVATION REQUIRED")+'</span><h2>'+esc(business.name)+' is set up.</h2><p class="muted">'+(trial?"Your 7-day free trial has started.":"This account has already used its free trial. Contact TWIGA to activate the workspace.")+'</p><p class="small">Trial ends: '+esc(fmtDate(sub?.trial_ends_at||business.paid_through))+'</p><a class="button" href="/app#overview">Open my dashboard</a>';
+    message("Your workspace and owner access were created successfully.","good");
+  } catch(error) {
+    message(error.message||"Could not create the workspace. Please try again.","error");
+    button.disabled=false;button.textContent="Create my free-trial workspace";
+  }
+}
+async function init() {
+  try {
+    const w=await getWorkspace(); currentSession=w.session;
+    if(!w.session){showSignIn();return;}
+    if(w.business){showExisting(w.business);return;}
+    showCreateForm();
+  } catch(error) { message(error.message||"Could not load your TWIGA account.","error"); }
+}
+sb.auth.onAuthStateChange((event,session)=>{
+  if(event==="SIGNED_IN"||event==="TOKEN_REFRESHED"){currentSession=session;setTimeout(init,0);}
+  if(event==="SIGNED_OUT"){currentSession=null;showSignIn();}
+});
+$("google")?.addEventListener("click", async()=>{
+  $("google").disabled=true;message("Opening secure Google sign-in…");
+  const {error}=await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+"/start",queryParams:{access_type:"offline",prompt:"select_account"}}});
+  if(error){message(error.message,"error");$("google").disabled=false;}
+});
+init();
+</script></body></html>
