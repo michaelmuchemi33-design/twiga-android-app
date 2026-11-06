@@ -1,0 +1,31 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>TWIGA subscription</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>*{box-sizing:border-box}body{margin:0;padding:24px 16px;background:#f7f7f5;color:#171717;font:15px/1.5 "DM Sans",system-ui,sans-serif}main{max-width:680px;margin:4vh auto}.card{background:#fff;border:1px solid #e5e5e5;border-radius:20px;padding:22px;margin:16px 0}h1{font-size:27px;margin:0 0 8px}.muted{color:#667085;font-size:13px}.price{font-size:34px;font-weight:800;margin:8px 0}.pill{display:inline-block;background:#fff1e5;color:#a74d0a;padding:5px 11px;border-radius:99px;font-size:12px;font-weight:800}.row{display:flex;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid #eee}.notice{padding:13px;border-radius:12px;background:#fff4e9;color:#78400e}.event{padding:12px 0;border-bottom:1px solid #eee}</style></head><body><main>
+<h1>Plan and subscription</h1><p class="muted" id="business">Loading your business…</p>
+<section class="card"><span class="pill" id="status">Loading</span><div class="price">KSh 1,500 <span class="muted">/ month</span></div><p class="muted">Starter plan · 7-day free trial for eligible new business accounts.</p>
+<div id="details" class="muted">Loading subscription details…</div>
+</section>
+<section class="card"><b>Payment history</b><div id="events" class="muted">Loading…</div></section>
+<div class="notice">M-Pesa subscription checkout is not connected to this subscription record yet. Do not send money to an unverified number or assume a payment is active. Contact <a href="mailto:support@twiga.co.ke?subject=TWIGA%20subscription">TWIGA support</a> to arrange activation until the payment gateway is connected.</div>
+<p class="muted"><a href="/app#settings">Back to dashboard</a> · <a href="/line-setup">Phone line setup</a></p>
+</main><script src="/config.js"></script><script type="module">
+import {sb,getWorkspace,esc,fmtDate} from "./workspace-client.js";
+const $=id=>document.getElementById(id);
+async function init(){
+ try{
+  const w=await getWorkspace();if(!w.session){$("business").innerHTML='<a href="/app#login">Sign in</a> to continue.';return;}if(!w.business){$("business").innerHTML='<a href="/start">Create a workspace</a> first.';return;}
+  $("business").textContent="Business: "+w.business.name;
+  const {data:s,error}=await sb.from("twiga_subscriptions").select("plan_code,billing_interval,currency,amount,status,trial_started_at,trial_ends_at,current_period_end,grace_period_ends_at,last_payment_at").eq("business_id",w.business.id).maybeSingle();
+  if(error)throw error;
+  if(!s){$("details").textContent="No subscription record was found. Contact support.";return;}
+  $("status").textContent=s.status.replaceAll("_"," ").toUpperCase();
+  const expiry=s.status==="trialing"?s.trial_ends_at:s.current_period_end;
+  const remaining=expiry?Math.max(0,Math.ceil((new Date(expiry).getTime()-Date.now())/86400000)):null;
+  $("details").innerHTML='<div class="row"><span>Plan</span><b>'+esc(s.plan_code)+' · '+esc(s.billing_interval)+'</b></div><div class="row"><span>Trial started</span><b>'+esc(fmtDate(s.trial_started_at))+'</b></div><div class="row"><span>'+(s.status==="trialing"?"Trial ends":"Period ends")+'</span><b>'+esc(fmtDate(expiry))+'</b></div><div class="row"><span>Time remaining</span><b>'+(remaining===null?"—":remaining+" days")+'</b></div><div class="row"><span>Last payment</span><b>'+esc(fmtDate(s.last_payment_at))+'</b></div>';
+  const {data:events,error:eventError}=await sb.from("twiga_subscription_events").select("provider,amount,currency,status,event_type,created_at").eq("business_id",w.business.id).order("created_at",{ascending:false}).limit(20);
+  if(eventError)throw eventError;
+  $("events").innerHTML=events.length?events.map(e=>'<div class="event"><b>'+esc(e.event_type)+'</b><div class="muted">'+esc(e.provider)+' · '+esc(e.status)+' · '+esc(fmtDate(e.created_at))+'</div><div>'+esc(e.currency)+' '+Number(e.amount).toLocaleString("en-KE")+'</div></div>').join(""):"No subscription payments recorded yet.";
+ }catch(e){$("details").textContent=e.message||"Could not load subscription.";}
+}
+init();
+</script></body></html>
