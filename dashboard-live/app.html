@@ -314,7 +314,9 @@ R.integrations=function(){
     row("Google Sheets","Create and manage TWIGA business spreadsheets.")+
     row("Google Drive","Create and manage TWIGA files and files you select.")+
     '<button class="btn pri" data-act="google-connect" style="margin-top:14px">Connect Google Workspace</button>'+
+    '<button class="btn" data-act="google-test" style="margin-top:8px">Test Google connections</button>'+
     '<div class="sub" id="googleAccessError" role="alert"></div>'+
+    '<div class="pb" id="googleCheckResults" aria-live="polite"></div>'+
     '<p class="sub" style="margin-top:10px">Google access is optional. TWIGA requests only the scopes listed here. Drive access is limited to files created or selected for TWIGA.</p>'+
    '</div>')+
    C("What this enables",'<ul class="tl pb"><li><div class="k">1</div><div><b>Appointments</b><span>Create and update business bookings in Google Calendar.</span></div></li><li><div class="k">2</div><div><b>Customers</b><span>Read Google Contacts to help match callers to saved customers.</span></div></li><li><div class="k">3</div><div><b>Business records</b><span>Use Google Sheets for business records and reports.</span></div></li><li><div class="k">4</div><div><b>Documents</b><span>Work with TWIGA-created or user-selected Google Drive files.</span></div></li></ul>')+
@@ -345,6 +347,56 @@ window.TWIGA_EXCHANGE_CODE=async function(code){
  if(r.error){console.error("TWIGA Google OAuth exchange failed",r.error);return false}
  return true
 };
+window.TWIGA_TEST_GOOGLE=async function(){
+ var token=window.TWIGA_GOOGLE_ACCESS_TOKEN;
+ var out=[];
+ var push=function(name,ok,detail){out.push({name:name,ok:ok,detail:detail||""})};
+ if(!token){
+  push("Google access",false,"Connect Google Workspace and approve the requested access first.");
+  return out
+ }
+ var api=async function(url,options){
+  options=options||{};
+  options.headers=Object.assign({"Authorization":"Bearer "+token,"Content-Type":"application/json"},options.headers||{});
+  var response=await fetch(url,options),data={};
+  try{data=await response.json()}catch(e){}
+  if(!response.ok)throw new Error(data.error&&data.error.message||"Google API returned HTTP "+response.status);
+  return data
+ };
+ try{
+  var now=new Date(),week=new Date(now.getTime()+7*86400000);
+  var calendar=await api("https://www.googleapis.com/calendar/v3/calendars/primary/events?maxResults=1&timeMin="+encodeURIComponent(now.toISOString())+"&timeMax="+encodeURIComponent(week.toISOString()));
+  push("Google Calendar",true,(calendar.items||[]).length+" upcoming event(s) visible.");
+ }catch(e){push("Google Calendar",false,e.message)}
+ try{
+  var contacts=await api("https://people.googleapis.com/v1/people/me/connections?pageSize=1&personFields=names");
+  push("Google Contacts",true,"People API access verified.");
+ }catch(e){push("Google Contacts",false,e.message)}
+ var key="twiga_google_sheet_"+(window.BIZ&&window.BIZ.id||"account");
+ var sheetId=localStorage.getItem(key)||"";
+ try{
+  if(!sheetId){
+   var sheet=await api("https://sheets.googleapis.com/v4/spreadsheets",{method:"POST",body:JSON.stringify({properties:{title:"TWIGA Business Records"}})});
+   sheetId=sheet.spreadsheetId;
+   if(!sheetId)throw new Error("Google did not return a spreadsheet ID.");
+   localStorage.setItem(key,sheetId);
+   await api("https://sheets.googleapis.com/v4/spreadsheets/"+encodeURIComponent(sheetId)+"/values/Sheet1!A1:F1?valueInputOption=RAW",{
+    method:"PUT",
+    body:JSON.stringify({values:[["Created","Customer","Phone","Order","Amount (KSh)","Status"]]})
+   });
+  }else{
+   await api("https://sheets.googleapis.com/v4/spreadsheets/"+encodeURIComponent(sheetId)+"?fields=spreadsheetId,properties.title");
+  }
+  push("Google Sheets",true,'TWIGA records sheet ready: <a target="_blank" rel="noopener" href="https://docs.google.com/spreadsheets/d/'+encodeURIComponent(sheetId)+'/edit">Open sheet</a>');
+ }catch(e){push("Google Sheets",false,e.message)}
+ try{
+  if(!sheetId)throw new Error("Create the TWIGA records sheet first.");
+  var file=await api("https://www.googleapis.com/drive/v3/files/"+encodeURIComponent(sheetId)+"?fields=id,name,mimeType");
+  push("Google Drive",true,"TWIGA file access verified for "+esc(file.name||"the records sheet")+".");
+ }catch(e){push("Google Drive",false,e.message)}
+ return out
+};
+
 window.SESS=null;window.BIZ=null;window.READY=false;window.UF="";
 var TX="",TYPES=[["salon","Salon or barber"],["shop","Shop or retail"],["clinic","Clinic"],["restaurant","Restaurant"],["repair","Repair or technician"],["legal","Law firm"],["realestate","Real estate"],["general","Other"]];
 var opt=function(a){return a.map(function(x){return '<option value="'+x[0]+'">'+x[1]+'</option>'}).join("")};
@@ -390,7 +442,17 @@ document.addEventListener("click",async function(e){
  var b=e.target.closest("[data-act]");if(!b)return;
  var a=b.dataset.act,id=b.dataset.id;
  try{
-  if(a==="g"||a==="google-connect"){
+  if(a==="google-test"){
+    var testButton=b;
+    testButton.disabled=true;testButton.textContent="Testing Google access...";
+    try{
+     var checks=await window.TWIGA_TEST_GOOGLE();
+     var target=$("googleCheckResults");
+     if(target)target.innerHTML=checks.map(function(x){return '<div class="opt"><div><b>'+esc(x.name)+'</b><span>'+esc(x.detail).replace(/&lt;a /g,'<a ').replace(/&gt;/g,'>')+'</span></div>'+G(x.ok?"Ready":"Needs access",x.ok?"ok":"bad")+'</div>'}).join("");
+    }catch(err){var target=$("googleCheckResults");if(target)target.textContent=err.message||"Google test failed."}
+    testButton.disabled=false;testButton.textContent="Test Google connections";
+   }
+   else if(a==="g"||a==="google-connect"){
     var scopeSet=[
      "https://www.googleapis.com/auth/calendar.events",
      "https://www.googleapis.com/auth/contacts.readonly",
