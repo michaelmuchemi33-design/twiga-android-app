@@ -59,6 +59,7 @@ export function createCall(publicKey, assistantIdOrHooks, hooksMaybe = {}) {
   let requestedAt = 0;
   let callStartedAt = 0;
   let pendingUserAt = 0;
+  let firstUserAt = 0;
   let firstResponseMs = null;
   let lastResponseMs = null;
   let connectMs = null;
@@ -101,6 +102,7 @@ export function createCall(publicKey, assistantIdOrHooks, hooksMaybe = {}) {
       ended = false;
       requestedAt = now();
       pendingUserAt = 0;
+      firstUserAt = 0;
       firstResponseMs = null;
       lastResponseMs = null;
       connectMs = null;
@@ -131,7 +133,19 @@ export function createCall(publicKey, assistantIdOrHooks, hooksMaybe = {}) {
           emit("state", "ended");
         });
 
-        vapi.on("speech-start", () => emit("state", "speaking"));
+        vapi.on("speech-start", () => {
+          const at = now();
+          if (pendingUserAt) {
+            if (firstResponseMs === null && firstUserAt) {
+              firstResponseMs = Math.max(0, Math.round(at - firstUserAt));
+            }
+            lastResponseMs = Math.max(0, Math.round(at - pendingUserAt));
+            pendingUserAt = 0;
+            turnCount += 1;
+            emit("metric", snapshot());
+          }
+          emit("state", "speaking");
+        });
         vapi.on("speech-end", () => emit("state", "listening"));
 
         vapi.on("message", message => {
@@ -141,20 +155,11 @@ export function createCall(publicKey, assistantIdOrHooks, hooksMaybe = {}) {
           const at = now();
           const role = message.role === "user" ? "user" : "assistant";
           if (role === "user") {
+            if (!firstUserAt) firstUserAt = at;
             pendingUserAt = at;
-          } else {
-            if (firstResponseMs === null && callStartedAt) {
-              firstResponseMs = Math.max(0, Math.round(at - callStartedAt));
-            }
-            if (pendingUserAt) {
-              lastResponseMs = Math.max(0, Math.round(at - pendingUserAt));
-              pendingUserAt = 0;
-            }
-            turnCount += 1;
           }
 
           emit("line", role, message.transcript);
-          emit("metric", snapshot());
         });
 
         vapi.on("error", error => {
