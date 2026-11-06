@@ -1,0 +1,43 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>TWIGA phone line setup</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>*{box-sizing:border-box}body{margin:0;padding:24px 16px;background:#f7f7f5;color:#171717;font:15px/1.5 "DM Sans",system-ui,sans-serif}main{max-width:680px;margin:4vh auto}.card{background:white;border:1px solid #e5e5e5;border-radius:20px;padding:22px;margin:16px 0}h1{font-size:27px;margin:0 0 8px}.muted{color:#667085;font-size:13px}label{display:block;font-weight:700;margin:14px 0 6px}input,select{width:100%;padding:13px;border:1px solid #ccc;border-radius:12px;font:inherit;background:white}button,.btn{display:block;width:100%;border:0;border-radius:99px;padding:14px;background:#f47721;color:white;font:700 15px inherit;text-align:center;text-decoration:none;margin-top:14px;cursor:pointer}.notice{padding:12px;border-radius:12px;background:#fff4e9;color:#78400e;margin:14px 0}.item{padding:12px 0;border-bottom:1px solid #eee}.item:last-child{border:0}</style></head><body><main>
+<h1>Connect your existing business line</h1><p class="muted" id="business">Loading your business…</p>
+<section class="card"><p><b>Keep the number your customers already know.</b></p><p class="muted">This records your line and the connection method you want to use. It does not activate call answering by itself.</p>
+<form id="lineForm"><label for="number">Business phone number</label><input id="number" placeholder="+254 7xx xxx xxx or 07xx xxx xxx" autocomplete="tel" required>
+<label for="carrier">Network</label><select id="carrier"><option value="safaricom">Safaricom</option><option value="airtel">Airtel</option><option value="telkom">Telkom</option><option value="other">Other</option></select>
+<label for="method">How should TWIGA connect?</label><select id="method"><option value="android_device">Use my existing Android phone</option><option value="call_forwarding">Call forwarding to a verified TWIGA destination</option><option value="sip_trunk">SIP trunk from my carrier/provider</option></select>
+<button id="save">Save line setup</button></form><div class="notice" id="methodNote">Choose a method to see its requirements.</div><div id="message" class="muted" role="status"></div></section>
+<section class="card"><b>Saved business lines</b><div id="lines" class="muted">Loading…</div></section>
+<p class="muted"><a href="/app#phone">Back to dashboard</a> · <a href="/billing">Subscription</a></p>
+</main><script src="/config.js"></script><script type="module">
+import {sb,getWorkspace,esc} from "./workspace-client.js";
+const $=id=>document.getElementById(id);let w=null;
+const notes={
+ android_device:"Android pairing can sync supported dialer events and device status. It is not yet a verified two-way SIM audio bridge, so do not expect the AI to answer normal cellular calls through microphone permission alone.",
+ call_forwarding:"Inbound calls can be forwarded only after a carrier-supported forwarding destination is supplied and verified. Outbound calls showing your own caller ID need a provider that authorizes that number.",
+ sip_trunk:"A SIP trunk needs working SIP credentials, an approved caller ID and a provider route. No calls will be sent until those details are verified."
+};
+$("method").addEventListener("change",()=>{$("methodNote").textContent=notes[$("method").value];});
+function normalize(v){let n=v.replace(/[\s()-]/g,"");if(/^0[17]\d{8}$/.test(n))n="+254"+n.slice(1);if(/^254[17]\d{8}$/.test(n))n="+"+n;return n;}
+async function loadLines(){
+ const {data,error}=await sb.from("twiga_phone_lines").select("id,line_number,carrier,connection_method,inbound_status,outbound_status,inbound_enabled,outbound_enabled,updated_at").eq("business_id",w.business.id).order("updated_at",{ascending:false});
+ if(error)throw error;
+ $("lines").innerHTML=data.length?data.map(x=>'<div class="item"><b>'+esc(x.line_number)+'</b><div class="muted">'+esc(x.carrier)+' · '+esc(x.connection_method.replaceAll("_"," "))+'</div><div class="muted">Inbound: '+esc(x.inbound_status)+' · Outbound: '+esc(x.outbound_status)+'</div><div class="muted">AI enabled: '+(x.inbound_enabled||x.outbound_enabled?"Yes":"Not yet")+'</div></div>').join(""):"No line has been registered yet.";
+}
+async function init(){
+ try{w=await getWorkspace();if(!w.session){$("business").innerHTML='<a href="/app#login">Sign in</a> to continue.';$("lineForm").hidden=true;return;}if(!w.business){$("business").innerHTML='<a href="/start">Create your business workspace</a> first.';$("lineForm").hidden=true;return;}
+ $("business").textContent="Business: "+w.business.name;await loadLines();$("methodNote").textContent=notes[$("method").value];
+ }catch(e){$("message").textContent=e.message;}
+}
+$("lineForm").addEventListener("submit",async e=>{
+ e.preventDefault();const num=normalize($("number").value.trim()),method=$("method").value,carrier=$("carrier").value;
+ if(!/^\+254[17]\d{8}$/.test(num)){$("message").textContent="Enter a valid Kenyan mobile number, for example +254712345678.";return;}
+ $("save").disabled=true;$("save").textContent="Saving…";
+ try{
+  const {error}=await sb.from("twiga_phone_lines").upsert({business_id:w.business.id,line_number:num,carrier,connection_method:method,inbound_status:"pending_verification",outbound_status:"pending_verification",inbound_enabled:false,outbound_enabled:false,verification_notes:"Saved by business owner. Provider routing and caller ID have not yet been verified."},{onConflict:"business_id,line_number"});
+  if(error)throw error;$("message").textContent="Line saved. It is not active yet; verification and provider routing are still required.";await loadLines();
+ }catch(error){$("message").textContent=error.message||"Could not save the line.";}
+ finally{$("save").disabled=false;$("save").textContent="Save line setup";}
+});
+init();
+</script></body></html>
