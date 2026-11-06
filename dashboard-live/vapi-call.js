@@ -188,7 +188,6 @@ export function createCall(publicKey, assistantIdOrHooks, hooksMaybe = {}) {
             voiceSeconds: 0.2,
             backoffSeconds: 0.5
           },
-          backgroundDenoisingEnabled: true
         };
 
         if (Number.isFinite(Number(options.maxSeconds)) && Number(options.maxSeconds) > 0) {
