@@ -2,6 +2,7 @@ package dev.alenajam.opendialer.ui
 
 import android.Manifest
 import android.content.Intent
+import android.net.Uri
 import android.content.pm.PackageManager
 import android.webkit.CookieManager
 import android.webkit.PermissionRequest
@@ -23,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
@@ -33,9 +35,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import org.json.JSONObject
 
 private const val TWIGA_APP_HOST = "app.twiga.co.ke"
 private const val TWIGA_APP_URL = "https://app.twiga.co.ke/"
+private const val SUPABASE_AUTH_HOST = "ztyxxikkposfpxsutnfr.supabase.co"
 
 /**
  * Hosts the real TWIGA business application inside the Android dialer shell.
@@ -43,10 +47,14 @@ private const val TWIGA_APP_URL = "https://app.twiga.co.ke/"
  * owned by the live app; the APK never embeds provider secrets.
  */
 @Composable
-fun TwigaDashboardTab() {
+fun TwigaDashboardTab(
+    authCallback: Uri? = null,
+    onAuthCallbackConsumed: () -> Unit = {}
+) {
     val context = LocalContext.current
     var webView by remember { mutableStateOf<WebView?>(null) }
     var canGoBack by remember { mutableStateOf(false) }
+    var pageReady by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(true) }
     var loadError by remember { mutableStateOf(false) }
     var pendingPermission by remember { mutableStateOf<PermissionRequest?>(null) }
@@ -62,6 +70,20 @@ fun TwigaDashboardTab() {
             request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
         } else {
             request?.deny()
+        }
+    }
+
+    LaunchedEffect(authCallback, pageReady, webView) {
+        val callback = authCallback ?: return@LaunchedEffect
+        val code = callback.getQueryParameter("code")
+        val view = webView
+        if (pageReady && view != null && !code.isNullOrBlank()) {
+            val safeCode = JSONObject.quote(code)
+            view.evaluateJavascript(
+                "window.TWIGA_EXCHANGE_CODE && window.TWIGA_EXCHANGE_CODE($safeCode);",
+                null
+            )
+            onAuthCallbackConsumed()
         }
     }
 
@@ -106,7 +128,9 @@ fun TwigaDashboardTab() {
 
                         override fun onPageFinished(view: WebView?, url: String?) {
                             loading = false
+                            pageReady = true
                             canGoBack = view?.canGoBack() == true
+                            view?.evaluateJavascript("window.TWIGA_ANDROID_APP = true;", null)
                         }
 
                         override fun shouldOverrideUrlLoading(
@@ -114,6 +138,16 @@ fun TwigaDashboardTab() {
                             request: WebResourceRequest?
                         ): Boolean {
                             val uri = request?.url ?: return true
+                            if (
+                                uri.scheme == "https" &&
+                                uri.host == SUPABASE_AUTH_HOST &&
+                                uri.path == "/auth/v1/authorize" &&
+                                uri.getQueryParameter("provider") == "google"
+                            ) {
+                                // Google OAuth must run in the system browser, never inside WebView.
+                                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
+                                return true
+                            }
                             return when (uri.scheme?.lowercase()) {
                                 "tel" -> {
                                     runCatching { context.startActivity(Intent(Intent.ACTION_DIAL, uri)) }
@@ -123,6 +157,7 @@ fun TwigaDashboardTab() {
                                     runCatching { context.startActivity(Intent(Intent.ACTION_SENDTO, uri)) }
                                     true
                                 }
+                                "twiga" -> true
                                 "sms" -> {
                                     runCatching { context.startActivity(Intent(Intent.ACTION_SENDTO, uri)) }
                                     true
