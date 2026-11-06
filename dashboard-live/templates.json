@@ -1,0 +1,50 @@
+{
+ "salon": {
+  "label": "Salon or barber",
+  "about": "Business: [Business name], a [salon or barbershop] in [area, town].\nOpen: [days and hours].\nServices and prices (KSh): [service] [price] ([time it takes]); [service] [price]; [service] [price].\nPayment: M-Pesa Till or Paybill [number], or cash.\nBooking: we need the customer's name, phone number, service, and preferred day and time.\nCancellations: please tell us at least [3] hours before.\nLocation: [landmark and directions].\nStaff: [names].",
+  "faq": "Q: Do I need to book?\nA: Walk-ins are welcome, but booking guarantees your time.\nQ: How long does [service] take?\nA: About [time].\nQ: Where are you?\nA: [location and landmark].\nQ: Do you take M-Pesa?\nA: Yes, [Till or Paybill number].",
+  "rules": "Never confirm a time that may not be free. Say the team will confirm by call or text.\nNever share other customers' details.\nDo not offer discounts unless listed above.\nIf a customer is upset, apologise and offer to take a message for the manager."
+ },
+ "shop": {
+  "label": "Shop or retail",
+  "about": "Business: [Business name], a shop selling [what you sell] in [area, town].\nOpen: [days and hours].\nProducts and prices (KSh): [product] [price]; [product] [price]; [product] [price].\nDelivery: [areas covered], fee [amount], takes about [time]. Pick-up at the shop is free.\nPayment: M-Pesa Till or Paybill [number], cash, or pay on delivery for [areas].\nReturns: [your return policy].\nTo order we need: name, phone number, items and quantity, and delivery address.",
+  "faq": "Q: Do you deliver?\nA: Yes, to [areas]. The fee is [amount].\nQ: Is [product] in stock?\nA: [Say yes or no based on the list above, or offer to check and call back].\nQ: Can I pay on delivery?\nA: [Yes or no].\nQ: What time do you close?\nA: [time].",
+  "rules": "Only quote prices and stock listed above. If unsure, say you will check and call back.\nAlways repeat the order and total, and ask the customer to confirm.\nNever say a payment was received. The owner confirms payments.\nNever promise delivery times that are not listed."
+ },
+ "clinic": {
+  "label": "Clinic or pharmacy",
+  "about": "Business: [Clinic name], a [clinic, dental clinic, pharmacy] in [area, town].\nOpen: [days and hours]. Emergency line: [number if any].\nServices and fees (KSh): [consultation] [fee]; [service] [fee].\nDoctors and clinics: [names and days they are in].\nInsurance and payment: [SHA, insurance names, M-Pesa, cash].\nAppointments: we need the patient's name, phone number, reason for visit, and preferred day and time.\nLocation: [landmark and directions].",
+  "faq": "Q: Do I need an appointment?\nA: [Walk-ins or appointment only].\nQ: How much is a consultation?\nA: KSh [fee].\nQ: Do you accept [insurance]?\nA: [Yes or no].\nQ: What time do you open?\nA: [time].",
+  "rules": "Never give medical advice, diagnosis, or medicine doses.\nFor an emergency, tell the caller to go to the nearest hospital or call 999 or 112 right away.\nKeep patient information private. Do not discuss one patient with another person.\nOffer to take a message for the doctor for anything medical."
+ },
+ "restaurant": {
+  "label": "Restaurant or takeaway",
+  "about": "Business: [Restaurant name], serving [type of food] in [area, town].\nOpen: [days and hours].\nMenu and prices (KSh): [dish] [price]; [dish] [price]; [dish] [price].\nDelivery: [areas], fee [amount], about [time]. Takeaway: ready in about [time].\nReservations: we need the name, phone number, number of people, day and time.\nPayment: M-Pesa Till or Paybill [number], cash, or card.\nLocation: [landmark and directions].",
+  "faq": "Q: Do you deliver?\nA: Yes, to [areas].\nQ: Can I book a table?\nA: Yes. Please give the name, number of people, and time.\nQ: Do you have vegetarian options?\nA: [list them].\nQ: What time do you close?\nA: [time].",
+  "rules": "Only offer dishes and prices listed above. If a dish is not listed, say you will check.\nRepeat the order and total and ask the customer to confirm.\nNever confirm allergy safety. Say the kitchen will advise.\nNever say a payment was received."
+ },
+ "repair": {
+  "label": "Technician or repair (Wi-Fi, IT, plumbing, electrical)",
+  "about": "Business: [Business name], offering [Wi-Fi and network setup, computer repair, plumbing, electrical] in [areas covered].\nOpen: [days and hours]. Emergency call-outs: [yes or no, extra fee].\nServices and prices (KSh): call-out fee [amount]; [service] from [price]; [service] from [price].\nTo book a visit we need: name, phone number, address or location, what the problem is, and a good time.\nPayment: M-Pesa Till or Paybill [number], or cash after the job.\nWarranty: [your warranty].",
+  "faq": "Q: How soon can you come?\nA: [usual time].\nQ: How much is the call-out?\nA: KSh [amount], which is [or is not] deducted from the job.\nQ: Which areas do you cover?\nA: [areas].\nQ: Do you work on weekends?\nA: [answer].",
+  "rules": "Do not quote a final price for a job before inspection unless it is listed above. Give the starting price only.\nAsk simple questions to understand the problem and write it down clearly.\nFor danger such as gas leaks, fire, or electric shock, tell the caller to stay safe, switch off the supply if safe, and call emergency services.\nNever promise exact arrival times."
+ },
+ "legal": {
+  "label": "Law firm or consultant",
+  "about": "Business: [Firm name], practising in [areas of law, for example family, land, employment, business] in [town].\nOpen: [days and hours].\nConsultation: KSh [fee] for [minutes]. Payment by M-Pesa [number].\nAdvocates: [names and specialities].\nFor a new enquiry we need: name, phone number, a short description of the matter, the names of any other parties, and a preferred time to talk.\nLocation: [building, floor, landmark].",
+  "faq": "Q: How much is a consultation?\nA: KSh [fee].\nQ: Do you handle [type of case]?\nA: [Yes or no].\nQ: Can I speak to an advocate now?\nA: I will take your details and an advocate will call you back.",
+  "rules": "Never give legal advice or predict outcomes.\nCollect the names of all other parties for a conflict check.\nKeep everything the caller says confidential.\nNever promise that a specific advocate will take the case."
+ },
+ "realestate": {
+  "label": "Real estate or property",
+  "about": "Business: [Agency name], handling [rentals, sales, property management] in [areas].\nOpen: [days and hours].\nListings: [property], [location], [price or rent in KSh], [bedrooms], [key features]. [property], [location], [price].\nViewings: we need the name, phone number, which property, and preferred day and time.\nFees: [agent or viewing fees, if any].\nTenant issues: take the unit number, name, phone number, and a clear description of the problem.",
+  "faq": "Q: Is [property] still available?\nA: [Say yes or no from the list, or offer to check].\nQ: What is the deposit?\nA: [deposit rule].\nQ: Can I view it today?\nA: I will take your details and confirm a time.",
+  "rules": "Only describe properties listed above. Do not invent details.\nDo not negotiate prices. Offer to pass the message to the agent.\nFor urgent tenant problems such as fire, flooding, or a gas leak, tell the caller to stay safe and call emergency services, then alert the manager."
+ },
+ "general": {
+  "label": "Other business",
+  "about": "Business: [Business name], which offers [what you do] in [area, town].\nOpen: [days and hours].\nServices or products and prices (KSh): [item] [price]; [item] [price].\nHow to order or book: we need the customer's name, phone number, what they want, and when.\nPayment: M-Pesa Till or Paybill [number], or cash.\nLocation: [landmark and directions].",
+  "faq": "Q: What do you offer?\nA: [short answer].\nQ: How much does [item] cost?\nA: KSh [price].\nQ: Where are you?\nA: [location].\nQ: What time do you open?\nA: [time].",
+  "rules": "Only use the information above. If you do not know, say so and offer to take a message.\nRepeat any order or booking and ask the customer to confirm.\nNever say a payment was received.\nBe polite, even if the caller is upset."
+ }
+}
