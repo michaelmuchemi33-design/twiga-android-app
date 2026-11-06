@@ -70,7 +70,9 @@ internal fun HomeScreen(
     onOpenVoicemail: () -> Unit = {},
     configuration: HomeScreenConfiguration = HomeScreenConfiguration(),
 ) {
-    var currentTab by rememberSaveable { mutableStateOf(HomeTab.CALLS) }
+    var currentTab by rememberSaveable {
+        mutableStateOf(if (configuration.customNavigationItem != null) HomeTab.CUSTOM else HomeTab.CALLS)
+    }
     var searchQuery by remember { mutableStateOf("") }
     val isSearchActive = searchQuery.isNotEmpty()
 
@@ -80,6 +82,7 @@ internal fun HomeScreen(
 
     Scaffold(
         topBar = {
+            if (currentTab != HomeTab.CUSTOM) {
             SearchBar(
                 inputField = @Composable {
                     SearchBarDefaults.InputField(
@@ -158,8 +161,10 @@ internal fun HomeScreen(
                     .statusBarsPadding()
                     .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
             ) {}
+            }
         },
         bottomBar = {
+            if (currentTab != HomeTab.CUSTOM) {
             val icons = LocalAppIcons.current
             NavigationBar {
                 NavigationBarItem(
@@ -208,6 +213,7 @@ internal fun HomeScreen(
                         onClick = { currentTab = HomeTab.CUSTOM },
                     )
                 }
+            }
             }
         },
         floatingActionButton = {
