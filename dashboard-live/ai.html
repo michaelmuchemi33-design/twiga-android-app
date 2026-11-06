@@ -42,6 +42,10 @@ async function init(){
   if(!workspace.session){$("who").innerHTML='Sign in first: <a href="/app#login">open TWIGA sign in</a>.';return;}
   if(!workspace.business){$("who").innerHTML='Create your business workspace first: <a href="/start">start your free trial</a>.';return;}
   $("who").textContent="Testing the receptionist for "+workspace.business.name+".";
+  const {data:subscription,error:subError}=await sb.from("twiga_subscriptions").select("status,trial_ends_at,current_period_end,grace_period_ends_at").eq("business_id",workspace.business.id).maybeSingle();
+  if(subError)throw subError;
+  const now=Date.now(),active=subscription&&(subscription.status==="active"||(subscription.status==="trialing"&&Date.parse(subscription.trial_ends_at)>now)||(subscription.status==="past_due"&&subscription.grace_period_ends_at&&Date.parse(subscription.grace_period_ends_at)>now));
+  if(!active){$("err").innerHTML='Your free trial has ended or this workspace is not active. <a href="/billing">Open billing to activate TWIGA</a>.';return;}
   const {data,error}=await sb.from("business_ai").select("prompt,greeting,faq,rules").eq("business_id",workspace.business.id).maybeSingle();
   if(error)throw error;ctx=data||{};$("go").disabled=false;
  }catch(error){$("err").textContent=error.message||"Could not load business settings.";}
