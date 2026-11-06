@@ -421,10 +421,24 @@ async function list(){try{var o=(await L("listOrders",{limit:60})).orders;
   return[esc(x.OrderId)+'<div class="sub">'+esc(x.Type)+'</div>',esc(x.Customer),Number(x.Total).toLocaleString(),Number(x.Paid).toLocaleString(),G(esc(x.Status),x.Status==="Paid"||x.Status==="Completed"?"ok":x.Status==="Cancelled"?"bad":"or"),
   (due?'<button class="btn sm" data-act="paid" data-id="'+esc(x.OrderId)+'">Mark paid</button> '+(x.Phone?'<button class="btn sm" data-act="stk" data-id="'+esc(x.OrderId)+'" data-ph="'+esc(x.Phone)+'">M-Pesa</button> ':""):"")+(open?'<button class="btn sm" data-act="done" data-id="'+esc(x.OrderId)+'">Complete</button> <button class="btn sm" data-act="cancel" data-id="'+esc(x.OrderId)+'">Cancel</button>':"")]})):"No orders yet."}catch(e){$("ol").textContent=e.message}}
 function orderLineHtml(){
- return '<div class="order-line" style="display:grid;grid-template-columns:minmax(0,1.5fr) 72px 105px auto;gap:8px;align-items:end;margin-bottom:8px"><label style="min-width:0">Item or service<br><input class="oi-name" type="text" maxlength="160" style="width:100%" placeholder="e.g. Haircut"></label><label>Qty<br><input class="oi-qty" type="number" min="1" step="1" value="1" style="width:100%"></label><label>Price (KSh)<br><input class="oi-price" type="number" min="0" step="0.01" style="width:100%"></label><button class="btn sm" type="button" data-act="remove-line" aria-label="Remove item">×</button></div>';
+ return '<div class="order-line" style="display:grid;grid-template-columns:minmax(0,1.5fr) 72px 105px auto;gap:8px;align-items:end;margin-bottom:8px"><label style="min-width:0">Item or service<br><input class="oi-name" type="text" maxlength="160" list="twigaOrderCatalog" style="width:100%" placeholder="Choose or type an item"></label><label>Qty<br><input class="oi-qty" type="number" min="1" step="1" value="1" style="width:100%"></label><label>Price (KSh)<br><input class="oi-price" type="number" min="0" step="0.01" style="width:100%"></label><button class="btn sm" type="button" data-act="remove-line" aria-label="Remove item">×</button></div>';
 }
-var FORM='<div class="pb"><label>Customer<br><input type="text" id="oc" maxlength="120" style="width:100%" required></label><label>Phone (07...)<br><input type="tel" id="op" maxlength="30" style="width:100%" autocomplete="tel"></label><label>Type<br><select id="ot" style="width:100%"><option>Sale</option><option>Appointment</option><option>Service</option><option>Quote</option></select></label><div><b>Items and services</b><div id="orderLines" style="margin-top:8px">'+orderLineHtml()+'</div><button class="btn sm" type="button" data-act="add-line">Add another item</button></div><label>Payment method<br><select id="om" style="width:100%"><option>Pay later</option><option>Cash</option><option>M-Pesa</option><option>Card</option></select></label><button class="btn pri" type="button" data-act="mk">Save order</button><div class="sub" id="omsg" role="status"></div></div>';var T0=R.orders;
-R.orders=function(){if(!K.ledgerUrl)return T0();setTimeout(list,0);return["Every sale, booking and job, saved in your business spreadsheet.",'<div class="g2">'+C("New order",FORM)+C("Orders",'<div id="ol" class="pb">Loading...</div>')+'</div>']};
+var FORM='<div class="pb"><label>Customer<br><input type="text" id="oc" maxlength="120" style="width:100%" required></label><label>Phone (07...)<br><input type="tel" id="op" maxlength="30" style="width:100%" autocomplete="tel"></label><label>Type<br><select id="ot" style="width:100%"><option>Sale</option><option>Appointment</option><option>Service</option><option>Quote</option></select></label><div><b>Items and services</b><div id="orderLines" style="margin-top:8px">'+orderLineHtml()+'</div><datalist id="twigaOrderCatalog"></datalist><button class="btn sm" type="button" data-act="add-line">Add another item</button><div class="sub">Choose a saved item to fill its price, or type a custom item.</div></div><label>Payment method<br><select id="om" style="width:100%"><option>Pay later</option><option>Cash</option><option>M-Pesa</option><option>Card</option></select></label><button class="btn pri" type="button" data-act="mk">Save order</button><div class="sub" id="omsg" role="status"></div></div>';var ORDER_CATALOG=[];
+async function loadOrderCatalog(){
+ try{
+  var result=await L("listItems");ORDER_CATALOG=result.items||[];
+  var options=$("twigaOrderCatalog");
+  if(options)options.innerHTML=ORDER_CATALOG.map(function(item){return '<option value="'+esc(item.Name||"")+'"></option>'}).join("");
+ }catch(error){console.warn("Could not load TWIGA order catalogue:",error.message||error)}
+}
+document.addEventListener("change",function(e){
+ if(!e.target.classList||!e.target.classList.contains("oi-name"))return;
+ var name=(e.target.value||"").trim().toLowerCase();
+ var item=ORDER_CATALOG.find(function(entry){return String(entry.Name||"").trim().toLowerCase()===name});
+ if(item){var price=e.target.closest(".order-line").querySelector(".oi-price");if(price)price.value=Number(item.Price||0)}
+});
+var T0=R.orders;
+R.orders=function(){if(!K.ledgerUrl)return T0();setTimeout(list,0);setTimeout(loadOrderCatalog,0);return["Every sale, booking and job, saved in your business spreadsheet.",'<div class="g2">'+C("New order",FORM)+C("Orders",'<div id="ol" class="pb">Loading...</div>')+'</div>']};
 document.addEventListener("click",async function(e){
  if(e.target.closest("#prof")){$("pm").hidden=!$("pm").hidden;return}
  if(!e.target.closest("#pm"))$("pm").hidden=true;
@@ -491,6 +505,9 @@ document.addEventListener("click",async function(e){
    if(!customer)throw new Error("Enter the customer name.");
    if(!items.length)throw new Error("Add at least one item or service.");
    if(items.some(function(x){return !Number.isInteger(x.qty)||x.qty<1||!Number.isFinite(x.unitPrice)||x.unitPrice<0}))throw new Error("Check each item's quantity and price.");
+   var stockNeeds={};
+   items.forEach(function(line){var saved=ORDER_CATALOG.find(function(entry){return String(entry.Name||"").trim().toLowerCase()===line.name.toLowerCase()});if(saved&&saved.TrackStock)stockNeeds[line.name]=(stockNeeds[line.name]||0)+line.qty});
+   Object.keys(stockNeeds).forEach(function(name){var saved=ORDER_CATALOG.find(function(entry){return String(entry.Name||"").trim().toLowerCase()===name.toLowerCase()});if(saved&&stockNeeds[name]>Number(saved.Stock||0))throw new Error(name+" has only "+Number(saved.Stock||0)+" in stock.")});
    if(pm==="M-Pesa"&&!/^(?:0[17][0-9]{8}|254[17][0-9]{8})$/.test(phone.replace(/[\s-]/g,"").replace(/^\+/,"")))throw new Error("Enter a valid Kenyan mobile number for the M-Pesa prompt.");
    if(!TX)TX=crypto.randomUUID();b.disabled=true;b.textContent="Saving order...";
    var paid=pm==="Cash";
