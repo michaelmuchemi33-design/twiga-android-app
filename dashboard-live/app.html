@@ -304,24 +304,26 @@ document.addEventListener("click",function(e){if(e.target.closest("#burger,#more
 document.addEventListener("click",function(e){if(e.target.closest("[data-send]")){var t=$("pt").value,s=svc[+$("ps").value],p={"Quotation":"QT-","Payment link":"PL-","Receipt":"RC-"}[t];docs.unshift([p+(2042+docs.length),$("pc").value,t,s[0],s[1],t==="Receipt"?"Paid":"Sent"]);route(1)}});
 addEventListener("hashchange",route);
 R.integrations=function(){
-  var ok=window.TWIGA_GOOGLE_GRANTED===true;
-  var state=ok?G("Run permission test","or"):G("Not connected","or");
-  var row=function(title,detail){return '<div class="opt"><div><b>'+title+'</b><span>'+detail+'</span></div>'+state+'</div>'};
-  return ["Connect the Google account your business uses. You choose the account and approve each permission on Google.",'<div class="g2">'+
-   C("Google Workspace access",'<div class="pb">'+
-    row("Google Calendar","Read and create or update appointments.")+
-    row("Google Contacts","Read contacts into your TWIGA customer list.")+
-    row("Google Sheets","Create and manage TWIGA business spreadsheets.")+
-    row("Google Drive","Create and manage TWIGA files and files you select.")+
-    '<button class="btn pri" data-act="google-connect" style="margin-top:14px">Connect Google Workspace</button>'+
-    '<button class="btn" data-act="google-test" style="margin-top:8px">Test Google connections</button>'+
-    '<button class="btn" data-act="google-export-orders" style="margin-top:8px">Sync TWIGA orders to Google Sheets</button>'+
-    '<div class="sub" id="googleAccessError" role="alert"></div>'+
-    '<div class="pb" id="googleCheckResults" aria-live="polite"></div>'+
-    '<p class="sub" style="margin-top:10px">Google access is optional. TWIGA requests only the scopes listed here. Drive access is limited to files created or selected for TWIGA.</p>'+
-   '</div>')+
-   C("What this enables",'<ul class="tl pb"><li><div class="k">1</div><div><b>Appointments</b><span>Create and update business bookings in Google Calendar.</span></div></li><li><div class="k">2</div><div><b>Customers</b><span>Read Google Contacts to help match callers to saved customers.</span></div></li><li><div class="k">3</div><div><b>Business records</b><span>Use Google Sheets for business records and reports.</span></div></li><li><div class="k">4</div><div><b>Documents</b><span>Work with TWIGA-created or user-selected Google Drive files.</span></div></li></ul>')+
-  '</div>'];
+ var current=window.TWIGA_GOOGLE_STATUS||{},ok=!!current.connected;
+ var row=function(title,detail){return '<div class="opt"><div><b>'+title+'</b><span>'+detail+'</span></div>'+G(ok?"Connected":"Not connected",ok?"ok":"or")+'</div>'};
+ var message=current.error||(!ok&&current.missingScopes&&current.missingScopes.length?"Missing permissions: "+current.missingScopes.join(", "):"");
+ var link=current.spreadsheetUrl?'<a class="lk" href="'+esc(current.spreadsheetUrl)+'" target="_blank" rel="noopener">Open TWIGA Business Records</a>':"";
+ return ["Connect the Google account your business uses. Access and refresh tokens are encrypted on the TWIGA server.",'<div class="g2">'+
+  C("Google Workspace access",'<div class="pb">'+
+   row("Google Calendar","Read and create appointments in your primary calendar.")+
+   row("Google Contacts","Read Google Contacts into the customer workflow.")+
+   row("Google Sheets","Create and update the TWIGA Business Records spreadsheet.")+
+   row("Google Drive","Manage files created for or selected by TWIGA.")+
+   '<button class="btn pri" data-act="google-connect" style="margin-top:14px">'+(ok?"Reconnect Google Workspace":"Connect Google Workspace")+'</button>'+
+   '<button class="btn" data-act="google-test" style="margin-top:8px">Test Google connections</button>'+
+   '<button class="btn" data-act="google-export-orders" style="margin-top:8px">Sync TWIGA orders to Google Sheets</button>'+
+   (ok?'<button class="btn" data-act="google-disconnect" style="margin-top:8px">Disconnect Google Workspace</button>':"")+
+   '<div class="sub" id="googleAccessError" role="alert">'+esc(message)+'</div>'+link+
+   '<div class="pb" id="googleCheckResults" aria-live="polite"></div>'+
+   '<p class="sub" style="margin-top:10px">Google access is optional. Drive access is limited by Google to TWIGA-created or selected files.</p>'+
+  '</div>')+
+  C("What this enables",'<ul class="tl pb"><li><div class="k">1</div><div><b>Appointments</b><span>Create and view bookings in Google Calendar.</span></div></li><li><div class="k">2</div><div><b>Customers</b><span>Read Google Contacts to help match callers to saved customers.</span></div></li><li><div class="k">3</div><div><b>Business records</b><span>Export orders to a business spreadsheet.</span></div></li><li><div class="k">4</div><div><b>Documents</b><span>Verify and open TWIGA records stored in Google Drive.</span></div></li></ul>')+
+ '</div>'];
 };
 render();route();
 </script>
@@ -331,96 +333,28 @@ var K=window.TWIGA_CONFIG||{},pre=function(){document.documentElement.classList.
 setTimeout(pre,7000);
 if(!K.supabaseUrl||!window.supabase){R.phone=function(){return["Sign in to use the dialer.",""]};pre();return}
 var sb=window.sb=supabase.createClient(K.supabaseUrl,K.supabaseKey,{auth:{flowType:"pkce"}});
-window.TWIGA_GOOGLE_GRANTED=false;
-window.TWIGA_GOOGLE_ACCESS_TOKEN=null;
-sb.auth.onAuthStateChange(function(event,session){
- if(event==="SIGNED_OUT"){
-  window.TWIGA_GOOGLE_GRANTED=false;
-  window.TWIGA_GOOGLE_ACCESS_TOKEN=null;
- }
- if(session&&session.provider_token){
-  window.TWIGA_GOOGLE_GRANTED=true;
-  window.TWIGA_GOOGLE_ACCESS_TOKEN=session.provider_token;
- }
-});
+window.TWIGA_GOOGLE_GRANTED=false;window.TWIGA_GOOGLE_STATUS={connected:false};window.TWIGA_GOOGLE_ACCESS_TOKEN=null;
+sb.auth.onAuthStateChange(function(event,session){if(event==="SIGNED_OUT"){window.TWIGA_GOOGLE_GRANTED=false;window.TWIGA_GOOGLE_STATUS={connected:false};window.TWIGA_GOOGLE_ACCESS_TOKEN=null}});
 window.TWIGA_EXCHANGE_CODE=async function(code){
  var r=await sb.auth.exchangeCodeForSession(code);
  if(r.error){console.error("TWIGA Google OAuth exchange failed",r.error);return false}
  return true
 };
 window.TWIGA_EXPORT_ORDERS=async function(){
- var token=window.TWIGA_GOOGLE_ACCESS_TOKEN;
- var sheetId=window.TWIGA_GOOGLE_SHEET_ID||localStorage.getItem("twiga_google_sheet_"+(window.BIZ&&window.BIZ.id||"account"))||"";
- if(!token)throw new Error("Connect Google Workspace first.");
- if(!sheetId)throw new Error("Run the Google connection test first to create your TWIGA Business Records sheet.");
- var result=await L("listOrders",{limit:500});
- var orders=result.orders||[];
- var values=[["Exported at","Order ID","Customer","Phone","Type","Total (KSh)","Paid (KSh)","Status"]];
- orders.forEach(function(o){
-  values.push([
-   o.UpdatedAt||o.Date||new Date().toISOString(),
-   o.OrderId||"",o.Customer||"",o.Phone||"",o.Type||"",
-   Number(o.Total||0),Number(o.Paid||0),o.Status||""
-  ]);
- });
- var apiUrl="https://sheets.googleapis.com/v4/spreadsheets/"+encodeURIComponent(sheetId)+"/values/Sheet1!A1:H1000?valueInputOption=RAW";
- var response=await fetch(apiUrl,{method:"PUT",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({values:values})});
- var payload={};try{payload=await response.json()}catch(e){}
- if(!response.ok)throw new Error(payload.error&&payload.error.message||"Google Sheets returned HTTP "+response.status);
- return orders.length;
+ var result=await L("listOrders",{limit:1000});
+ var synced=await googleWorkspaceCall("sheets.export-orders",{orders:result.orders||[]});
+ window.TWIGA_GOOGLE_STATUS=Object.assign({},window.TWIGA_GOOGLE_STATUS||{},{spreadsheetUrl:synced.spreadsheetUrl,lastSyncAt:new Date().toISOString()});
+ return synced.exported||0;
 };
 window.TWIGA_TEST_GOOGLE=async function(){
- var token=window.TWIGA_GOOGLE_ACCESS_TOKEN;
- var out=[];
- var push=function(name,ok,detail){out.push({name:name,ok:ok,detail:detail||""})};
- if(!token){
-  push("Google access",false,"Connect Google Workspace and approve the requested access first.");
-  return out
- }
- var api=async function(url,options){
-  options=options||{};
-  options.headers=Object.assign({"Authorization":"Bearer "+token,"Content-Type":"application/json"},options.headers||{});
-  var response=await fetch(url,options),data={};
-  try{data=await response.json()}catch(e){}
-  if(!response.ok)throw new Error(data.error&&data.error.message||"Google API returned HTTP "+response.status);
-  return data
- };
- try{
-  var now=new Date(),week=new Date(now.getTime()+7*86400000);
-  var calendar=await api("https://www.googleapis.com/calendar/v3/calendars/primary/events?maxResults=1&timeMin="+encodeURIComponent(now.toISOString())+"&timeMax="+encodeURIComponent(week.toISOString()));
-  push("Google Calendar",true,(calendar.items||[]).length+" upcoming event(s) visible.");
- }catch(e){push("Google Calendar",false,e.message)}
- try{
-  var contacts=await api("https://people.googleapis.com/v1/people/me/connections?pageSize=1&personFields=names");
-  push("Google Contacts",true,"People API access verified.");
- }catch(e){push("Google Contacts",false,e.message)}
- var key="twiga_google_sheet_"+(window.BIZ&&window.BIZ.id||"account");
- var sheetId=localStorage.getItem(key)||"";
- try{
-  if(!sheetId){
-   var search=await api("https://www.googleapis.com/drive/v3/files?q="+encodeURIComponent("name='TWIGA Business Records' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false")+"&pageSize=1&fields=files(id,name)");
-   sheetId=search.files&&search.files[0]&&search.files[0].id||"";
-  }
-  if(!sheetId){
-   var sheet=await api("https://sheets.googleapis.com/v4/spreadsheets",{method:"POST",body:JSON.stringify({properties:{title:"TWIGA Business Records"}})});
-   sheetId=sheet.spreadsheetId;
-   if(!sheetId)throw new Error("Google did not return a spreadsheet ID.");
-   await api("https://sheets.googleapis.com/v4/spreadsheets/"+encodeURIComponent(sheetId)+"/values/Sheet1!A1:H1?valueInputOption=RAW",{
-    method:"PUT",
-    body:JSON.stringify({values:[["Exported at","Order ID","Customer","Phone","Type","Total (KSh)","Paid (KSh)","Status"]]})
-   });
-  }
-  localStorage.setItem(key,sheetId);
-  window.TWIGA_GOOGLE_SHEET_ID=sheetId;
-  await api("https://sheets.googleapis.com/v4/spreadsheets/"+encodeURIComponent(sheetId)+"?fields=spreadsheetId,properties.title");
-  push("Google Sheets",true,"TWIGA Business Records sheet is ready and available for order exports.");
- }catch(e){push("Google Sheets",false,e.message)}
- try{
-  if(!sheetId)throw new Error("Create the TWIGA records sheet first.");
-  var file=await api("https://www.googleapis.com/drive/v3/files/"+encodeURIComponent(sheetId)+"?fields=id,name,mimeType");
-  push("Google Drive",true,"Drive access verified for the TWIGA records file.");
- }catch(e){push("Google Drive",false,e.message)}
- return out
+ var checks=[],status,add=function(name,ok,detail){checks.push({name:name,ok:!!ok,detail:detail||""})};
+ try{status=await googleWorkspaceCall("status");window.TWIGA_GOOGLE_STATUS=status;window.TWIGA_GOOGLE_GRANTED=!!status.connected}catch(error){status={connected:false,error:error.message}}
+ if(!status.connected){var reason=status.error||"Connect Google Workspace and approve all four permissions first.";["Google Calendar","Google Contacts","Google Sheets","Google Drive"].forEach(function(name){add(name,false,reason)});return checks}
+ try{var now=new Date(),week=new Date(now.getTime()+7*86400000),cal=await googleWorkspaceCall("calendar.list",{timeMin:now.toISOString(),timeMax:week.toISOString()});add("Google Calendar",true,(cal.items||[]).length+" upcoming event(s) visible")}catch(error){add("Google Calendar",false,error.message)}
+ try{var people=await googleWorkspaceCall("contacts.list",{pageSize:1});add("Google Contacts",true,(people.connections||[]).length+" contact(s) returned in the test page")}catch(error){add("Google Contacts",false,error.message)}
+ try{var sheet=await googleWorkspaceCall("sheets.ensure");add("Google Sheets",true,"TWIGA Business Records is ready");window.TWIGA_GOOGLE_STATUS.spreadsheetUrl=sheet.spreadsheetUrl}catch(error){add("Google Sheets",false,error.message)}
+ try{var drive=await googleWorkspaceCall("drive.status");add("Google Drive",true,"Drive access verified for "+(drive.file&&drive.file.name||"TWIGA Business Records"))}catch(error){add("Google Drive",false,error.message)}
+ return checks;
 };
 
 window.SESS=null;window.BIZ=null;window.READY=false;window.UF="";
@@ -440,7 +374,7 @@ function paint(){
 async function load(){
  var r=await sb.auth.getSession();SESS=r.data.session;BIZ=null;
  if(SESS){var q=await sb.from("business_members").select("role,businesses(id,name,business_type,status,paid_through)").limit(1),w=q.data&&q.data[0];if(w&&w.businesses){BIZ=w.businesses;BIZ.role=w.role}}
- READY=true;paint();route();pre();
+ await refreshGoogleConnectionState();READY=true;paint();route();pre();
 }
 window.gate_=function(k){
  if(!READY)return true;
@@ -455,12 +389,35 @@ async function L(a,d){var s=(await sb.auth.getSession()).data.session;if(!s)thro
  var r=await fetch(K.ledgerUrl,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:a,token:s.access_token,business_id:BIZ.id,data:d||{},txn:(d&&d.txn)||""})});
  var j=await r.json();if(!j.ok)throw new Error(String(j.error||"Request failed").replace(/^INACTIVE\|/,""));return j}
 function msg(t,bad){var e=$("omsg");if(e){e.textContent=t;e.style.color=bad?"var(--bad)":"var(--ok)"}}
+async function googleWorkspaceCall(action,payload){
+ var session=(await sb.auth.getSession()).data.session;
+ if(!session)throw new Error("Sign in to TWIGA again.");
+ if(!BIZ||!BIZ.id)throw new Error("Create or select your TWIGA business first.");
+ var result=await sb.functions.invoke("google-workspace",{body:Object.assign({action:action,businessId:BIZ.id},payload||{}),headers:{Authorization:"Bearer "+session.access_token}});
+ if(result.error){var detail=result.error.message||"Google Workspace request failed.";try{if(result.error.context&&result.error.context.json){var body=await result.error.context.json();detail=body.error||detail}}catch(x){}throw new Error(detail)}
+ if(result.data&&result.data.error)throw new Error(result.data.error);
+ return result.data||{};
+}
+async function refreshGoogleConnectionState(){
+ if(!BIZ){window.TWIGA_GOOGLE_GRANTED=false;window.TWIGA_GOOGLE_STATUS={connected:false};return}
+ var status={connected:false};
+ try{
+  if(SESS&&SESS.provider_token){
+   var linked=await googleWorkspaceCall("connect",{accessToken:SESS.provider_token,refreshToken:SESS.provider_refresh_token||null});
+   status=linked.connected?await googleWorkspaceCall("status"):await googleWorkspaceCall("status");
+   if(!status.connected)status=Object.assign({},linked,{connected:false});
+  }else status=await googleWorkspaceCall("status");
+ }catch(error){status={connected:false,error:error.message||"Could not check Google Workspace."}}
+ window.TWIGA_GOOGLE_STATUS=status;window.TWIGA_GOOGLE_GRANTED=!!status.connected;window.TWIGA_GOOGLE_ACCESS_TOKEN=null;
+}
 async function list(){try{var o=(await L("listOrders",{limit:60})).orders;
  $("ol").innerHTML=o.length?T(["Order","Customer","Total","Paid","Status",""],o.map(function(x){var due=Number(x.Paid)<Number(x.Total)&&x.Status!=="Quote"&&x.Status!=="Cancelled",open=["Completed","Paid","Cancelled"].indexOf(x.Status)<0;
   return[esc(x.OrderId)+'<div class="sub">'+esc(x.Type)+'</div>',esc(x.Customer),Number(x.Total).toLocaleString(),Number(x.Paid).toLocaleString(),G(esc(x.Status),x.Status==="Paid"||x.Status==="Completed"?"ok":x.Status==="Cancelled"?"bad":"or"),
-  (due?'<button class="btn sm" data-act="paid" data-id="'+esc(x.OrderId)+'">Mark paid</button> '+(x.Phone?'<button class="btn sm" data-act="stk" data-id="'+esc(x.OrderId)+'" data-ph="'+esc(x.Phone)+'">M-Pesa</button> ':""):"")+(open?'<button class="btn sm" data-act="done" data-id="'+esc(x.OrderId)+'">Done</button>':"")]})):"No orders yet."}catch(e){$("ol").textContent=e.message}}
-var FORM='<div class="pb"><label>Customer<br><input type="text" id="oc" style="width:100%"></label><label>Phone (07...)<br><input type="text" id="op" style="width:100%"></label><label>Type<br><select id="ot" style="width:100%"><option>Sale</option><option>Appointment</option><option>Service</option><option>Quote</option></select></label><label>Item or service<br><input type="text" id="oi" style="width:100%"></label><label>Quantity<br><input type="number" id="oq" value="1" min="1" style="width:100%"></label><label>Price (KES)<br><input type="number" id="opr" min="0" style="width:100%"></label><label>Payment<br><select id="om" style="width:100%"><option>Pay later</option><option>Cash</option><option>M-Pesa</option><option>Card</option></select></label><button class="btn pri" data-act="mk">Save order</button><div class="sub" id="omsg"></div></div>';
-var T0=R.orders;
+  (due?'<button class="btn sm" data-act="paid" data-id="'+esc(x.OrderId)+'">Mark paid</button> '+(x.Phone?'<button class="btn sm" data-act="stk" data-id="'+esc(x.OrderId)+'" data-ph="'+esc(x.Phone)+'">M-Pesa</button> ':""):"")+(open?'<button class="btn sm" data-act="done" data-id="'+esc(x.OrderId)+'">Complete</button> <button class="btn sm" data-act="cancel" data-id="'+esc(x.OrderId)+'">Cancel</button>':"")]})):"No orders yet."}catch(e){$("ol").textContent=e.message}}
+function orderLineHtml(){
+ return '<div class="order-line" style="display:grid;grid-template-columns:minmax(0,1.5fr) 72px 105px auto;gap:8px;align-items:end;margin-bottom:8px"><label style="min-width:0">Item or service<br><input class="oi-name" type="text" maxlength="160" style="width:100%" placeholder="e.g. Haircut"></label><label>Qty<br><input class="oi-qty" type="number" min="1" step="1" value="1" style="width:100%"></label><label>Price (KSh)<br><input class="oi-price" type="number" min="0" step="0.01" style="width:100%"></label><button class="btn sm" type="button" data-act="remove-line" aria-label="Remove item">×</button></div>';
+}
+var FORM='<div class="pb"><label>Customer<br><input type="text" id="oc" maxlength="120" style="width:100%" required></label><label>Phone (07...)<br><input type="tel" id="op" maxlength="30" style="width:100%" autocomplete="tel"></label><label>Type<br><select id="ot" style="width:100%"><option>Sale</option><option>Appointment</option><option>Service</option><option>Quote</option></select></label><div><b>Items and services</b><div id="orderLines" style="margin-top:8px">'+orderLineHtml()+'</div><button class="btn sm" type="button" data-act="add-line">Add another item</button></div><label>Payment method<br><select id="om" style="width:100%"><option>Pay later</option><option>Cash</option><option>M-Pesa</option><option>Card</option></select></label><button class="btn pri" type="button" data-act="mk">Save order</button><div class="sub" id="omsg" role="status"></div></div>';var T0=R.orders;
 R.orders=function(){if(!K.ledgerUrl)return T0();setTimeout(list,0);return["Every sale, booking and job, saved in your business spreadsheet.",'<div class="g2">'+C("New order",FORM)+C("Orders",'<div id="ol" class="pb">Loading...</div>')+'</div>']};
 document.addEventListener("click",async function(e){
  if(e.target.closest("#prof")){$("pm").hidden=!$("pm").hidden;return}
@@ -502,8 +459,9 @@ document.addEventListener("click",async function(e){
    }
    else if(a==="google-connect"){
     var scopeSet=[
-     "https://www.googleapis.com/auth/calendar.events",
+     "https://www.googleapis.com/auth/calendar.events.owned",
      "https://www.googleapis.com/auth/contacts.readonly",
+     "https://www.googleapis.com/auth/spreadsheets",
      "https://www.googleapis.com/auth/drive.file"
     ].join(" ");
     var nativeApp=window.TWIGA_ANDROID_APP===true;
@@ -511,11 +469,38 @@ document.addEventListener("click",async function(e){
     var o=await sb.auth.signInWithOAuth({provider:"google",options:opts});
     if(o.error){var ge=$("googleAccessError");if(ge)ge.textContent=o.error.message}
    }
+  else if(a==="google-disconnect"){if(confirm("Disconnect Google Workspace for this business?")){await googleWorkspaceCall("disconnect");window.TWIGA_GOOGLE_GRANTED=false;window.TWIGA_GOOGLE_STATUS={connected:false};window.TWIGA_GOOGLE_ACCESS_TOKEN=null;route()}}
   else if(a==="out"){await sb.auth.signOut();load()}
   else if(a==="mkbiz"){var n=$("bn").value.trim();if(n.length<2){$("serr").textContent="Enter your business name.";return}var r=await sb.from("businesses").insert({name:n,business_type:$("bt").value});if(r.error){$("serr").textContent=r.error.message;return}load()}
-  else if(a==="mk"){if(!TX)TX=crypto.randomUUID();var pm=$("om").value,j=await L("createOrder",{txn:TX,customer:$("oc").value,phone:$("op").value,type:$("ot").value,method:pm,paid:pm!=="Pay later",items:[{name:$("oi").value,qty:$("oq").value,unitPrice:$("opr").value}]});TX="";msg("Saved "+j.orderId+", KES "+j.total.toLocaleString());list()}
+  else if(a==="add-line"){var wrap=$("orderLines");if(wrap){wrap.insertAdjacentHTML("beforeend",orderLineHtml());var names=wrap.querySelectorAll(".oi-name");if(names.length)names[names.length-1].focus()}}
+  else if(a==="remove-line"){var row=b.closest(".order-line"),wrap=$("orderLines");if(row&&wrap){if(wrap.querySelectorAll(".order-line").length>1)row.remove();else{row.querySelector(".oi-name").value="";row.querySelector(".oi-qty").value="1";row.querySelector(".oi-price").value=""}}}
+  else if(a==="mk"){
+   var customer=($("oc").value||"").trim(),phone=($("op").value||"").trim(),pm=$("om").value;
+   var rows=Array.from(document.querySelectorAll("#orderLines .order-line"));
+   var items=rows.map(function(row){return{name:(row.querySelector(".oi-name").value||"").trim(),qty:Number(row.querySelector(".oi-qty").value),unitPrice:Number(row.querySelector(".oi-price").value)}}).filter(function(x){return x.name});
+   if(!customer)throw new Error("Enter the customer name.");
+   if(!items.length)throw new Error("Add at least one item or service.");
+   if(items.some(function(x){return !Number.isInteger(x.qty)||x.qty<1||!Number.isFinite(x.unitPrice)||x.unitPrice<0}))throw new Error("Check each item's quantity and price.");
+   if(pm==="M-Pesa"&&!/^(?:0[17][0-9]{8}|254[17][0-9]{8})$/.test(phone.replace(/[\\s-]/g,"")))throw new Error("Enter a valid Kenyan mobile number for the M-Pesa prompt.");
+   if(!TX)TX=crypto.randomUUID();b.disabled=true;b.textContent="Saving order...";
+   var paid=pm==="Cash"||pm==="Card";
+   var j=await L("createOrder",{txn:TX,customer:customer,phone:phone,type:$("ot").value,method:pm,paid:paid,items:items});
+   TX="";$("oc").value="";$("op").value="";$("orderLines").innerHTML=orderLineHtml();
+   if(pm==="M-Pesa"){
+    msg("Order "+j.orderId+" saved. Starting M-Pesa request...");
+    var payment=await L("stkStart",{orderId:j.orderId,phone:phone});msg(payment.message||"M-Pesa payment prompt sent.");
+    list();
+    for(var pi=0;pi<12;pi++){await new Promise(function(resolve){setTimeout(resolve,5000)});var check=await L("stkCheck",{paymentId:payment.paymentId});
+     if(check.status==="SUCCESS"){msg("Payment confirmed. Receipt "+(check.receipt||""));list();break}
+     if(["FAILED","CANCELLED","EXPIRED","REVERSED","REVIEW"].indexOf(check.status)>=0){msg(check.message||"Payment not completed. The order remains unpaid.",1);break}
+     if(pi===11)msg("Payment is still pending. Refresh the order list to check again.");
+    }
+   }else msg("Saved "+j.orderId+", KSh "+Number(j.total||0).toLocaleString()+(paid?". Paid by "+pm:". Payment pending."));
+   list();b.disabled=false;b.textContent="Save order";
+  }
   else if(a==="paid"){await L("updateOrder",{orderId:id,paid:true,method:"Cash"});list()}
   else if(a==="done"){await L("updateOrder",{orderId:id,status:"Completed"});list()}
+  else if(a==="cancel"){if(confirm("Cancel order "+id+"?")){await L("updateOrder",{orderId:id,status:"Cancelled"});list()}}
   else if(a==="stk"){var s=await L("stkStart",{orderId:id,phone:b.dataset.ph});msg(s.message);
    for(var i=0;i<12;i++){await new Promise(function(r){setTimeout(r,5000)});var c=await L("stkCheck",{paymentId:s.paymentId});
     if(c.status==="SUCCESS"){msg("Paid. Receipt "+(c.receipt||""));list();break}
@@ -673,16 +658,16 @@ if(K.mode==="live"){
   $("aic").textContent=$("aip").value.length+" / 20000";$("aimsg").textContent="Template added to the empty boxes. Replace the [brackets] with your details, then Save.";$("aimsg").style.color="var(--ok)"})}
 
 if(K.mode==="live"){
- function googleAccessToken(){return window.TWIGA_GOOGLE_ACCESS_TOKEN||""}
+ function googleAccessToken(){return window.TWIGA_GOOGLE_GRANTED===true}
  async function googleRequest(url,method,body){
-  var token=googleAccessToken();
-  if(!token)throw new Error("Connect Google Workspace first.");
-  var opt={method:method||"GET",headers:{"Authorization":"Bearer "+token}};
-  if(body){opt.headers["Content-Type"]="application/json";opt.body=JSON.stringify(body)}
-  var response=await fetch(url,opt),data={};
-  try{data=await response.json()}catch(e){}
-  if(!response.ok)throw new Error(data.error&&data.error.message||"Google Calendar returned HTTP "+response.status);
-  return data;
+  if(!googleAccessToken())throw new Error("Connect Google Workspace first.");
+  var target=new URL(url),verb=(method||"GET").toUpperCase(),path=target.pathname;
+  if(path.indexOf("/calendar/v3/calendars/primary/events")>=0){
+   if(verb==="POST")return (await googleWorkspaceCall("calendar.create",{event:body})).event;
+   return googleWorkspaceCall("calendar.list",{timeMin:target.searchParams.get("timeMin"),timeMax:target.searchParams.get("timeMax")});
+  }
+  if(target.hostname==="people.googleapis.com")return googleWorkspaceCall("contacts.list",{pageSize:Number(target.searchParams.get("pageSize")||100),pageToken:target.searchParams.get("pageToken")||null});
+  throw new Error("This Google Workspace action is not available yet.");
  }
  function gcalWhen(ev){
   var raw=ev.start&&(ev.start.dateTime||ev.start.date);
