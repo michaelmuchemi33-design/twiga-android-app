@@ -36,6 +36,8 @@ $("who").textContent = "Test how your AI answers customers for " + biz + ".";
 VOICES.forEach(v => { const o = document.createElement("option"); o.value = v[0]; o.textContent = v[1]; $("voice").appendChild(o); });
 let ai = {}, call = null;
 async function loadAi() {
+  const L = window.TWIGA_LOCAL;
+  if (L && (L.prompt || L.faq || L.rules)) { ai = L; return; }
   if (!token) return;
   try {
     const r = await fetch(K.supabaseUrl + "/rest/v1/rpc/device_get_ai", { method: "POST", headers: { apikey: K.supabaseKey, "Content-Type": "application/json" }, body: JSON.stringify({ p_token: token }) });
@@ -50,6 +52,6 @@ $("go").addEventListener("click", async () => {
   $("err").textContent = "";
   await loadAi();
   call = createCall(K.vapiKey, { state, line, error: e => { $("err").textContent = e; state("ended"); } });
-  call.start({ name: biz, prompt: ai.prompt, greeting: ai.greeting, voice: $("voice").value, lang: $("lang").value, maxSeconds: 300 });
+  call.start({ name: biz, prompt: ai.prompt, faq: ai.faq, rules: ai.rules, greeting: ai.greeting, voice: $("voice").value, lang: $("lang").value, maxSeconds: 300 });
 });
 </script></body></html>
