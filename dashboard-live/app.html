@@ -364,7 +364,9 @@ window.TWIGA_EXPORT_ORDERS=async function(){
   ]);
  });
  var apiUrl="https://sheets.googleapis.com/v4/spreadsheets/"+encodeURIComponent(sheetId)+"/values/Sheet1!A1:H1000";
- await googleRequest(apiUrl,"PUT",{values:values});
+ var response=await fetch(apiUrl,{method:"PUT",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({values:values})});
+ var payload={};try{payload=await response.json()}catch(e){}
+ if(!response.ok)throw new Error(payload.error&&payload.error.message||"Google Sheets returned HTTP "+response.status);
  return orders.length;
 };
 window.TWIGA_TEST_GOOGLE=async function(){
@@ -488,7 +490,13 @@ document.addEventListener("click",async function(e){
     }catch(err){var target=$("googleCheckResults");if(target)target.textContent=err.message||"Google test failed."}
     testButton.disabled=false;testButton.textContent="Test Google connections";
    }
-   else if(a==="g"||a==="google-connect"){
+   else if(a==="g"){
+    var nativeApp=window.TWIGA_ANDROID_APP===true;
+    var loginRedirect=nativeApp?"twiga://auth/callback":location.origin+"/";
+    var o=await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:loginRedirect}});
+    if(o.error){var ge=$("lerr");if(ge)ge.textContent=o.error.message}
+   }
+   else if(a==="google-connect"){
     var scopeSet=[
      "https://www.googleapis.com/auth/calendar.events",
      "https://www.googleapis.com/auth/contacts.readonly",
@@ -496,10 +504,9 @@ document.addEventListener("click",async function(e){
      "https://www.googleapis.com/auth/drive.file"
     ].join(" ");
     var nativeApp=window.TWIGA_ANDROID_APP===true;
-    var opts={redirectTo:nativeApp?"twiga://auth/callback":location.origin+"/",scopes:scopeSet,queryParams:{access_type:"offline",include_granted_scopes:"true"}};
-    if(a==="google-connect")opts.queryParams.prompt="consent";
+    var opts={redirectTo:nativeApp?"twiga://auth/callback":location.origin+"/",scopes:scopeSet,queryParams:{access_type:"offline",include_granted_scopes:"true",prompt:"consent"}};
     var o=await sb.auth.signInWithOAuth({provider:"google",options:opts});
-    if(o.error){var ge=$("lerr")||$("googleAccessError");if(ge)ge.textContent=o.error.message}
+    if(o.error){var ge=$("googleAccessError");if(ge)ge.textContent=o.error.message}
    }
   else if(a==="out"){await sb.auth.signOut();load()}
   else if(a==="mkbiz"){var n=$("bn").value.trim();if(n.length<2){$("serr").textContent="Enter your business name.";return}var r=await sb.from("businesses").insert({name:n,business_type:$("bt").value});if(r.error){$("serr").textContent=r.error.message;return}load()}
