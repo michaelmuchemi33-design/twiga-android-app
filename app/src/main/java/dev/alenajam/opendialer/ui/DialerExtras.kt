@@ -90,6 +90,7 @@ fun BusinessTab() {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         AiTalkCard()
+        AiSetupCard()
         Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
             Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -107,7 +108,6 @@ fun BusinessTab() {
             ) { Text("Orders and stock") }
         }
         RemoteDeskCard()
-        AiSettingsCard()
         WhatsAppSoonCard()
         UpdateCard()
     }
