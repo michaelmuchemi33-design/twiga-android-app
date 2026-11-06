@@ -6,7 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import dagger.hilt.android.AndroidEntryPoint
@@ -37,11 +37,17 @@ class MainActivity : ComponentActivity() {
         setContent {
             DialerApp(
                 defaultPhoneManager = defaultPhoneManager,
+                forceLightTheme = true,
                 homeScreenConfiguration = HomeScreenConfiguration(
                     topBarAction = { AiToggleAction() },
                     customNavigationItem = HomeNavigationItem(
-                        label = { Text("Business") },
-                        icon = { Icon(Icons.Default.ShoppingCart, contentDescription = null) },
+                        label = { Text("TWIGA") },
+                        icon = { selected ->
+                            Icon(
+                                Icons.Filled.Dashboard,
+                                contentDescription = if (selected) "TWIGA dashboard" else null
+                            )
+                        },
                         content = { BusinessTab() },
                     ),
                 ),
