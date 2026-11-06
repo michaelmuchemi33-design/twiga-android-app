@@ -372,7 +372,7 @@ window.gate_=function(k){
   document.body.classList.add("auth");$("v-live").hidden=true;$("v-other").hidden=false;$("v-other").innerHTML=SETUP;return true}
  if(k==="setup"){location.hash="#overview";return true}
  return false};
-sb.auth.onAuthStateChange(function(e){if(e==="SIGNED_OUT")setTimeout(load,0)});
+sb.auth.onAuthStateChange(function(e){if(e==="SIGNED_OUT"||e==="SIGNED_IN"||e==="TOKEN_REFRESHED")setTimeout(load,0)});
 async function L(a,d){var s=(await sb.auth.getSession()).data.session;if(!s)throw new Error("Please sign in again.");
  var r=await fetch(K.ledgerUrl,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:a,token:s.access_token,business_id:BIZ.id,data:d||{},txn:(d&&d.txn)||""})});
  var j=await r.json();if(!j.ok)throw new Error(String(j.error||"Request failed").replace(/^INACTIVE\|/,""));return j}
