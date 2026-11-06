@@ -109,9 +109,9 @@ async function authenticate(req: Request, businessId: string) {
   if (error || !data.user) throw new HttpError(401, "Your TWIGA session has expired. Sign in again.");
   // This query runs with the caller's JWT and existing business_members RLS policy.
   const { data: member, error: memberError } = await userClient
-    .from("business_members").select("business_id").eq("business_id", businessId).maybeSingle();
+    .from("business_members").select("business_id,role").eq("business_id", businessId).maybeSingle();
   if (memberError || !member) throw new HttpError(403, "You do not have access to this TWIGA business.");
-  return { user: data.user, admin: getAdmin() };
+  return { user: data.user, role: String(member.role || "member").toLowerCase(), admin: getAdmin() };
 }
 async function getConnection(admin: any, businessId: string): Promise<Conn | null> {
   const { data, error } = await admin.from("twiga_google_connections").select("*")
@@ -221,7 +221,10 @@ Deno.serve(async (req: Request) => {
     const action = String(body.action || "");
     const businessId = String(body.businessId || "");
     if (!businessId || businessId.length > 100) throw new HttpError(400, "A valid TWIGA business is required.");
-    const { user, admin } = await authenticate(req, businessId);
+    const { user, role, admin } = await authenticate(req, businessId);
+    if ((action === "connect" || action === "disconnect") && !["owner", "admin"].includes(role)) {
+      throw new HttpError(403, "Only a TWIGA business owner or administrator can connect or disconnect Google Workspace.");
+    }
 
     if (action === "connect") return reply(req, await connectGoogle(admin, user.id, businessId, body));
     if (action === "status") {
