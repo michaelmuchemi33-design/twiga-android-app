@@ -1,46 +1,71 @@
-<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>TWIGA AI Receptionist Test</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-*{box-sizing:border-box}body{font:15px/1.5 Poppins,system-ui,sans-serif;color:#111;background:#fff;margin:0;padding:20px 16px calc(20px + env(safe-area-inset-bottom));min-height:100vh}
-main{max-width:680px;margin:0 auto}h1{font-size:22px;margin:0 0 4px}.sub{color:#667085;font-size:13px;margin-bottom:18px}
-.card{border:1px solid #111;border-radius:20px;box-shadow:0 3px 0 #111;padding:16px;margin:14px 0}
+*{box-sizing:border-box}body{font:15px/1.5 "DM Sans",system-ui,sans-serif;color:#171717;background:#fff;margin:0;padding:20px 16px calc(20px + env(safe-area-inset-bottom));min-height:100vh}
+main{max-width:700px;margin:0 auto}h1{font-size:24px;margin:0 0 4px}.sub{color:#667085;font-size:13px;margin-bottom:16px}
+.card{border:1px solid #e5e5e5;border-radius:20px;padding:16px;margin:14px 0}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
 select{font:inherit;border:1px solid #bbb;border-radius:12px;padding:10px;background:white;flex:1;min-width:130px}
-button{width:100%;border:1px solid #111;background:#f47721;border-radius:99px;padding:15px;font:700 16px Poppins;cursor:pointer;box-shadow:0 2px 0 #111}
-button:disabled{opacity:.55;cursor:not-allowed}.chip{border:1px solid #111;border-radius:99px;padding:3px 12px;font-size:12px;font-weight:600}
+button,.button{width:100%;border:0;background:#f47721;color:#fff;border-radius:99px;padding:15px;font:700 16px inherit;cursor:pointer;text-align:center;text-decoration:none;display:block}
+button:disabled{opacity:.55;cursor:not-allowed}.chip{border:1px solid #171717;border-radius:99px;padding:3px 12px;font-size:12px;font-weight:700}
 #tr{background:#f6f6f5;border-radius:14px;padding:12px;min-height:150px;max-height:42vh;overflow:auto}
-.msg{padding:9px 11px;border-radius:12px;background:white;margin:7px 0;max-width:92%;overflow-wrap:anywhere}.u{margin-left:auto;background:#111;color:white}
+.msg{padding:9px 11px;border-radius:12px;background:white;margin:7px 0;max-width:92%;overflow-wrap:anywhere}.u{margin-left:auto;background:#171717;color:white}
 .err{color:#b42318;font-size:13px;margin-top:10px}label{font-size:12px;color:#667085;display:block;margin:0 0 5px}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}.metric{background:#f7f7f5;border-radius:12px;padding:10px}.metric b{display:block;font-size:20px}.metric span{font-size:11px;color:#667085}
+a{color:#a74d0a}
 </style></head><body><main>
-<h1>AI receptionist</h1><div class="sub" id="who">Test your TWIGA receptionist with a live voice conversation.</div>
+<h1>AI receptionist</h1><div class="sub" id="who">Sign in to test your business receptionist.</div>
 <section class="card"><div class="row">
-<div style="flex:1;min-width:120px"><label for="lang">Language mode</label><select id="lang"><option value="auto">Automatic (English + Kiswahili)</option></select></div>
+<div style="flex:1;min-width:120px"><label for="lang">Language</label><select id="lang"><option value="auto">Automatic English + Kiswahili</option></select></div>
 <div style="flex:1;min-width:120px"><label for="voice">Voice</label><select id="voice"></select></div>
 <span class="chip" id="st">Ready</span></div>
-<button id="go">Start talking</button><div class="err" id="err" role="alert"></div></section>
+<button id="go" disabled>Start talking</button><div class="err" id="err" role="alert"></div>
+<div class="metrics"><div class="metric"><span>Connection</span><b id="connect">—</b></div><div class="metric"><span>First answer</span><b id="first">—</b></div><div class="metric"><span>Latest response</span><b id="last">—</b></div></div>
+<div class="sub" id="turns">0 completed assistant turns</div></section>
 <section id="tr" aria-live="polite"><div class="sub">The live conversation will appear here.</div></section>
-</main><script src="config.js"></script><script type="module">
+<p class="sub"><a href="/app#ai">Back to dashboard</a> · <a href="/line-setup">Set up your business phone line</a></p>
+</main>
+<script src="/config.js"></script><script type="module">
 import {createCall,VOICES} from "./vapi-call.js";
-const K=window.TWIGA_CONFIG||{},$=id=>document.getElementById(id);
-const params=new URLSearchParams(location.hash.slice(1)),token=params.get("t")||"",biz=params.get("n")||"your business";
-$("who").textContent="Test how your AI answers customers for "+biz+".";
+import {sb,getWorkspace,esc} from "./workspace-client.js";
+const $=id=>document.getElementById(id);let ctx={},call=null,workspace=null;
 VOICES.forEach(([id,name])=>{const o=document.createElement("option");o.value=id;o.textContent=name;$("voice").append(o)});
-let context={},call=null;
-async function loadContext(){
- const local=window.TWIGA_LOCAL;
- if(local&&(local.prompt||local.faq||local.rules)){context=local;return}
- if(!token||!K.supabaseUrl||!K.supabaseKey)return;
- try{const r=await fetch(K.supabaseUrl+"/rest/v1/rpc/device_get_ai",{method:"POST",headers:{apikey:K.supabaseKey,"Content-Type":"application/json"},body:JSON.stringify({p_token:token})});if(r.ok)context=await r.json()}catch(_){}
-}
 const labels={connecting:"Connecting…",listening:"Listening",speaking:"Speaking",ended:"Ready"};
-function state(s){$("st").textContent=labels[s]||s;$("go").textContent=(s==="listening"||s==="speaking")?"End call":s==="connecting"?"Connecting…":"Start talking";$("go").disabled=s==="connecting"}
-function line(role,text){const t=$("tr");if(t.querySelector(".sub"))t.innerHTML="";const d=document.createElement("div");d.className="msg "+(role==="user"?"u":"a");d.textContent=(role==="user"?"You: ":"TWIGA: ")+text;t.append(d);t.scrollTop=t.scrollHeight}
+function state(s){$("st").textContent=labels[s]||s;$("go").textContent=(s==="listening"||s==="speaking")?"End call":s==="connecting"?"Connecting…":"Start talking";$("go").disabled=s==="connecting"||!workspace;}
+function metric(m={}){$("connect").textContent=m.connectMs==null?"—":m.connectMs+" ms";$("first").textContent=m.firstResponseMs==null?"—":m.firstResponseMs+" ms";$("last").textContent=m.lastResponseMs==null?"—":m.lastResponseMs+" ms";$("turns").textContent=(m.turnCount||0)+" completed assistant turns";}
+function line(role,text){const t=$("tr");if(t.querySelector(".sub"))t.innerHTML="";const d=document.createElement("div");d.className="msg "+(role==="user"?"u":"a");d.textContent=(role==="user"?"You: ":"TWIGA: ")+text;t.append(d);t.scrollTop=t.scrollHeight;}
+async function init(){
+ try{
+  workspace=await getWorkspace();
+  if(!workspace.session){$("who").innerHTML='Sign in first: <a href="/app#login">open TWIGA sign in</a>.';return;}
+  if(!workspace.business){$("who").innerHTML='Create your business workspace first: <a href="/start">start your free trial</a>.';return;}
+  $("who").textContent="Testing the receptionist for "+workspace.business.name+".";
+  const {data,error}=await sb.from("business_ai").select("prompt,greeting,faq,rules").eq("business_id",workspace.business.id).maybeSingle();
+  if(error)throw error;ctx=data||{};$("go").disabled=false;
+ }catch(error){$("err").textContent=error.message||"Could not load business settings.";}
+}
 $("go").addEventListener("click",async()=>{
- if(call&&call.live){call.stop();return}
- $("err").textContent="";await loadContext();
- call=createCall(K.vapiKey,K.vapiAssistantId,{state,line,error:e=>$("err").textContent=e});
- call.start({name:context.name||biz,prompt:context.prompt||"",faq:context.faq||"",rules:context.rules||"",greeting:context.greeting||"",voice:$("voice").value});
+ if(call&&(call.live||call.connecting)){call.stop();return;}
+ if(!workspace?.business){$("err").textContent="Sign in and create a business first.";return;}
+ $("err").textContent="";$("tr").innerHTML="";metric({});
+ const lines=[];
+ call=createCall((window.TWIGA_CONFIG||{}).vapiKey,(window.TWIGA_CONFIG||{}).vapiAssistantId,{
+  state,line:(role,text)=>{lines.push({role,text});line(role,text);},
+  metric,
+  error:e=>$("err").textContent=e,
+  end:async report=>{
+   try{
+    const payload={business_id:workspace.business.id,created_by:workspace.session.user.id,provider:"vapi",
+     provider_call_id:report.callId||crypto.randomUUID(),channel:"web",direction:"inbound",status:"ended",
+     started_at:report.startedAt,ended_at:report.endedAt,duration_seconds:report.durationSeconds,
+     metadata:{latency:report.metrics,voice:$("voice").value,transcript_line_count:lines.length}};
+    const {error}=await sb.from("twiga_call_records").insert(payload);if(error)throw error;
+   }catch(error){$("err").textContent="Call ended, but its call log could not be saved: "+error.message;}
+  }
+ });
+ await call.start({name:workspace.business.name,prompt:ctx.prompt,faq:ctx.faq,rules:ctx.rules,greeting:ctx.greeting,voice:$("voice").value,maxSeconds:300});
 });
+init();
 </script></body></html>
