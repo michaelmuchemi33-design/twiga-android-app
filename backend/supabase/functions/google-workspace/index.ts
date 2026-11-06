@@ -262,6 +262,25 @@ Deno.serve(async (req: Request) => {
       });
       return reply(req, { event: data });
     }
+    if (action === "calendar.update") {
+      const eventId = String(body.eventId || "");
+      const event = body.event;
+      if (!eventId || !event?.summary || !event?.start?.dateTime || !event?.end?.dateTime) {
+        throw new HttpError(400, "Appointment ID, title, start and end are required.");
+      }
+      const data = await googleJson(token, "https://www.googleapis.com/calendar/v3/calendars/primary/events/" + encodeURIComponent(eventId), {
+        method: "PATCH", body: JSON.stringify(event),
+      });
+      return reply(req, { event: data });
+    }
+    if (action === "calendar.delete") {
+      const eventId = String(body.eventId || "");
+      if (!eventId) throw new HttpError(400, "Appointment ID is required.");
+      await googleJson(token, "https://www.googleapis.com/calendar/v3/calendars/primary/events/" + encodeURIComponent(eventId), {
+        method: "DELETE",
+      });
+      return reply(req, { deleted: true, eventId });
+    }
     if (action === "contacts.list") {
       const q = new URLSearchParams({ pageSize: String(Math.min(100, Math.max(1, Number(body.pageSize || 100)))), personFields: "names,emailAddresses,phoneNumbers" });
       if (body.pageToken) q.set("pageToken", String(body.pageToken));
