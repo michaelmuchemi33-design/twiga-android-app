@@ -65,7 +65,7 @@ $("go").addEventListener("click",async()=>{
    }catch(error){$("err").textContent="Call ended, but its call log could not be saved: "+error.message;}
   }
  });
- await call.start({name:workspace.business.name,prompt:ctx.prompt,faq:ctx.faq,rules:ctx.rules,greeting:ctx.greeting,voice:$("voice").value,maxSeconds:300});
+ await call.start({businessId:workspace.business.id,name:workspace.business.name,prompt:ctx.prompt,faq:ctx.faq,rules:ctx.rules,greeting:ctx.greeting,voice:$("voice").value,maxSeconds:300});
 });
 init();
 </script></body></html>
