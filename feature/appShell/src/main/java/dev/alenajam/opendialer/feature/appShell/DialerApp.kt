@@ -342,7 +342,7 @@ fun DialerApp(
         }
         }
         if (forceLightTheme) {
-            AppTheme(darkTheme = false, content = content)
+            AppTheme(darkTheme = false, dynamicColor = false, content = content)
         } else {
             content()
         }

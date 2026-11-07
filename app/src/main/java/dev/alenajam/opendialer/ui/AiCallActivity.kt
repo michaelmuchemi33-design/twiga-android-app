@@ -6,7 +6,9 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.view.ViewGroup
+import android.webkit.CookieManager
 import android.webkit.PermissionRequest
+import android.webkit.WebSettings
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -41,11 +43,22 @@ class AiCallActivity : ComponentActivity() {
         w.settings.javaScriptEnabled = true
         w.settings.domStorageEnabled = true
         w.settings.mediaPlaybackRequiresUserGesture = false
+        w.settings.allowFileAccess = false
+        w.settings.allowContentAccess = false
+        w.settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+        CookieManager.getInstance().setAcceptCookie(true)
+        CookieManager.getInstance().setAcceptThirdPartyCookies(w, true)
         w.webViewClient = WebViewClient()
         w.webChromeClient = object : WebChromeClient() {
             override fun onPermissionRequest(request: PermissionRequest) {
                 runOnUiThread {
-                    if (request.origin.host == "app.twiga.co.ke") request.grant(request.resources) else request.deny()
+                    val canUseMic = request.origin.host == "app.twiga.co.ke" &&
+                        request.resources.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE)
+                    if (canUseMic) {
+                        request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
+                    } else {
+                        request.deny()
+                    }
                 }
             }
         }

@@ -17,7 +17,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = 'OpenDialer'
+rootProject.name = 'TWIGA'
 
 include(
         // core

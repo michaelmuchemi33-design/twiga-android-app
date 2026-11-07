@@ -96,7 +96,7 @@ class ReceptionistActivity : ComponentActivity() {
 @Composable
 private fun ReceptionistScreen(onDefaultDialer: () -> Unit) {
     val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("unity_receptionist", Context.MODE_PRIVATE) }
+    val prefs = remember { context.getSharedPreferences("twiga_receptionist", Context.MODE_PRIVATE) }
     var business by remember { mutableStateOf(prefs.getString("business", "") ?: "") }
     var greeting by remember { mutableStateOf(prefs.getString("greeting", "Hello! Thanks for calling. How can I help you today?") ?: "") }
     var endpoint by remember { mutableStateOf(prefs.getString("endpoint", "") ?: "") }
@@ -301,7 +301,7 @@ private fun ReceptionistScreen(onDefaultDialer: () -> Unit) {
                     }
                 }
                 4 -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    item { Text("Twiga AI assistant", fontSize = 25.sp, fontWeight = FontWeight.Bold, color = Ink); Text("Choose the AI brain, voice and call behaviour for your business.", color = Muted) }
+                    item { Text("TWIGA AI receptionist", fontSize = 25.sp, fontWeight = FontWeight.Bold, color = Ink); Text("Choose the AI brain, voice and call behaviour for your business.", color = Muted) }
                     item {
                         Card(colors = CardDefaults.cardColors(containerColor = Color.White)) {
                             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -377,7 +377,7 @@ private fun ReceptionistScreen(onDefaultDialer: () -> Unit) {
                     item { Text("Provider selection is saved locally. Actual AI calls require a configured backend; provider API keys must stay on the server, not in the APK.", color = Muted, fontSize = 12.sp) }
                 }
                 else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    item { Text("Twiga setup", fontSize = 25.sp, fontWeight = FontWeight.Bold, color = Ink); Text("Business profile and secure AI backend connection.", color = Muted) }
+                    item { Text("TWIGA setup", fontSize = 25.sp, fontWeight = FontWeight.Bold, color = Ink); Text("Business profile and secure AI backend connection.", color = Muted) }
                     item {
                         Card(colors = CardDefaults.cardColors(containerColor = Color.White)) {
                             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -394,7 +394,7 @@ private fun ReceptionistScreen(onDefaultDialer: () -> Unit) {
                                 Text("Calling status", fontWeight = FontWeight.Bold)
                                 Text("SIM calling: opens Android's dialler for manual confirmation.", color = Muted, fontSize = 12.sp)
                                 Text("AI answering: requires a supported call-audio bridge such as SIP/WebRTC. SIM audio is not universally exposed to apps.", color = Muted, fontSize = 12.sp)
-                                Text("WhatsApp, M-Pesa, cloud sync and Unity ERP: integration points planned; not active in this APK.", color = Muted, fontSize = 12.sp)
+                                Text("WhatsApp and M-Pesa services require their own account setup. This screen does not activate those services by itself.", color = Muted, fontSize = 12.sp)
                             }
                         }
                     }

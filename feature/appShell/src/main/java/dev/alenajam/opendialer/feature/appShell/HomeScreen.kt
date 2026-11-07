@@ -70,7 +70,9 @@ internal fun HomeScreen(
     onOpenVoicemail: () -> Unit = {},
     configuration: HomeScreenConfiguration = HomeScreenConfiguration(),
 ) {
-    var currentTab by rememberSaveable { mutableStateOf(HomeTab.CALLS) }
+    var currentTab by rememberSaveable {
+        mutableStateOf(if (configuration.customNavigationItem != null) HomeTab.CUSTOM else HomeTab.CALLS)
+    }
     var searchQuery by remember { mutableStateOf("") }
     val isSearchActive = searchQuery.isNotEmpty()
 
@@ -80,6 +82,7 @@ internal fun HomeScreen(
 
     Scaffold(
         topBar = {
+            if (currentTab != HomeTab.CUSTOM) {
             SearchBar(
                 inputField = @Composable {
                     SearchBarDefaults.InputField(
@@ -158,8 +161,10 @@ internal fun HomeScreen(
                     .statusBarsPadding()
                     .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
             ) {}
+            }
         },
         bottomBar = {
+            if (currentTab != HomeTab.CUSTOM) {
             val icons = LocalAppIcons.current
             NavigationBar {
                 NavigationBarItem(
@@ -209,12 +214,18 @@ internal fun HomeScreen(
                     )
                 }
             }
+            }
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { onOpenDialpad("") }) {
+            FloatingActionButton(
+                onClick = {
+                    if (currentTab == HomeTab.CUSTOM) currentTab = HomeTab.CALLS
+                    else onOpenDialpad("")
+                },
+            ) {
                 AppIcon(
-                    LocalAppIcons.current.dialpad,
-                    contentDescription = null,
+                    if (currentTab == HomeTab.CUSTOM) LocalAppIcons.current.recents else LocalAppIcons.current.dialpad,
+                    contentDescription = if (currentTab == HomeTab.CUSTOM) "Open phone calls" else "Open dial pad",
                     modifier = Modifier.size(24.dp)
                 )
             }

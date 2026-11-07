@@ -32,13 +32,13 @@ jobs:
             | (.body // "") as $notes
             | (.assets | map(select(.name | endswith(".apk"))) | first) as $apk
             | {
-                content: ($mention + "A new release of OpenDialer is available! Use the **Download APK** link below to install it."),
+                content: ($mention + "A new release of TWIGA is available! Use the **Download APK** link below to install it."),
                 allowed_mentions: {
                   parse: (if $is_major then ["everyone"] else [] end)
                 },
                 embeds: [
                   ({
-                    title: ("OpenDialer " + $release_name),
+                    title: ("TWIGA " + $release_name),
                     url: .url,
                     fields: (
                       [
@@ -51,14 +51,14 @@ jobs:
                     + (if $apk == null then [] else [
                       {
                         name: "Download APK",
-                        value: ("[Download OpenDialer APK](" + $apk.url + ")"),
+                        value: ("[Download TWIGA APK](" + $apk.url + ")"),
                         inline: false
                       }
                     ] end)
                     + [
                       {
-                        name: "💜 Support development",
-                        value: "[Support development](https://ko-fi.com/monster-dialer)",
+                        name: "TWIGA website",
+                        value: "[TWIGA website](https://twiga.co.ke/)",
                         inline: false
                       }
                     ])
