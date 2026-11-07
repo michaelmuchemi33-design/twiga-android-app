@@ -5,6 +5,7 @@ interface Env {
   SUPABASE_URL: string;
   SUPABASE_ANON_KEY: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
+  WORKSPACE_PROVISIONING_KEY?: string;
   MAX_UPLOAD_BYTES?: string;
 }
 type Member = { user_id: string; business_id: string; role: string };
@@ -12,7 +13,7 @@ const QUOTA = 500 * 1024 * 1024;
 const RETENTION_DAYS = 90;
 const ALLOWED_ORIGINS = new Set(["https://app.twiga.co.ke", "https://twiga.co.ke", "https://www.twiga.co.ke"]);
 const corsFor = (origin: string | null) => ({
-  ...(origin && ALLOWED_ORIGINS.has(origin) ? { "access-control-allow-origin": origin } : {}),
+  "access-control-allow-origin": origin && ALLOWED_ORIGINS.has(origin) ? origin : "*",
   "access-control-allow-methods": "GET,POST,DELETE,OPTIONS",
   "access-control-allow-headers": "authorization,content-type",
   "access-control-max-age": "86400",
@@ -77,6 +78,7 @@ async function handle(req: Request, env: Env): Promise<Response> {
 
   // Workspace creation is the only route that does not require a pre-existing membership.
   if (req.method === "POST" && url.pathname === "/v1/workspaces") {
+    if (!env.WORKSPACE_PROVISIONING_KEY || req.headers.get("x-twiga-provisioning-key") !== env.WORKSPACE_PROVISIONING_KEY) return response({ error: "Workspace provisioning is restricted to authorized setup operations" }, 403, origin);
     const body = await req.json() as { name?: string };
     const name = String(body.name ?? "").trim().slice(0, 120);
     if (!name) return response({ error: "Workspace name is required" }, 400);
@@ -112,6 +114,8 @@ async function handle(req: Request, env: Env): Promise<Response> {
 
   if (url.pathname === "/v1/records" && req.method === "POST") {
     if (!canWrite) return response({ error: "Read-only membership" }, 403);
+    const declaredLength = Number(req.headers.get("content-length") ?? 0);
+    if (declaredLength > 1100000) return response({ error: "Record request is too large" }, 413, origin);
     const body = await req.json() as { type?: string; data?: unknown };
     const type = String(body.type ?? "").trim().toLowerCase();
     if (!/^[a-z][a-z0-9_-]{0,59}$/.test(type) || body.data === undefined) return response({ error: "Valid type and data are required" }, 400);
@@ -123,7 +127,7 @@ async function handle(req: Request, env: Env): Promise<Response> {
     try {
       await env.DB.prepare("INSERT INTO records(id,business_id,record_type,payload,size_bytes,created_at,expires_at,created_by) VALUES(?,?,?,?,?,?,?,?)")
         .bind(recordId,businessId,type,payload,bytes,created,expires,auth.userId).run();
-      void audit(env,businessId,auth.userId,"record.created",recordId).catch(e=>console.error("Audit write failed",e));
+      try { await audit(env,businessId,auth.userId,"record.created",recordId); } catch (e) { console.error("Audit write failed",e); }
     } catch (e) { await release(env,businessId,bytes); throw e; }
     return response({ id: recordId, type, createdAt: created, expiresAt: expires, sizeBytes: bytes }, 201);
   }
@@ -145,16 +149,18 @@ async function handle(req: Request, env: Env): Promise<Response> {
     if (!row) return response({ error: "Record not found" }, 404);
     await env.DB.prepare("DELETE FROM records WHERE id=? AND business_id=?").bind(recordId,businessId).run();
     await release(env,businessId,row.size_bytes);
-    void audit(env,businessId,auth.userId,"record.deleted",recordId).catch(e=>console.error("Audit write failed",e));
+    try { await audit(env,businessId,auth.userId,"record.deleted",recordId); } catch (e) { console.error("Audit write failed",e); }
     return response({ ok: true });
   }
 
   if (url.pathname === "/v1/files" && req.method === "POST") {
     if (!canWrite) return response({ error: "Read-only membership" }, 403);
+    const max = Number(env.MAX_UPLOAD_BYTES ?? 26214400);
+    const declaredLength = Number(req.headers.get("content-length") ?? 0);
+    if (declaredLength > max + 1048576) return response({ error: "Upload request is too large" }, 413, origin);
     const form = await req.formData();
     const file = form.get("file");
     if (!(file instanceof File)) return response({ error: "Multipart field 'file' is required" }, 400);
-    const max = Number(env.MAX_UPLOAD_BYTES ?? 26214400);
     if (file.size < 1 || file.size > max) return response({ error: "File must be between 1 byte and " + max + " bytes" }, 413);
     if (!await reserve(env,businessId,file.size)) return response({ error: "500 MB business storage limit reached" }, 413);
     const objectId=id(), created=iso(), expires=expiry(), key=businessId+"/"+objectId+"/"+safeName(file.name);
@@ -162,7 +168,7 @@ async function handle(req: Request, env: Env): Promise<Response> {
       await env.FILES.put(key,file.stream(),{ httpMetadata:{ contentType:file.type || "application/octet-stream" }, customMetadata:{ businessId, objectId, expiresAt:expires } });
       await env.DB.prepare("INSERT INTO objects(id,business_id,object_key,filename,content_type,size_bytes,created_at,expires_at,created_by) VALUES(?,?,?,?,?,?,?,?,?)")
         .bind(objectId,businessId,key,safeName(file.name),file.type || "application/octet-stream",file.size,created,expires,auth.userId).run();
-      void audit(env,businessId,auth.userId,"file.uploaded",objectId).catch(e=>console.error("Audit write failed",e));
+      try { await audit(env,businessId,auth.userId,"file.uploaded",objectId); } catch (e) { console.error("Audit write failed",e); }
     } catch(e) { await env.FILES.delete(key); await release(env,businessId,file.size); throw e; }
     return response({ id:objectId, filename:safeName(file.name), sizeBytes:file.size, createdAt:created, expiresAt:expires },201);
   }
@@ -194,7 +200,7 @@ async function handle(req: Request, env: Env): Promise<Response> {
     await env.FILES.delete(row.object_key);
     await env.DB.prepare("DELETE FROM objects WHERE id=? AND business_id=?").bind(fileId,businessId).run();
     await release(env,businessId,row.size_bytes);
-    void audit(env,businessId,auth.userId,"file.deleted",fileId).catch(e=>console.error("Audit write failed",e));
+    try { await audit(env,businessId,auth.userId,"file.deleted",fileId); } catch (e) { console.error("Audit write failed",e); }
     return response({ok:true});
   }
   return response({error:"Route not found"},404);
