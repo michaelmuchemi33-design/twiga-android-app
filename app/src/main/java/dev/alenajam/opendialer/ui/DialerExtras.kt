@@ -64,7 +64,6 @@ fun dialCode(context: Context, code: String) {
 fun AiToggleAction() {
     val context = LocalContext.current
     var ai by remember { mutableStateOf(RemoteDesk.aiEnabled(context)) }
-    var autoAnswer by remember { mutableStateOf(RemoteDesk.autoAnswerEnabled(context)) }
     LaunchedEffect(Unit) {
         while (true) { ai = RemoteDesk.aiEnabled(context); delay(2000) }
     }
@@ -84,6 +83,7 @@ fun AiToggleAction() {
 fun BusinessTab() {
     val context = LocalContext.current
     var ai by remember { mutableStateOf(RemoteDesk.aiEnabled(context)) }
+    var autoAnswer by remember { mutableStateOf(RemoteDesk.autoAnswerEnabled(context)) }
     LaunchedEffect(Unit) {
         while (true) { ai = RemoteDesk.aiEnabled(context); delay(2000) }
     }
