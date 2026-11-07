@@ -149,6 +149,17 @@ fun DialerApp(
                 defaultPhoneRequestWasDenied = !isDefaultPhoneApp
             }
         )
+
+        // Prompt once on first launch so the owner does not miss Android's required
+        // default-phone-app hand-off. The owner still explicitly approves in Android.
+        LaunchedEffect(activity) {
+            val currentActivity = activity ?: return@LaunchedEffect
+            val setupPrefs = currentActivity.getSharedPreferences("twiga_setup", android.content.Context.MODE_PRIVATE)
+            if (!isDefaultPhoneApp && !setupPrefs.getBoolean("default_phone_prompted", false)) {
+                setupPrefs.edit().putBoolean("default_phone_prompted", true).apply()
+                defaultPhoneManager.createRequestDefaultDialerIntent()?.let { defaultPhoneLauncher.launch(it) }
+            }
+        }
         val fullScreenIntentLauncher = rememberLauncherForActivityResult(
             contract = ActivityResultContracts.StartActivityForResult(),
             onResult = { refreshSetupState() }
