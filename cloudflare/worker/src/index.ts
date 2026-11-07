@@ -10,14 +10,16 @@ interface Env {
 type Member = { user_id: string; business_id: string; role: string };
 const QUOTA = 500 * 1024 * 1024;
 const RETENTION_DAYS = 90;
-const cors = {
-  "access-control-allow-origin": "https://app.twiga.co.ke",
+const ALLOWED_ORIGINS = new Set(["https://app.twiga.co.ke", "https://twiga.co.ke", "https://www.twiga.co.ke"]);
+const corsFor = (origin: string | null) => ({
+  ...(origin && ALLOWED_ORIGINS.has(origin) ? { "access-control-allow-origin": origin } : {}),
   "access-control-allow-methods": "GET,POST,DELETE,OPTIONS",
   "access-control-allow-headers": "authorization,content-type",
+  "access-control-max-age": "86400",
   "vary": "Origin"
-};
-const response = (data: unknown, status = 200) =>
-  new Response(JSON.stringify(data), { status, headers: { ...cors, "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+});
+const response = (data: unknown, status = 200, origin: string | null = null) =>
+  new Response(JSON.stringify(data), { status, headers: { ...corsFor(origin), "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" } });
 const id = () => crypto.randomUUID();
 const iso = () => new Date().toISOString();
 const expiry = () => new Date(Date.now() + RETENTION_DAYS * 86400000).toISOString();
@@ -63,10 +65,15 @@ async function audit(env: Env, businessId: string, actor: string, event: string,
 }
 async function handle(req: Request, env: Env): Promise<Response> {
   const url = new URL(req.url);
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
-  if (url.pathname === "/health") return response({ ok: true, service: "twiga-storage", time: iso() });
+  const origin = req.headers.get("origin");
+  if (req.method === "OPTIONS") {
+    if (origin && !ALLOWED_ORIGINS.has(origin)) return new Response(null, { status: 403 });
+    return new Response(null, { status: 204, headers: corsFor(origin) });
+  }
+  if (origin && !ALLOWED_ORIGINS.has(origin)) return response({ error: "Origin not allowed" }, 403, origin);
+  if (url.pathname === "/health") return response({ ok: true, service: "twiga-storage", time: iso() }, 200, origin);
   const auth = await authenticate(req, env);
-  if (!auth) return response({ error: "Authentication required" }, 401);
+  if (!auth) return response({ error: "Authentication required" }, 401, origin);
 
   // Workspace creation is the only route that does not require a pre-existing membership.
   if (req.method === "POST" && url.pathname === "/v1/workspaces") {
@@ -84,9 +91,17 @@ async function handle(req: Request, env: Env): Promise<Response> {
   }
 
   const businessId = url.searchParams.get("businessId") ?? "";
-  if (!/^[0-9a-f-]{36}$/i.test(businessId)) return response({ error: "A valid businessId is required" }, 400);
+  if (!/^[0-9a-f-]{36}$/i.test(businessId)) return response({ error: "A valid businessId is required" }, 400, origin);
   const member = await membership(env, auth.userId, businessId);
-  if (!member) return response({ error: "You do not have access to this business" }, 403);
+  if (!member) return response({ error: "You do not have access to this business" }, 403, origin);
+  const workspaceUrl = new URL(env.SUPABASE_URL + "/rest/v1/twiga_business_workspaces");
+  workspaceUrl.searchParams.set("select", "status");
+  workspaceUrl.searchParams.set("id", "eq." + businessId);
+  workspaceUrl.searchParams.set("limit", "1");
+  const workspaceResponse = await fetch(workspaceUrl, { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: "Bearer " + env.SUPABASE_SERVICE_ROLE_KEY } });
+  if (!workspaceResponse.ok) return response({ error: "Workspace status verification unavailable" }, 503, origin);
+  const workspaceRows = await workspaceResponse.json() as Array<{status:string}>;
+  if (!workspaceRows[0] || workspaceRows[0].status !== "active") return response({ error: "Workspace is not active" }, 403, origin);
   const canWrite = ["owner", "admin", "manager"].includes(member.role);
 
   if (req.method === "GET" && url.pathname === "/v1/storage/usage") {
@@ -108,7 +123,7 @@ async function handle(req: Request, env: Env): Promise<Response> {
     try {
       await env.DB.prepare("INSERT INTO records(id,business_id,record_type,payload,size_bytes,created_at,expires_at,created_by) VALUES(?,?,?,?,?,?,?,?)")
         .bind(recordId,businessId,type,payload,bytes,created,expires,auth.userId).run();
-      await audit(env,businessId,auth.userId,"record.created",recordId);
+      void audit(env,businessId,auth.userId,"record.created",recordId).catch(e=>console.error("Audit write failed",e));
     } catch (e) { await release(env,businessId,bytes); throw e; }
     return response({ id: recordId, type, createdAt: created, expiresAt: expires, sizeBytes: bytes }, 201);
   }
@@ -117,8 +132,8 @@ async function handle(req: Request, env: Env): Promise<Response> {
     const type = url.searchParams.get("type");
     const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") ?? 50)));
     const rows = type
-      ? await env.DB.prepare("SELECT id,record_type,payload,size_bytes,created_at,expires_at FROM records WHERE business_id=? AND record_type=? ORDER BY created_at DESC LIMIT ?").bind(businessId,type,limit).all()
-      : await env.DB.prepare("SELECT id,record_type,payload,size_bytes,created_at,expires_at FROM records WHERE business_id=? ORDER BY created_at DESC LIMIT ?").bind(businessId,limit).all();
+      ? await env.DB.prepare("SELECT id,record_type,payload,size_bytes,created_at,expires_at FROM records WHERE business_id=? AND record_type=? AND expires_at>? ORDER BY created_at DESC LIMIT ?").bind(businessId,type,iso(),limit).all()
+      : await env.DB.prepare("SELECT id,record_type,payload,size_bytes,created_at,expires_at FROM records WHERE business_id=? AND expires_at>? ORDER BY created_at DESC LIMIT ?").bind(businessId,iso(),limit).all();
     return response({ records: rows.results });
   }
 
@@ -126,11 +141,11 @@ async function handle(req: Request, env: Env): Promise<Response> {
     if (!canWrite) return response({ error: "Read-only membership" }, 403);
     const recordId = url.searchParams.get("id");
     if (!recordId) return response({ error: "Record id required" }, 400);
-    const row = await env.DB.prepare("SELECT size_bytes FROM records WHERE id=? AND business_id=?").bind(recordId,businessId).first<{size_bytes:number}>();
+    const row = await env.DB.prepare("SELECT size_bytes FROM records WHERE id=? AND business_id=? AND expires_at>?").bind(recordId,businessId,iso()).first<{size_bytes:number}>();
     if (!row) return response({ error: "Record not found" }, 404);
     await env.DB.prepare("DELETE FROM records WHERE id=? AND business_id=?").bind(recordId,businessId).run();
     await release(env,businessId,row.size_bytes);
-    await audit(env,businessId,auth.userId,"record.deleted",recordId);
+    void audit(env,businessId,auth.userId,"record.deleted",recordId).catch(e=>console.error("Audit write failed",e));
     return response({ ok: true });
   }
 
@@ -147,7 +162,7 @@ async function handle(req: Request, env: Env): Promise<Response> {
       await env.FILES.put(key,file.stream(),{ httpMetadata:{ contentType:file.type || "application/octet-stream" }, customMetadata:{ businessId, objectId, expiresAt:expires } });
       await env.DB.prepare("INSERT INTO objects(id,business_id,object_key,filename,content_type,size_bytes,created_at,expires_at,created_by) VALUES(?,?,?,?,?,?,?,?,?)")
         .bind(objectId,businessId,key,safeName(file.name),file.type || "application/octet-stream",file.size,created,expires,auth.userId).run();
-      await audit(env,businessId,auth.userId,"file.uploaded",objectId);
+      void audit(env,businessId,auth.userId,"file.uploaded",objectId).catch(e=>console.error("Audit write failed",e));
     } catch(e) { await env.FILES.delete(key); await release(env,businessId,file.size); throw e; }
     return response({ id:objectId, filename:safeName(file.name), sizeBytes:file.size, createdAt:created, expiresAt:expires },201);
   }
@@ -155,15 +170,15 @@ async function handle(req: Request, env: Env): Promise<Response> {
   if (url.pathname === "/v1/files" && req.method === "GET") {
     const fileId=url.searchParams.get("id");
     if (!fileId) {
-      const rows=await env.DB.prepare("SELECT id,filename,content_type,size_bytes,created_at,expires_at FROM objects WHERE business_id=? ORDER BY created_at DESC LIMIT 100").bind(businessId).all();
+      const rows=await env.DB.prepare("SELECT id,filename,content_type,size_bytes,created_at,expires_at FROM objects WHERE business_id=? AND expires_at>? ORDER BY created_at DESC LIMIT 100").bind(businessId,iso()).all();
       return response({ files:rows.results });
     }
-    const row=await env.DB.prepare("SELECT object_key,filename,content_type,size_bytes FROM objects WHERE id=? AND business_id=?").bind(fileId,businessId).first<{object_key:string;filename:string;content_type:string;size_bytes:number}>();
+    const row=await env.DB.prepare("SELECT object_key,filename,content_type,size_bytes FROM objects WHERE id=? AND business_id=? AND expires_at>?").bind(fileId,businessId,iso()).first<{object_key:string;filename:string;content_type:string;size_bytes:number}>();
     if(!row) return response({error:"File not found"},404);
     const object=await env.FILES.get(row.object_key);
     if(!object) return response({error:"File content missing"},404);
-    const headers=new Headers(cors);
-    headers.set("content-type",row.content_type);
+    const headers=new Headers(corsFor(origin));
+    headers.set("content-type",/^[\w.+-]+\/[\w.+-]+$/.test(row.content_type) ? row.content_type : "application/octet-stream");
     headers.set("content-length",String(row.size_bytes));
     headers.set("content-disposition",'attachment; filename="'+safeName(row.filename)+'"');
     headers.set("cache-control","private, no-store");
@@ -179,7 +194,7 @@ async function handle(req: Request, env: Env): Promise<Response> {
     await env.FILES.delete(row.object_key);
     await env.DB.prepare("DELETE FROM objects WHERE id=? AND business_id=?").bind(fileId,businessId).run();
     await release(env,businessId,row.size_bytes);
-    await audit(env,businessId,auth.userId,"file.deleted",fileId);
+    void audit(env,businessId,auth.userId,"file.deleted",fileId).catch(e=>console.error("Audit write failed",e));
     return response({ok:true});
   }
   return response({error:"Route not found"},404);
