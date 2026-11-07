@@ -131,7 +131,35 @@ body.auth aside,body.auth .bar,body.auth .scrim{display:none}body.auth .app{grid
 .lc,.cb,.out{border-radius:14px}.lc{border-color:var(--bd)}.tabs button{border-radius:99px}nav a{border-radius:99px}.lgo{border:1px solid #fff}
 .tabbar{display:none}
 @media (max-width:820px){.tabbar{display:flex;position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:15;background:var(--panel);border:1px solid var(--bd);border-radius:24px;box-shadow:0 3px 0 var(--bd);padding:6px;gap:2px}.tabbar a,.tabbar button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border:0;background:none;border-radius:18px;color:var(--mute);font-size:11px;font-weight:600;text-decoration:none}.tabbar .on{background:var(--or);color:#111}.tabbar svg{width:20px;height:20px}main{padding-bottom:110px}body.nav .tabbar,body.auth .tabbar{display:none}}
-.av img{width:100%;height:100%;object-fit:cover;display:block}.pre main{visibility:hidden}.kp{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.kp .btn{font-size:20px;padding:12px 0}</style>
+.av img{width:100%;height:100%;object-fit:cover;display:block}.pre main{visibility:hidden}.kp{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.kp .btn{font-size:20px;padding:12px 0}
+/* TWIGA calendar: light, readable, responsive weekly layout */
+.twiga-calendar-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:18px 18px 14px}
+.twiga-calendar-head h3{font-size:19px;letter-spacing:-.5px;margin:5px 0}
+.twiga-calendar-head p{font-size:12px;color:var(--mute);margin:0}
+.twiga-cal-range{font-size:10px;font-weight:800;letter-spacing:1.2px;color:var(--or)}
+.twiga-cal-actions{display:flex;gap:8px;flex-wrap:wrap}
+.twiga-cal-legend{display:flex;gap:18px;align-items:center;padding:0 18px 14px;color:var(--mute);font-size:11px}
+.twiga-cal-legend span{display:flex;align-items:center;gap:7px}
+.twiga-cal-legend i{width:9px;height:9px;border-radius:3px;display:inline-block;background:#e9e6e1}
+.twiga-cal-legend i.ai{background:#F47721}
+.twiga-cal-scroll{overflow:auto;border-top:1px solid var(--line)}
+.twiga-week{display:grid;grid-template-columns:68px repeat(7,minmax(104px,1fr));grid-template-rows:58px repeat(8,70px);min-width:850px;position:relative;background:#fff}
+.twiga-week>div{border-right:1px solid #efede9;border-bottom:1px solid #efede9;min-width:0}
+.twiga-cal-corner{grid-column:1;grid-row:1;background:#faf9f7}
+.twiga-cal-day{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:#fff}
+.twiga-cal-day span{font-size:10px;color:var(--mute);font-weight:700}
+.twiga-cal-day b{font-size:16px;color:var(--ink)}
+.twiga-cal-day i{font-size:8px;color:var(--or);font-style:normal;font-weight:800}
+.twiga-cal-time{grid-column:1;padding:9px 8px 0 0;text-align:right;color:var(--mute);font-size:10px;border-right:1px solid var(--line)!important;background:#fcfbfa}
+.twiga-cal-cell{background:linear-gradient(to bottom,transparent calc(100% - 1px),#f0eeeb 1px)}
+.twiga-cal-event{z-index:2;margin:4px 3px;padding:7px 7px 6px;border-radius:7px;background:#f1f0ed;border-left:3px solid #aaa49c;display:flex;flex-direction:column;gap:4px;overflow:hidden;min-width:0}
+.twiga-cal-event.is-ai{background:#fff0e6;border-left-color:#F47721}
+.twiga-cal-event b{font-size:10px;line-height:1.3;color:#272522;white-space:normal}
+.twiga-cal-event small{font-size:9px;color:#77716a}
+.twiga-cal-foot{padding:13px 18px;color:var(--mute);font-size:11px;background:#fcfbfa;border-top:1px solid var(--line)}
+@media(max-width:720px){.twiga-calendar-head{display:block}.twiga-cal-actions{margin-top:12px}.twiga-cal-legend{gap:12px;flex-wrap:wrap}.twiga-week{grid-template-columns:52px repeat(7,minmax(92px,1fr));grid-template-rows:52px repeat(8,64px)}}
+
+</style>
 </head>
 <body>
 <div class="app">
@@ -276,7 +304,27 @@ overview:function(){return["What the receptionist has done today, and what needs
 history:function(){return["Every call the receptionist handled. Open one to see exactly what it did.",C("All calls",T(["Caller","Direction","Time","Language","Outcome",""],calls.map(function(c){return[esc(c.name),c.dir==="in"?"Inbound":"Outbound",c.start+", "+fmt(c.dur),esc(c.lang),G(esc(c.out[0]),c.out[1]),'<button class="btn sm" data-open="'+c.id+'">View</button>']})))]},
 ai:function(){return["Choose what your receptionist can do and when it hands over to a person.",'<div class="g2">'+C("Abilities",O("Answer inbound calls","Picks up every call, day and night",1)+O("English and Kiswahili","Follows the caller, including mid-call switches",1)+O("Book appointments","Only for services marked bookable",1)+O("Make outbound calls","Within your calling hours",1)+O("Send quotes and payment links","On WhatsApp, with PalPlus",1)+O("Send receipts","On WhatsApp, after payment",1)+O("Record calls","Only with the caller’s consent",0))+C("Ask a person first",O("Refunds and payments","Staff approve before anything moves",1)+O("Special service requests","Things the AI can’t confirm",1)+O("Serious complaints","Transfer to the manager",1)+O("Caller asks for a person","Always transfer",1))+'</div>'+C("Greeting",'<div class="pb"><textarea rows="3" aria-label="Greeting">Hello, karibu TWIGA Salon. How can I help you today?</textarea><div><button class="btn pri" data-save>Save greeting</button></div></div>')]},
 appointments:function(){return["Book, move or cancel. The AI checks the calendar again before every save, so slots never double up.",C("Today",T(["Time","Customer","Service","Stylist","Status",""],appts.map(function(a,i){return[a[0],a[1],a[2],a[3],G(a[4],ST[a[4]]),a[4]==="Cancelled"?"":'<button class="btn sm" data-ap="'+i+':Rescheduled">Reschedule</button> <button class="btn sm" data-ap="'+i+':Cancelled">Cancel</button>']})))]},
-calendar:function(){var st=["Faith","Joseph","Mary"],ev=[[0,1,2,"Amina, knotless braids"],[0,5,3,"Faith A., box braids"],[1,0,1,"Brian, haircut"],[1,3,1,"Walk-in"],[2,2,1,"Wanjiru, blow-dry"],[2,4,1,"Mercy, gel nails"],[2,6,1,"Grace, treatment"]],h='<div></div>'+st.map(function(s){return '<div style="font-weight:700;color:var(--ink)">'+s+'</div>'}).join(''),i,j;for(i=0;i<8;i++){h+='<div style="grid-column:1;grid-row:'+(i+2)+'">'+(9+i)+':00</div>';for(j=0;j<3;j++)h+='<div style="grid-column:'+(j+2)+';grid-row:'+(i+2)+'"></div>'}ev.forEach(function(e){h+='<div class="ev" style="grid-column:'+(e[0]+2)+';grid-row:'+(e[1]+2)+'/span '+e[2]+'">'+e[3]+'</div>'});return["Each stylist has their own calendar, so two bookings never clash.",C("Today",'<div class="tw"><div class="cal">'+h+'</div></div>')]},
+calendar:function(){
+ var names=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],today=new Date(),monday=new Date(today);
+ monday.setDate(today.getDate()-((today.getDay()+6)%7));
+ var dateLabel=names.map(function(n,i){var d=new Date(monday);d.setDate(monday.getDate()+i);return '<div class="twiga-cal-day"><span>'+n+'</span><b>'+d.getDate()+'</b>'+(d.toDateString()===today.toDateString()?'<i>Today</i>':'')+'</div>'}).join("");
+ var h='<div class="twiga-week"><div class="twiga-cal-corner"></div>'+dateLabel;
+ for(var hr=9;hr<17;hr++){h+='<div class="twiga-cal-time">'+(hr>12?hr-12:hr)+':00 '+(hr>=12?'PM':'AM')+'</div>';for(var d=0;d<7;d++)h+='<div class="twiga-cal-cell"></div>'}
+ var ev=[
+  [0,1,1,"Content planning","9:00 AM","manual"],
+  [1,2,2,"One-to-one","10:00 AM","manual"],
+  [2,0,2,"Deep work","9:00 AM","manual"],
+  [2,3,1,"Design sync","12:00 PM","manual"],
+  [3,4,1,"Lunch appointment","1:00 PM","ai"],
+  [4,2,2,"Customer booking","10:00 AM","ai"],
+  [5,1,1,"Service appointment","9:00 AM","ai"],
+  [6,5,1,"Follow-up","2:00 PM","manual"]
+ ];
+ ev.forEach(function(e){h+='<div class="twiga-cal-event '+(e[5]==="ai"?"is-ai":"")+'" style="grid-column:'+(e[0]+2)+';grid-row:'+(e[1]+2)+'/span '+e[2]+'"><b>'+e[3]+'</b><small>'+e[4]+'</small></div>'});
+ h+='</div>';
+ var html='<div class="twiga-calendar-head"><div><div class="twiga-cal-range">WEEKLY SCHEDULE</div><h3>Appointments at a glance</h3><p>Preview layout · Example appointments, not live business records</p></div><div class="twiga-cal-actions"><a class="btn sm" href="#appointments">Appointment list</a><a class="btn sm pri" href="#integrations">Connect Google Calendar</a></div></div><div class="twiga-cal-legend"><span><i class="ai"></i>AI-assisted booking</span><span><i class="manual"></i>Team appointment</span></div><div class="twiga-cal-scroll">'+h+'</div><div class="twiga-cal-foot">Live appointments will appear here after your Google Calendar connection and booking permissions are configured.</div>';
+ return["A clean weekly view for your team. Connect Google Calendar to replace the preview with your actual appointments.",C("Weekly calendar",html)]
+},
 customers:function(){return["Profiles, preferences and balances the receptionist uses on every call.",'<div class="pg"><input type="search" placeholder="Search customers" aria-label="Search customers" style="width:100%;max-width:320px" oninput="var v=this.value.toLowerCase();document.querySelectorAll(\'#ct tbody tr\').forEach(function(r){r.hidden=r.textContent.toLowerCase().indexOf(v)<0})"></div>'+C("Customers",T(["Name","Phone","Last visit","Next visit","Balance","Notes"],[["Wanjiru Kamau","+254 712 345 678","12 Oct","Braids, due 23 Nov","KES 0","Prefers afternoons"],["Amina Hassan","+254 701 220 415","30 Sep","Braids, due 11 Nov","KES 0","Likes Faith"],["Brian Otieno","+254 722 118 904","20 Oct","Haircut, due 3 Nov","KES 0","Early mornings"],["Grace Njeri","+254 733 904 117","18 Oct","On hold","KES 900","Complaint open"],["Mercy Wambui","+254 790 118 346","1 Nov","Nails, due 22 Nov","KES 0","Speaks Kiswahili"]],"ct"))]},
 services:function(){return["What the AI can quote and book. Durations set how long each slot is held.",C("Services",T(["Service","Time","Price (KES)","AI can book"],[["Knotless braids, medium","4 h","3,500",SW(1)],["Box braids","3 h","3,000",SW(1)],["Wash and blow-dry","1 h","800",SW(1)],["Gel nails","1 h 30","1,500",SW(1)],["Men’s haircut","45 min","500",SW(1)],["Bridal styling","3 h","8,000",SW(0)]]))]},
 orders:function(){return["Product sales and service orders, with M-Pesa references and stock.",'<div class="g2">'+C("Orders",T(["Order","Customer","Items","KES","M-Pesa ref","Status"],[["#1042","Amina Hassan","Edge control, shea butter","1,800","QJ8K2LM4PX",G("Paid","ok")],["#1043","Walk-in","Shampoo, conditioner","2,400","QJ8M7TR2NA",G("Paid","ok")],["#1044","Grace Njeri","Hair oil","900","Awaiting",G("Deposit","or")]]))+C("Stock",T(["Product","Left",""],[["Shampoo 500 ml",3,G("Low","bad")],["Conditioner",12,G("OK","ok")],["Hair oil",4,G("Low","bad")],["Shea butter",18,G("OK","ok")]]))+'</div>']},

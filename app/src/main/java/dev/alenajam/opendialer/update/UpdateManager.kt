@@ -17,7 +17,7 @@ import java.net.URL
 
 /** Checks the GitHub release for a newer build and installs it with one tap (or silently when Android allows). */
 object UpdateManager {
-    private const val API = "https://github.com/michaelmuchemi33-design/unity-ai-receptionist-app/releases/download/latest-apk/version.json"
+    private const val API = "https://github.com/michaelmuchemi33-design/twiga-android-app/releases/download/latest-apk/version.json"
 
     data class Info(val build: Long, val url: String, val size: Long)
 
