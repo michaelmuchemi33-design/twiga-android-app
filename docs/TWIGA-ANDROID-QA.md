@@ -14,3 +14,5 @@
 
 ## Critical telephony limitation
 Android's public InCallService API lets the default dialer manage and answer calls, but it does not expose carrier-call uplink/downlink audio to an ordinary third-party app. Auto-answer is a phone-call control feature, not proof that the AI can listen and speak on a SIM call. A supported SIP/carrier/voice bridge is still required for a real AI receptionist conversation.
+
+- Verify the auto-answer preference survives an app restart and remains OFF after a fresh install until the owner explicitly enables it.
