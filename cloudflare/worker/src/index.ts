@@ -170,7 +170,8 @@ async function handle(req: Request, env: Env): Promise<Response> {
 
   if (url.pathname === "/v1/records" && req.method === "GET") {
     const type = url.searchParams.get("type");
-    const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") ?? 50)));
+    const requestedLimit = Number(url.searchParams.get("limit") ?? 50);
+    const limit = Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, Math.floor(requestedLimit))) : 50;
     const rows = type
       ? await env.DB.prepare("SELECT id,record_type,payload,size_bytes,created_at,expires_at FROM records WHERE business_id=? AND record_type=? AND expires_at>? ORDER BY created_at DESC LIMIT ?").bind(businessId,type,iso(),limit).all()
       : await env.DB.prepare("SELECT id,record_type,payload,size_bytes,created_at,expires_at FROM records WHERE business_id=? AND expires_at>? ORDER BY created_at DESC LIMIT ?").bind(businessId,iso(),limit).all();
