@@ -60,10 +60,10 @@ async function createWorkspace(event) {
   event.preventDefault();
   const button=$("createButton"),name=$("name").value.trim(),type=$("type").value;
   const rawPhone=$("phone").value.trim();
-  let phone=rawPhone.replace(/[\\s().-]/g,"");
+  let phone=rawPhone.replace(/[\s().-]/g,"");
   if(phone.startsWith("0"))phone="+254"+phone.slice(1);else if(phone.startsWith("254"))phone="+"+phone;
   if(name.length<2){message("Enter your business name.","error");return;}
-  if(!/^\\+254\\d{9}$/.test(phone)){message("Enter a valid Kenyan business number, for example +254 712 345 678.","error");return;}
+  if(!/^\+254\d{9}$/.test(phone)){message("Enter a valid Kenyan business number, for example +254 712 345 678.","error");return;}
   button.disabled=true;button.textContent="Creating private workspace…";message("Setting up your trial and business profile…");
   try {
     const {data:business,error}=await sb.from("businesses").insert({name,business_type:type,phone_number:phone}).select("id,name,business_type,status,paid_through").single();
