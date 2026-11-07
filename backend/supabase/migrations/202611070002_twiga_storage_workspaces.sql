@@ -6,6 +6,7 @@ create table if not exists public.twiga_business_workspaces (
   id uuid primary key default gen_random_uuid(),
   name text not null check (length(trim(name)) between 1 and 120),
   created_by uuid not null references auth.users(id) on delete restrict,
+  legacy_customer_id uuid unique references public.twiga_customers(id) on delete restrict,
   created_at timestamptz not null default now(),
   status text not null default 'active' check (status in ('active','suspended','closed'))
 );
