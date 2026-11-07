@@ -35,7 +35,7 @@ export async function getWorkspace() {
 
   const { data: member, error } = await sb
     .from("business_members")
-    .select("role,businesses(id,name,business_type,status,paid_through)")
+    .select("role,businesses(id,name,business_type,phone_number,status,paid_through)")
     .limit(1)
     .maybeSingle();
   if (error) throw error;

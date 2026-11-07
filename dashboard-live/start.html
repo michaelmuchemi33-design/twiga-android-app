@@ -22,7 +22,7 @@ footer{margin:18px 0;text-align:center;color:var(--muted);font-size:12px}
     <span class="pill">7-DAY FREE TRIAL</span>
     <h1>Let TWIGA answer while you run your business.</h1>
     <p class="muted">Create your private workspace, teach the receptionist about your business, then connect the phone route that your carrier supports.</p>
-    <ul><li>One workspace for your business and team.</li><li>Set your greeting, services, prices and FAQs.</li><li>Test English and Kiswahili voice conversations.</li></ul>
+    <ul><li>One workspace for your business and team.</li><li>Set your greeting, services, prices and FAQs.</li><li>Add your existing business phone number.</li><li>Test English and Kiswahili voice conversations.</li></ul>
     <div id="content"><button id="google">Continue with Google</button><p class="small muted">Your Google account is used to sign in. You choose separately whether to connect Calendar, Contacts, Sheets and Drive.</p></div>
     <div id="message" class="status" hidden role="status"></div>
   </section>
@@ -52,17 +52,21 @@ function showExisting(business) {
   message("Signed in as "+(currentSession.user.email||"your Google account"),"good");
 }
 function showCreateForm() {
-  $("content").innerHTML='<h2>Create your workspace</h2><p class="muted">Your 7-day trial starts when your first business workspace is created.</p><form id="create"><label for="name">Business name</label><input id="name" name="name" maxlength="120" required placeholder="e.g. NILA Salon"><label for="type">Business type</label><select id="type" name="type">'+TYPES.map((t,i)=>'<option value="'+esc(t)+'">'+esc(t)+'</option>').join("")+'</select><button id="createButton" type="submit">Create my free-trial workspace</button></form><button class="outline" id="signout">Sign out</button>';
+  $("content").innerHTML='<h2>Create your workspace</h2><p class="muted">Your 7-day trial starts when your first business workspace is created.</p><form id="create"><label for="name">Business name</label><input id="name" name="name" maxlength="120" required autocomplete="organization" placeholder="e.g. NILA Salon"><label for="phone">Business phone number</label><input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" required placeholder="+254 7xx xxx xxx"><p class="small muted">Use the number customers already call. You can configure forwarding or SIP after signup.</p><label for="type">Business type</label><select id="type" name="type">'+TYPES.map((t,i)=>'<option value="'+esc(t)+'">'+esc(t)+'</option>').join("")+'</select><button id="createButton" type="submit">Create my free-trial workspace</button></form><button class="outline" id="signout">Sign out</button>';
   $("create").addEventListener("submit", createWorkspace);
   $("signout").addEventListener("click", async()=>{await sb.auth.signOut();currentSession=null;showSignIn();message("Signed out.");});
 }
 async function createWorkspace(event) {
   event.preventDefault();
   const button=$("createButton"),name=$("name").value.trim(),type=$("type").value;
+  const rawPhone=$("phone").value.trim();
+  let phone=rawPhone.replace(/[\s().-]/g,"");
+  if(phone.startsWith("0"))phone="+254"+phone.slice(1);else if(phone.startsWith("254"))phone="+"+phone;
   if(name.length<2){message("Enter your business name.","error");return;}
+  if(!/^\+254\d{9}$/.test(phone)){message("Enter a valid Kenyan business number, for example +254 712 345 678.","error");return;}
   button.disabled=true;button.textContent="Creating private workspace…";message("Setting up your trial and business profile…");
   try {
-    const {data:business,error}=await sb.from("businesses").insert({name,business_type:type}).select("id,name,business_type,status,paid_through").single();
+    const {data:business,error}=await sb.from("businesses").insert({name,business_type:type,phone_number:phone}).select("id,name,business_type,status,paid_through").single();
     if(error)throw error;
     const {data:member,error:memberError}=await sb.from("business_members").select("role,business_id").eq("business_id",business.id).maybeSingle();
     if(memberError)throw memberError;
