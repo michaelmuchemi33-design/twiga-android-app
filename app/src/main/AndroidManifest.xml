@@ -29,7 +29,7 @@
         </activity>
         <service android:name=".feature.inCall.service.InCallServiceImpl" android:enabled="true" android:exported="true" android:foregroundServiceType="phoneCall" android:permission="android.permission.BIND_INCALL_SERVICE">
             <meta-data android:name="android.telecom.IN_CALL_SERVICE_UI" android:value="true" />
-            <meta-data android:name="android.telecom.IN_CALL_SERVICE_RINGING" android:value="false" />
+            <meta-data android:name="android.telecom.IN_CALL_SERVICE_RINGING" android:value="true" />
             <intent-filter><action android:name="android.telecom.InCallService" /></intent-filter>
         </service>
         <receiver android:name="dev.alenajam.opendialer.remote.CallStateReceiver" android:exported="true">
