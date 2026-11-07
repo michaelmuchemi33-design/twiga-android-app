@@ -165,6 +165,23 @@ fun DialerApp(
             onResult = { refreshSetupState() }
         )
 
+        // Android 14+ requires a separate full-screen notification permission.
+        // Ask once after the owner has granted the default-phone role.
+        LaunchedEffect(isDefaultPhoneApp, hasFullScreenIntentAccess) {
+            val currentActivity = activity ?: return@LaunchedEffect
+            if (android.os.Build.VERSION.SDK_INT >= 34 && isDefaultPhoneApp && !hasFullScreenIntentAccess) {
+                val setupPrefs = currentActivity.getSharedPreferences("twiga_setup", android.content.Context.MODE_PRIVATE)
+                if (!setupPrefs.getBoolean("full_screen_prompted", false)) {
+                    setupPrefs.edit().putBoolean("full_screen_prompted", true).apply()
+                    fullScreenIntentLauncher.launch(
+                        Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+                            data = Uri.fromParts("package", currentActivity.packageName, null)
+                        }
+                    )
+                }
+            }
+        }
+
         DisposableEffect(activity, lifecycleOwner) {
             val observer = LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
