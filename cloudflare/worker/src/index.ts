@@ -26,15 +26,15 @@ const iso = () => new Date().toISOString();
 const expiry = () => new Date(Date.now() + RETENTION_DAYS * 86400000).toISOString();
 const safeName = (s: string) => s.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 150) || "file";
 
-async function authenticate(req: Request, env: Env): Promise<{ userId: string } | null> {
+async function authenticate(req: Request, env: Env): Promise<{ userId: string; email: string } | null> {
   const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!token || !env.SUPABASE_ANON_KEY) return null;
   const r = await fetch(env.SUPABASE_URL + "/auth/v1/user", {
     headers: { apikey: env.SUPABASE_ANON_KEY, authorization: "Bearer " + token }
   });
   if (!r.ok) return null;
-  const user = await r.json() as { id?: string };
-  return user.id ? { userId: user.id } : null;
+  const user = await r.json() as { id?: string; email?: string; email_confirmed_at?: string | null };
+  return user.id && user.email && user.email_confirmed_at ? { userId: user.id, email: user.email.toLowerCase() } : null;
 }
 async function membership(env: Env, userId: string, businessId: string): Promise<Member | null> {
   const u = new URL(env.SUPABASE_URL + "/rest/v1/twiga_business_memberships");
@@ -79,17 +79,53 @@ async function handle(req: Request, env: Env): Promise<Response> {
   // Workspace creation is the only route that does not require a pre-existing membership.
   if (req.method === "POST" && url.pathname === "/v1/workspaces") {
     if (!env.WORKSPACE_PROVISIONING_KEY || req.headers.get("x-twiga-provisioning-key") !== env.WORKSPACE_PROVISIONING_KEY) return response({ error: "Workspace provisioning is restricted to authorized setup operations" }, 403, origin);
-    const body = await req.json() as { name?: string };
+    const body = await req.json() as { name?: string; customerId?: string };
     const name = String(body.name ?? "").trim().slice(0, 120);
-    if (!name) return response({ error: "Workspace name is required" }, 400);
-    const businessId = id();
+    const customerId = String(body.customerId ?? "");
+    if (!name || !/^[0-9a-f-]{36}$/i.test(customerId)) return response({ error: "Workspace name and existing TWIGA customerId are required" }, 400, origin);
     const headers = { apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: "Bearer " + env.SUPABASE_SERVICE_ROLE_KEY, "content-type": "application/json", prefer: "return=minimal" };
-    const r = await fetch(env.SUPABASE_URL + "/rest/v1/twiga_business_workspaces", { method: "POST", headers, body: JSON.stringify({ id: businessId, name, created_by: auth.userId }) });
-    if (!r.ok) return response({ error: "Could not create workspace", detail: await r.text() }, 502);
+    const customerUrl = new URL(env.SUPABASE_URL + "/rest/v1/twiga_customers");
+    customerUrl.searchParams.set("select", "id,business_name,email,status,trial_ends_at");
+    customerUrl.searchParams.set("id", "eq." + customerId);
+    customerUrl.searchParams.set("limit", "1");
+    const customerResponse = await fetch(customerUrl, { headers });
+    if (!customerResponse.ok) return response({ error: "Could not verify TWIGA subscription account" }, 503, origin);
+    const customers = await customerResponse.json() as Array<{id:string;business_name:string;email:string|null;status:string;trial_ends_at:string|null}>;
+    const customer = customers[0];
+    if (!customer || !customer.email || customer.email.toLowerCase() !== auth.email) return response({ error: "The signed-in verified Google email must match the email on the existing TWIGA subscription" }, 403, origin);
+    const subscriptionsUrl = new URL(env.SUPABASE_URL + "/rest/v1/twiga_subscriptions");
+    subscriptionsUrl.searchParams.set("select", "status,ends_at");
+    subscriptionsUrl.searchParams.set("customer_id", "eq." + customerId);
+    subscriptionsUrl.searchParams.set("order", "ends_at.desc");
+    subscriptionsUrl.searchParams.set("limit", "1");
+    const subscriptionsResponse = await fetch(subscriptionsUrl, { headers });
+    if (!subscriptionsResponse.ok) return response({ error: "Could not verify subscription status" }, 503, origin);
+    const subscriptions = await subscriptionsResponse.json() as Array<{status:string;ends_at:string|null}>;
+    const now = Date.now();
+    const validTrial = customer.status === "trial" && !!customer.trial_ends_at && new Date(customer.trial_ends_at).getTime() > now;
+    const validPaid = customer.status === "active" && subscriptions[0]?.status === "active" && !!subscriptions[0].ends_at && new Date(subscriptions[0].ends_at).getTime() > now;
+    if (!validTrial && !validPaid) return response({ error: "An active trial or paid TWIGA subscription is required before creating a workspace" }, 403, origin);
+    const existingUrl = new URL(env.SUPABASE_URL + "/rest/v1/twiga_business_workspaces");
+    existingUrl.searchParams.set("select", "id,name,created_by,status");
+    existingUrl.searchParams.set("legacy_customer_id", "eq." + customerId);
+    existingUrl.searchParams.set("limit", "1");
+    const existingResponse = await fetch(existingUrl, { headers });
+    if (!existingResponse.ok) return response({ error: "Could not check existing workspace mapping" }, 503, origin);
+    const existing = (await existingResponse.json()) as Array<{id:string;name:string;created_by:string;status:string}>;
+    if (existing[0]) {
+      if (existing[0].created_by !== auth.userId) return response({ error: "This subscription is already linked to another account. Contact TWIGA support." }, 409, origin);
+      return response({ businessId: existing[0].id, name: existing[0].name, quotaBytes: QUOTA, retentionDays: RETENTION_DAYS }, 200, origin);
+    }
+    const businessId = id();
+    const r = await fetch(env.SUPABASE_URL + "/rest/v1/twiga_business_workspaces", { method: "POST", headers, body: JSON.stringify({ id: businessId, name, created_by: auth.userId, legacy_customer_id: customerId }) });
+    if (!r.ok) return response({ error: "Could not create workspace" }, 502, origin);
     const m = await fetch(env.SUPABASE_URL + "/rest/v1/twiga_business_memberships", { method: "POST", headers, body: JSON.stringify({ business_id: businessId, user_id: auth.userId, role: "owner" }) });
-    if (!m.ok) return response({ error: "Workspace created but owner membership failed; contact support" }, 502);
+    if (!m.ok) {
+      await fetch(env.SUPABASE_URL + "/rest/v1/twiga_business_workspaces?id=eq." + businessId, { method: "DELETE", headers });
+      return response({ error: "Workspace owner setup failed; retry or contact support" }, 502, origin);
+    }
     await ensureUsage(env, businessId);
-    return response({ businessId, name, quotaBytes: QUOTA, retentionDays: RETENTION_DAYS }, 201);
+    return response({ businessId, name, quotaBytes: QUOTA, retentionDays: RETENTION_DAYS }, 201, origin);
   }
 
   const businessId = url.searchParams.get("businessId") ?? "";
