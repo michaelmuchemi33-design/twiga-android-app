@@ -1,0 +1,222 @@
+interface Env {
+  DB: D1Database;
+  FILES: R2Bucket;
+  CACHE: KVNamespace;
+  SUPABASE_URL: string;
+  SUPABASE_ANON_KEY: string;
+  SUPABASE_SERVICE_ROLE_KEY: string;
+  MAX_UPLOAD_BYTES?: string;
+}
+type Member = { user_id: string; business_id: string; role: string };
+const QUOTA = 500 * 1024 * 1024;
+const RETENTION_DAYS = 90;
+const cors = {
+  "access-control-allow-origin": "https://app.twiga.co.ke",
+  "access-control-allow-methods": "GET,POST,DELETE,OPTIONS",
+  "access-control-allow-headers": "authorization,content-type",
+  "vary": "Origin"
+};
+const response = (data: unknown, status = 200) =>
+  new Response(JSON.stringify(data), { status, headers: { ...cors, "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+const id = () => crypto.randomUUID();
+const iso = () => new Date().toISOString();
+const expiry = () => new Date(Date.now() + RETENTION_DAYS * 86400000).toISOString();
+const safeName = (s: string) => s.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 150) || "file";
+
+async function authenticate(req: Request, env: Env): Promise<{ userId: string } | null> {
+  const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+  if (!token || !env.SUPABASE_ANON_KEY) return null;
+  const r = await fetch(env.SUPABASE_URL + "/auth/v1/user", {
+    headers: { apikey: env.SUPABASE_ANON_KEY, authorization: "Bearer " + token }
+  });
+  if (!r.ok) return null;
+  const user = await r.json() as { id?: string };
+  return user.id ? { userId: user.id } : null;
+}
+async function membership(env: Env, userId: string, businessId: string): Promise<Member | null> {
+  const u = new URL(env.SUPABASE_URL + "/rest/v1/twiga_business_memberships");
+  u.searchParams.set("select", "user_id,business_id,role");
+  u.searchParams.set("user_id", "eq." + userId);
+  u.searchParams.set("business_id", "eq." + businessId);
+  u.searchParams.set("limit", "1");
+  const r = await fetch(u, { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: "Bearer " + env.SUPABASE_SERVICE_ROLE_KEY } });
+  if (!r.ok) throw new Error("Membership verification unavailable");
+  const rows = await r.json() as Member[];
+  return rows[0] ?? null;
+}
+async function ensureUsage(env: Env, businessId: string) {
+  await env.DB.prepare("INSERT OR IGNORE INTO storage_usage(business_id,used_bytes,quota_bytes) VALUES(?,0,?)").bind(businessId, QUOTA).run();
+}
+async function reserve(env: Env, businessId: string, bytes: number) {
+  await ensureUsage(env, businessId);
+  const r = await env.DB.prepare("UPDATE storage_usage SET used_bytes=used_bytes+?,updated_at=? WHERE business_id=? AND used_bytes+?<=quota_bytes")
+    .bind(bytes, iso(), businessId, bytes).run();
+  return r.meta.changes === 1;
+}
+async function release(env: Env, businessId: string, bytes: number) {
+  await env.DB.prepare("UPDATE storage_usage SET used_bytes=MAX(0,used_bytes-?),updated_at=? WHERE business_id=?")
+    .bind(bytes, iso(), businessId).run();
+}
+async function audit(env: Env, businessId: string, actor: string, event: string, target?: string) {
+  await env.DB.prepare("INSERT INTO audit_events(id,business_id,actor_user_id,event_type,target_id,created_at) VALUES(?,?,?,?,?,?)")
+    .bind(id(), businessId, actor, event, target ?? null, iso()).run();
+}
+async function handle(req: Request, env: Env): Promise<Response> {
+  const url = new URL(req.url);
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+  if (url.pathname === "/health") return response({ ok: true, service: "twiga-storage", time: iso() });
+  const auth = await authenticate(req, env);
+  if (!auth) return response({ error: "Authentication required" }, 401);
+
+  // Workspace creation is the only route that does not require a pre-existing membership.
+  if (req.method === "POST" && url.pathname === "/v1/workspaces") {
+    const body = await req.json() as { name?: string };
+    const name = String(body.name ?? "").trim().slice(0, 120);
+    if (!name) return response({ error: "Workspace name is required" }, 400);
+    const businessId = id();
+    const headers = { apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: "Bearer " + env.SUPABASE_SERVICE_ROLE_KEY, "content-type": "application/json", prefer: "return=minimal" };
+    const r = await fetch(env.SUPABASE_URL + "/rest/v1/twiga_business_workspaces", { method: "POST", headers, body: JSON.stringify({ id: businessId, name, created_by: auth.userId }) });
+    if (!r.ok) return response({ error: "Could not create workspace", detail: await r.text() }, 502);
+    const m = await fetch(env.SUPABASE_URL + "/rest/v1/twiga_business_memberships", { method: "POST", headers, body: JSON.stringify({ business_id: businessId, user_id: auth.userId, role: "owner" }) });
+    if (!m.ok) return response({ error: "Workspace created but owner membership failed; contact support" }, 502);
+    await ensureUsage(env, businessId);
+    return response({ businessId, name, quotaBytes: QUOTA, retentionDays: RETENTION_DAYS }, 201);
+  }
+
+  const businessId = url.searchParams.get("businessId") ?? "";
+  if (!/^[0-9a-f-]{36}$/i.test(businessId)) return response({ error: "A valid businessId is required" }, 400);
+  const member = await membership(env, auth.userId, businessId);
+  if (!member) return response({ error: "You do not have access to this business" }, 403);
+  const canWrite = ["owner", "admin", "manager"].includes(member.role);
+
+  if (req.method === "GET" && url.pathname === "/v1/storage/usage") {
+    await ensureUsage(env, businessId);
+    const row = await env.DB.prepare("SELECT used_bytes,quota_bytes FROM storage_usage WHERE business_id=?").bind(businessId).first<{used_bytes:number;quota_bytes:number}>();
+    return response({ usedBytes: row?.used_bytes ?? 0, quotaBytes: row?.quota_bytes ?? QUOTA, availableBytes: Math.max(0,(row?.quota_bytes ?? QUOTA)-(row?.used_bytes ?? 0)), retentionDays: RETENTION_DAYS });
+  }
+
+  if (url.pathname === "/v1/records" && req.method === "POST") {
+    if (!canWrite) return response({ error: "Read-only membership" }, 403);
+    const body = await req.json() as { type?: string; data?: unknown };
+    const type = String(body.type ?? "").trim().toLowerCase();
+    if (!/^[a-z][a-z0-9_-]{0,59}$/.test(type) || body.data === undefined) return response({ error: "Valid type and data are required" }, 400);
+    const payload = JSON.stringify(body.data);
+    const bytes = new TextEncoder().encode(payload).byteLength;
+    if (bytes > 1024 * 1024) return response({ error: "A record cannot exceed 1 MB" }, 413);
+    if (!await reserve(env, businessId, bytes)) return response({ error: "Storage limit reached", quotaBytes: QUOTA }, 413);
+    const recordId = id(), created = iso(), expires = expiry();
+    try {
+      await env.DB.prepare("INSERT INTO records(id,business_id,record_type,payload,size_bytes,created_at,expires_at,created_by) VALUES(?,?,?,?,?,?,?,?)")
+        .bind(recordId,businessId,type,payload,bytes,created,expires,auth.userId).run();
+      await audit(env,businessId,auth.userId,"record.created",recordId);
+    } catch (e) { await release(env,businessId,bytes); throw e; }
+    return response({ id: recordId, type, createdAt: created, expiresAt: expires, sizeBytes: bytes }, 201);
+  }
+
+  if (url.pathname === "/v1/records" && req.method === "GET") {
+    const type = url.searchParams.get("type");
+    const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") ?? 50)));
+    const rows = type
+      ? await env.DB.prepare("SELECT id,record_type,payload,size_bytes,created_at,expires_at FROM records WHERE business_id=? AND record_type=? ORDER BY created_at DESC LIMIT ?").bind(businessId,type,limit).all()
+      : await env.DB.prepare("SELECT id,record_type,payload,size_bytes,created_at,expires_at FROM records WHERE business_id=? ORDER BY created_at DESC LIMIT ?").bind(businessId,limit).all();
+    return response({ records: rows.results });
+  }
+
+  if (url.pathname === "/v1/records" && req.method === "DELETE") {
+    if (!canWrite) return response({ error: "Read-only membership" }, 403);
+    const recordId = url.searchParams.get("id");
+    if (!recordId) return response({ error: "Record id required" }, 400);
+    const row = await env.DB.prepare("SELECT size_bytes FROM records WHERE id=? AND business_id=?").bind(recordId,businessId).first<{size_bytes:number}>();
+    if (!row) return response({ error: "Record not found" }, 404);
+    await env.DB.prepare("DELETE FROM records WHERE id=? AND business_id=?").bind(recordId,businessId).run();
+    await release(env,businessId,row.size_bytes);
+    await audit(env,businessId,auth.userId,"record.deleted",recordId);
+    return response({ ok: true });
+  }
+
+  if (url.pathname === "/v1/files" && req.method === "POST") {
+    if (!canWrite) return response({ error: "Read-only membership" }, 403);
+    const form = await req.formData();
+    const file = form.get("file");
+    if (!(file instanceof File)) return response({ error: "Multipart field 'file' is required" }, 400);
+    const max = Number(env.MAX_UPLOAD_BYTES ?? 26214400);
+    if (file.size < 1 || file.size > max) return response({ error: "File must be between 1 byte and " + max + " bytes" }, 413);
+    if (!await reserve(env,businessId,file.size)) return response({ error: "500 MB business storage limit reached" }, 413);
+    const objectId=id(), created=iso(), expires=expiry(), key=businessId+"/"+objectId+"/"+safeName(file.name);
+    try {
+      await env.FILES.put(key,file.stream(),{ httpMetadata:{ contentType:file.type || "application/octet-stream" }, customMetadata:{ businessId, objectId, expiresAt:expires } });
+      await env.DB.prepare("INSERT INTO objects(id,business_id,object_key,filename,content_type,size_bytes,created_at,expires_at,created_by) VALUES(?,?,?,?,?,?,?,?,?)")
+        .bind(objectId,businessId,key,safeName(file.name),file.type || "application/octet-stream",file.size,created,expires,auth.userId).run();
+      await audit(env,businessId,auth.userId,"file.uploaded",objectId);
+    } catch(e) { await env.FILES.delete(key); await release(env,businessId,file.size); throw e; }
+    return response({ id:objectId, filename:safeName(file.name), sizeBytes:file.size, createdAt:created, expiresAt:expires },201);
+  }
+
+  if (url.pathname === "/v1/files" && req.method === "GET") {
+    const fileId=url.searchParams.get("id");
+    if (!fileId) {
+      const rows=await env.DB.prepare("SELECT id,filename,content_type,size_bytes,created_at,expires_at FROM objects WHERE business_id=? ORDER BY created_at DESC LIMIT 100").bind(businessId).all();
+      return response({ files:rows.results });
+    }
+    const row=await env.DB.prepare("SELECT object_key,filename,content_type,size_bytes FROM objects WHERE id=? AND business_id=?").bind(fileId,businessId).first<{object_key:string;filename:string;content_type:string;size_bytes:number}>();
+    if(!row) return response({error:"File not found"},404);
+    const object=await env.FILES.get(row.object_key);
+    if(!object) return response({error:"File content missing"},404);
+    const headers=new Headers(cors);
+    headers.set("content-type",row.content_type);
+    headers.set("content-length",String(row.size_bytes));
+    headers.set("content-disposition",'attachment; filename="'+safeName(row.filename)+'"');
+    headers.set("cache-control","private, no-store");
+    return new Response(object.body,{headers});
+  }
+
+  if (url.pathname === "/v1/files" && req.method === "DELETE") {
+    if (!canWrite) return response({ error: "Read-only membership" },403);
+    const fileId=url.searchParams.get("id");
+    if(!fileId) return response({error:"File id required"},400);
+    const row=await env.DB.prepare("SELECT object_key,size_bytes FROM objects WHERE id=? AND business_id=?").bind(fileId,businessId).first<{object_key:string;size_bytes:number}>();
+    if(!row) return response({error:"File not found"},404);
+    await env.FILES.delete(row.object_key);
+    await env.DB.prepare("DELETE FROM objects WHERE id=? AND business_id=?").bind(fileId,businessId).run();
+    await release(env,businessId,row.size_bytes);
+    await audit(env,businessId,auth.userId,"file.deleted",fileId);
+    return response({ok:true});
+  }
+  return response({error:"Route not found"},404);
+}
+
+export default {
+  fetch(req: Request, env: Env) {
+    return handle(req,env).catch((e: unknown) => {
+      console.error("TWIGA worker error",e);
+      return response({error:"Internal server error"},500);
+    });
+  },
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil((async()=>{
+      const runId=id(), started=iso();
+      await env.DB.prepare("INSERT INTO cleanup_runs(id,started_at,status) VALUES(?,?,'running')").bind(runId,started).run();
+      let recordsDeleted=0, objectsDeleted=0, bytesReleased=0;
+      // Bounded batches keep scheduled invocations short and make retries safe.
+      for(let batch=0;batch<20;batch++){
+        const rows=await env.DB.prepare("SELECT id,business_id,size_bytes FROM records WHERE expires_at<=? LIMIT 200").bind(iso()).all<{id:string;business_id:string;size_bytes:number}>();
+        if(!rows.results.length) break;
+        for(const r of rows.results){
+          const d=await env.DB.prepare("DELETE FROM records WHERE id=? AND expires_at<=?").bind(r.id,iso()).run();
+          if(d.meta.changes){await release(env,r.business_id,r.size_bytes);recordsDeleted++;bytesReleased+=r.size_bytes;}
+        }
+      }
+      for(let batch=0;batch<20;batch++){
+        const rows=await env.DB.prepare("SELECT id,business_id,object_key,size_bytes FROM objects WHERE expires_at<=? LIMIT 100").bind(iso()).all<{id:string;business_id:string;object_key:string;size_bytes:number}>();
+        if(!rows.results.length) break;
+        for(const r of rows.results){
+          await env.FILES.delete(r.object_key);
+          const d=await env.DB.prepare("DELETE FROM objects WHERE id=? AND expires_at<=?").bind(r.id,iso()).run();
+          if(d.meta.changes){await release(env,r.business_id,r.size_bytes);objectsDeleted++;bytesReleased+=r.size_bytes;}
+        }
+      }
+      await env.DB.prepare("UPDATE cleanup_runs SET finished_at=?,records_deleted=?,objects_deleted=?,bytes_released=?,status='complete' WHERE id=?")
+        .bind(iso(),recordsDeleted,objectsDeleted,bytesReleased,runId).run();
+    })());
+  }
+};
