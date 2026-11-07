@@ -96,7 +96,7 @@ fun BusinessTab() {
             Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("AI receptionist", fontWeight = FontWeight.Bold)
-                    Text(if (ai) "On. Incoming calls are tagged for the AI." else "Off. Calls are handled by you.", fontSize = 12.sp, color = Color(0xFF667085))
+                    Text(if (ai) "On. AI settings are enabled; live SIM-call AI still needs a supported call-audio provider." else "Off. Calls are handled by you.", fontSize = 12.sp, color = Color(0xFF667085))
                 }
                 Switch(checked = ai, onCheckedChange = { ai = it; setAi(context, it) })
             }
