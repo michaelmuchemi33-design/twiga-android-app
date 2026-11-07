@@ -4,7 +4,6 @@ import android.content.Context
 import android.telecom.Call
 import android.telecom.CallAudioState
 import android.telecom.VideoProfile
-import dev.alenajam.opendialer.remote.RemoteDesk
 import androidx.annotation.MainThread
 import dev.alenajam.opendialer.feature.inCall.ui.InCallActivity
 import kotlinx.coroutines.CoroutineScope
@@ -154,7 +153,7 @@ class CallsHandler @Inject constructor(
 
         newOngoingCall?.let { ongoingCall ->
             resolveContact(ongoingCall)
-            if (CallActionPolicy.shouldAutoAnswer(ongoingCall.state, RemoteDesk.autoAnswerEnabled(context))) {
+            if (CallActionPolicy.shouldAutoAnswer(ongoingCall.state, context.getSharedPreferences("twiga_remote_desk", android.content.Context.MODE_PRIVATE).getBoolean("auto_answer", false))) {
                 // Opt-in only; Android binds this service for calls. No permanent polling service.
                 scope.launch {
                     kotlinx.coroutines.delay(1200)
