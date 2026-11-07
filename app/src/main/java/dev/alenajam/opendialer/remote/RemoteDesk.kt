@@ -24,6 +24,8 @@ object RemoteDesk {
     fun business(c: Context): String = prefs(c).getString("business", "") ?: ""
     fun isPaired(c: Context): Boolean = token(c).isNotBlank()
     fun aiEnabled(c: Context): Boolean = prefs(c).getBoolean("ai", false)
+    fun autoAnswerEnabled(c: Context): Boolean = prefs(c).getBoolean("auto_answer", false)
+    fun setAutoAnswerEnabled(c: Context, on: Boolean) { prefs(c).edit().putBoolean("auto_answer", on).apply() }
     fun remoteControl(c: Context): Boolean = prefs(c).getBoolean("remote", true)
     fun setRemoteControl(c: Context, on: Boolean) { prefs(c).edit().putBoolean("remote", on).apply() }
     fun save(c: Context, token: String, business: String) {
