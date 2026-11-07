@@ -149,10 +149,38 @@ fun DialerApp(
                 defaultPhoneRequestWasDenied = !isDefaultPhoneApp
             }
         )
+
+        // Prompt once on first launch so the owner does not miss Android's required
+        // default-phone-app hand-off. The owner still explicitly approves in Android.
+        LaunchedEffect(activity) {
+            val currentActivity = activity ?: return@LaunchedEffect
+            val setupPrefs = currentActivity.getSharedPreferences("twiga_setup", android.content.Context.MODE_PRIVATE)
+            if (!isDefaultPhoneApp && !setupPrefs.getBoolean("default_phone_prompted", false)) {
+                setupPrefs.edit().putBoolean("default_phone_prompted", true).apply()
+                defaultPhoneManager.createRequestDefaultDialerIntent()?.let { defaultPhoneLauncher.launch(it) }
+            }
+        }
         val fullScreenIntentLauncher = rememberLauncherForActivityResult(
             contract = ActivityResultContracts.StartActivityForResult(),
             onResult = { refreshSetupState() }
         )
+
+        // Android 14+ requires a separate full-screen notification permission.
+        // Ask once after the owner has granted the default-phone role.
+        LaunchedEffect(isDefaultPhoneApp, hasFullScreenIntentAccess) {
+            val currentActivity = activity ?: return@LaunchedEffect
+            if (android.os.Build.VERSION.SDK_INT >= 34 && isDefaultPhoneApp && !hasFullScreenIntentAccess) {
+                val setupPrefs = currentActivity.getSharedPreferences("twiga_setup", android.content.Context.MODE_PRIVATE)
+                if (!setupPrefs.getBoolean("full_screen_prompted", false)) {
+                    setupPrefs.edit().putBoolean("full_screen_prompted", true).apply()
+                    fullScreenIntentLauncher.launch(
+                        Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+                            data = Uri.fromParts("package", currentActivity.packageName, null)
+                        }
+                    )
+                }
+            }
+        }
 
         DisposableEffect(activity, lifecycleOwner) {
             val observer = LifecycleEventObserver { _, event ->

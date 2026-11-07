@@ -16,6 +16,14 @@ class CallActionPolicyTest {
     }
 
     @Test
+    fun autoAnswerIsOptInAndOnlyAppliesToRingingCalls() {
+        assertTrue(CallActionPolicy.shouldAutoAnswer(Call.STATE_RINGING, enabled = true))
+        assertFalse(CallActionPolicy.shouldAutoAnswer(Call.STATE_RINGING, enabled = false))
+        assertFalse(CallActionPolicy.shouldAutoAnswer(Call.STATE_ACTIVE, enabled = true))
+        assertFalse(CallActionPolicy.shouldAutoAnswer(Call.STATE_DIALING, enabled = true))
+    }
+
+    @Test
     fun holdDefaultsToHoldingEligibleNonHeldCall() {
         assertEquals(
             CallActionPolicy.HoldAction.HOLD,

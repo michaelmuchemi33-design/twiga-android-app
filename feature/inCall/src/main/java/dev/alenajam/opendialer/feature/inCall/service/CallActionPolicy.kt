@@ -7,6 +7,8 @@ internal object CallActionPolicy {
 
     fun shouldReject(state: Int): Boolean = state == Call.STATE_RINGING
 
+    fun shouldAutoAnswer(state: Int, enabled: Boolean): Boolean = enabled && state == Call.STATE_RINGING
+
     fun holdAction(state: Int, canHold: Boolean, requestedHold: Boolean?): HoldAction = when (requestedHold) {
         true -> if (canHold) HoldAction.HOLD else HoldAction.NONE
         false -> if (state == Call.STATE_HOLDING) HoldAction.UNHOLD else HoldAction.NONE
