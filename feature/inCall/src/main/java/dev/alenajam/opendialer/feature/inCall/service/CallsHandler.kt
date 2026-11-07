@@ -4,6 +4,7 @@ import android.content.Context
 import android.telecom.Call
 import android.telecom.CallAudioState
 import android.telecom.VideoProfile
+import dev.alenajam.opendialer.remote.RemoteDesk
 import androidx.annotation.MainThread
 import dev.alenajam.opendialer.feature.inCall.ui.InCallActivity
 import kotlinx.coroutines.CoroutineScope
@@ -151,7 +152,18 @@ class CallsHandler @Inject constructor(
             }
         }
 
-        newOngoingCall?.let { resolveContact(it) }
+        newOngoingCall?.let { ongoingCall ->
+            resolveContact(ongoingCall)
+            if (CallActionPolicy.shouldAutoAnswer(ongoingCall.state, RemoteDesk.autoAnswerEnabled(context))) {
+                // Opt-in only; Android binds this service for calls. No permanent polling service.
+                scope.launch {
+                    kotlinx.coroutines.delay(1200)
+                    if (CallActionPolicy.shouldAutoAnswer(ongoingCall.state, RemoteDesk.autoAnswerEnabled(context))) {
+                        ongoingCall.answer()
+                    }
+                }
+            }
+        }
         reconcileCallsFromTelecom()
     }
 
