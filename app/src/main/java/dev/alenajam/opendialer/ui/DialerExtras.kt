@@ -21,6 +21,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -63,6 +64,7 @@ fun dialCode(context: Context, code: String) {
 fun AiToggleAction() {
     val context = LocalContext.current
     var ai by remember { mutableStateOf(RemoteDesk.aiEnabled(context)) }
+    var autoAnswer by remember { mutableStateOf(RemoteDesk.autoAnswerEnabled(context)) }
     LaunchedEffect(Unit) {
         while (true) { ai = RemoteDesk.aiEnabled(context); delay(2000) }
     }
@@ -99,12 +101,27 @@ fun BusinessTab() {
                 Switch(checked = ai, onCheckedChange = { ai = it; setAi(context, it) })
             }
         }
+        Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+            Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Auto-answer incoming calls", fontWeight = FontWeight.Bold)
+                    Text("When enabled, TWIGA answers after 1.2 seconds while it is your default phone app. This answers the SIM call on the handset; it does not connect the call audio to the cloud AI.", fontSize = 11.sp, color = MutedText)
+                }
+                Switch(checked = autoAnswer, onCheckedChange = {
+                    autoAnswer = it
+                    RemoteDesk.setAutoAnswerEnabled(context, it)
+                })
+            }
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { dialCode(context, "*334#") }, modifier = Modifier.weight(1f)) { Text("M-Pesa / Airtime") }
             OutlinedButton(
                 onClick = { context.startActivity(Intent(context, ReceptionistActivity::class.java)) },
                 modifier = Modifier.weight(1f)
-            ) { Text("Orders and stock") }
+            ) { Text("Orders & customers") }
+        }
+        Button(onClick = { context.startActivity(Intent(context, PosActivity::class.java)) }, modifier = Modifier.fillMaxWidth()) {
+            Text("Open TWIGA POS")
         }
         RemoteDeskCard()
         AiSettingsCard()
