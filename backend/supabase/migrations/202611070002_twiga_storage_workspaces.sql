@@ -25,3 +25,6 @@ alter table public.twiga_business_memberships enable row level security;
 revoke all on public.twiga_business_workspaces,public.twiga_business_memberships from anon,authenticated;
 -- The Worker uses the Supabase service role after validating the caller's Auth JWT.
 -- Client-side writes are intentionally disabled to keep workspace membership server-controlled.
+
+-- Explicitly grant the trusted Worker role access; browser roles remain denied.
+grant all on public.twiga_business_workspaces, public.twiga_business_memberships to service_role;
