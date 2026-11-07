@@ -663,7 +663,7 @@ async function aiToggle(){
  async function svLoad(){try{var it=(await L("listItems")).items;if($("sl"))$("sl").outerHTML='<div id="sl">'+tbl(["Name","Type","Price","Stock"],it.map(function(i){return[esc(i.Name),esc(i.Kind),Number(i.Price).toLocaleString(),i.TrackStock?i.Stock:"-"]}),"No items yet. Add your first one.")+'</div>'}catch(x){if($("sl"))$("sl").textContent=x.message}}
  R.customers=function(){setTimeout(cuLoad,0);return["People you have saved. Contacts from your phone will sync here.",C("Customers",'<div id="cu" class="pb sub">Loading...</div>')]};
  async function cuLoad(){try{var c=(await L("listContacts",{limit:200})).contacts;if($("cu"))$("cu").outerHTML='<div id="cu">'+tbl(["Name","Phone","Email"],c.map(function(x){return[esc(x.Name||""),esc(x.Phone),esc(x.Email||"")]}),"No customers yet.")+'</div>'}catch(x){if($("cu"))$("cu").textContent=x.message}}
- R.settings=function(){setTimeout(stLoad,0);setTimeout(loadTwigaSubscriptionSummary,0);return["Your business, plan, phone line and account.",C("Business",'<div class="pb"><div><b>'+esc(BIZ.name)+'</b> ('+esc(BIZ.business_type)+')</div><div class="sub">Workspace status: '+esc(BIZ.status)+', paid through '+esc(BIZ.paid_through)+'</div><div class="sub" id="stu">Storage: checking...</div></div>')+C("Subscription",'<div class="pb"><div id="twigaSubSummary" class="sub">Loading plan…</div><a class="btn pri" href="/billing">Manage plan and billing</a></div>')+C("Phone line",'<div class="pb"><div class="sub">Register your existing business number and track verification.</div><a class="btn" href="/line-setup">Connect existing line</a></div>')+C("Follow-ups",'<div class="pb"><div class="sub">Manage callback tasks and customer contact permissions.</div><a class="btn" href="/followups">Open follow-up queue</a></div>')+C("Account",'<div class="pb"><div class="sub">'+esc(SESS.user.email||"")+'</div><button class="btn" data-act="out">Sign out</button></div>')]};
+ R.settings=function(){setTimeout(stLoad,0);setTimeout(loadTwigaSubscriptionSummary,0);return["Your business, plan, phone line and account.",C("Business",'<div class="pb"><div><b>'+esc(BIZ.name)+'</b> ('+esc(BIZ.business_type)+')</div><div class="sub">Workspace status: '+esc(BIZ.status)+', paid through '+esc(BIZ.paid_through)+'</div><div class="sub" id="stu">Storage: checking...</div></div>')+C("Subscription",'<div class="pb"><div id="twigaSubSummary" class="sub">Loading plan…</div><a class="btn pri" href="/billing">Manage plan and billing</a></div>')+C("Phone line",'<div class="pb"><div class="sub">Register your existing business number and track verification.</div><a class="btn" href="/line-setup">Connect existing line</a></div>')+C("Follow-ups",'<div class="pb"><div class="sub">Manage callback tasks and customer contact permissions.</div><a class="btn" href="/followups">Open follow-up queue</a></div>')+C("TWIGA Android app",'<div class="pb"><div class="sub" id="twigaAppVersion">Check whether a newer app version is available.</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><a class="btn pri" href="https://github.com/michaelmuchemi33-design/twiga-android-app/releases/download/latest-apk/twiga.apk">Download latest APK</a><button class="btn" id="twigaCheckUpdates" type="button">Check for updates</button></div><div class="sub" style="margin-top:8px">Android may ask you to approve the installation.</div></div>')+C("Account",'<div class="pb"><div class="sub">'+esc(SESS.user.email||"")+'</div><button class="btn" data-act="out">Sign out</button></div>')]};
  async function stLoad(){try{var u=await L("usage");if($("stu"))$("stu").textContent="Storage: "+(u.used/1048576).toFixed(1)+" MB of 500 MB used"}catch(x){if($("stu"))$("stu").textContent="Storage: "+x.message}}
  R.test=function(){return["Check that everything works before you rely on it.",'<div class="g2">'+C("System checks",'<div id="tchk" class="pb sub">Press Run checks.</div><div class="pb"><button class="btn pri" data-act="tcheck">Run checks</button></div>')+C("Try your AI receptionist",AIBOX)+'</div>'+C("Try the dialer",'<div class="pb"><label>Number to call (use your other phone)<br><input type="text" id="tnum" inputmode="tel" style="width:100%"></label><button class="btn pri" data-act="tdial">Call from my paired phone</button><div class="sub" id="tmsg"></div></div>')+C("Connect your phone line to the AI",'<ol class="pb" style="padding-left:34px;margin:0">'+["In Vapi, open Phone Numbers and create or import a number.","Set that number Server URL to https://twiga-api.twiga-ke.workers.dev/vapi and paste the secret I gave you into Server URL Secret.","Type the number into My AI phone number on the AI Receptionist page and press Save.","On your phone open the TWIGA app, go to AI, and under Forward calls to my AI choose when and press Turn forwarding on.","Call your own number from another phone to test."].map(function(x){return '<li style="margin-bottom:6px">'+x+'</li>'}).join("")+'</ol>')]};
  async function runChecks(){
@@ -946,6 +946,21 @@ async function loadTwigaLiveCalls(){
  }catch(error){console.warn("TWIGA live call refresh failed:",error.message||error)}
 }
 
+document.addEventListener("click",async function(event){
+ var button=event.target.closest("#twigaCheckUpdates");
+ if(!button)return;
+ var info=document.getElementById("twigaAppVersion");
+ button.disabled=true;button.textContent="Checking…";
+ try{
+  var response=await fetch("https://github.com/michaelmuchemi33-design/twiga-android-app/releases/download/latest-apk/version.json?ts="+Date.now(),{cache:"no-store"});
+  if(!response.ok)throw new Error("Latest version is not published yet.");
+  var data=await response.json();
+  if(!data.build||!data.apk)throw new Error("Release information is incomplete.");
+  info.textContent="Latest available build: "+data.build+" · APK size: "+(data.size?Math.round(data.size/1048576)+" MB":"see download");
+  button.textContent="Latest version found";
+ }catch(error){info.textContent=error.message||"Could not check for updates. Try again shortly.";button.textContent="Try again";}
+ finally{button.disabled=false;}
+});
 load();
 setInterval(loadTwigaLiveCalls,5000);
 })();
