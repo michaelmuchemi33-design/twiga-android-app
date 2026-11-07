@@ -952,12 +952,13 @@ document.addEventListener("click",async function(event){
  var info=document.getElementById("twigaAppVersion");
  button.disabled=true;button.textContent="Checking…";
  try{
-  var response=await fetch("https://github.com/michaelmuchemi33-design/twiga-android-app/releases/download/latest-apk/version.json?ts="+Date.now(),{cache:"no-store"});
-  if(!response.ok)throw new Error("Latest version is not published yet.");
-  var data=await response.json();
-  if(!data.build||!data.apk)throw new Error("Release information is incomplete.");
-  info.textContent="Latest available build: "+data.build+" · APK size: "+(data.size?Math.round(data.size/1048576)+" MB":"see download");
-  button.textContent="Latest version found";
+  var response=await fetch("https://api.github.com/repos/michaelmuchemi33-design/twiga-android-app/releases/tags/latest-apk",{headers:{Accept:"application/vnd.github+json"},cache:"no-store"});
+  if(!response.ok)throw new Error("Latest release is not published yet.");
+  var release=await response.json();
+  var apk=(release.assets||[]).find(function(asset){return asset.name==="twiga.apk"});
+  if(!apk)throw new Error("The latest APK asset is not available yet.");
+  info.textContent="Latest release: "+new Date(apk.updated_at).toLocaleString()+" · APK size: "+Math.round(apk.size/1048576)+" MB";
+  button.textContent="Latest release found";
  }catch(error){info.textContent=error.message||"Could not check for updates. Try again shortly.";button.textContent="Try again";}
  finally{button.disabled=false;}
 });
