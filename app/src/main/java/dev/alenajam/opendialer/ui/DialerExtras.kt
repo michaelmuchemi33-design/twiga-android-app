@@ -105,7 +105,7 @@ fun BusinessTab() {
             Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Auto-answer incoming calls", fontWeight = FontWeight.Bold)
-                    Text("When enabled, TWIGA answers after 1.2 seconds while it is your default phone app. This answers the SIM call on the handset; it does not connect the call audio to the cloud AI.", fontSize = 11.sp, color = MutedText)
+                    Text("When enabled, TWIGA answers after 1.2 seconds while it is your default phone app. This answers the SIM call on the handset; it does not connect the call audio to the cloud AI.", fontSize = 11.sp, color = Color(0xFF667085))
                 }
                 Switch(checked = autoAnswer, onCheckedChange = {
                     autoAnswer = it
