@@ -184,7 +184,8 @@ async function handle(req: Request, env: Env): Promise<Response> {
     if (!recordId) return response({ error: "Record id required" }, 400);
     const row = await env.DB.prepare("SELECT size_bytes FROM records WHERE id=? AND business_id=? AND expires_at>?").bind(recordId,businessId,iso()).first<{size_bytes:number}>();
     if (!row) return response({ error: "Record not found" }, 404);
-    await env.DB.prepare("DELETE FROM records WHERE id=? AND business_id=?").bind(recordId,businessId).run();
+    const deleted = await env.DB.prepare("DELETE FROM records WHERE id=? AND business_id=?").bind(recordId,businessId).run();
+    if (!deleted.meta.changes) return response({ error: "Record not found" }, 404);
     await release(env,businessId,row.size_bytes);
     try { await audit(env,businessId,auth.userId,"record.deleted",recordId); } catch (e) { console.error("Audit write failed",e); }
     return response({ ok: true });
@@ -235,7 +236,8 @@ async function handle(req: Request, env: Env): Promise<Response> {
     const row=await env.DB.prepare("SELECT object_key,size_bytes FROM objects WHERE id=? AND business_id=?").bind(fileId,businessId).first<{object_key:string;size_bytes:number}>();
     if(!row) return response({error:"File not found"},404);
     await env.FILES.delete(row.object_key);
-    await env.DB.prepare("DELETE FROM objects WHERE id=? AND business_id=?").bind(fileId,businessId).run();
+    const deleted = await env.DB.prepare("DELETE FROM objects WHERE id=? AND business_id=?").bind(fileId,businessId).run();
+    if (!deleted.meta.changes) return response({ error: "File not found" }, 404);
     await release(env,businessId,row.size_bytes);
     try { await audit(env,businessId,auth.userId,"file.deleted",fileId); } catch (e) { console.error("Audit write failed",e); }
     return response({ok:true});
