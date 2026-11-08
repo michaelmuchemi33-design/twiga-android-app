@@ -5,7 +5,8 @@ window.TWIGA_CONFIG={supabaseUrl:"https://ztyxxikkposfpxsutnfr.supabase.co",supa
     if(document.getElementById("twiga-polish"))return;
     var link=document.createElement("link");
     link.id="twiga-polish";link.rel="stylesheet";link.href="/twiga-polish.css?v=1";
-    document.head.appendChild(link);\n    var script=document.createElement("script");script.src="/twiga-live-fixes.js?v=1";script.async=false;document.body.appendChild(script);
+    document.head.appendChild(link);
+    var script=document.createElement("script");script.src="/twiga-live-fixes.js?v=1";script.async=false;document.body.appendChild(script);
   };
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",add,{once:true});else add();
 })();
