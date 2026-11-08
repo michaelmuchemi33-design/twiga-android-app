@@ -17,6 +17,23 @@ export function buildAssistant(o) {
   };
 }
 
+function transcriptText(value) {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number") return String(value);
+  if (Array.isArray(value)) return value.map(transcriptText).filter(Boolean).join(" ").trim();
+  if (!value || typeof value !== "object") return "";
+  for (const key of ["text", "transcript", "content", "utterance", "value"]) {
+    if (typeof value[key] === "string" && value[key].trim()) return value[key].trim();
+  }
+  for (const key of ["segments", "words", "results", "alternatives"]) {
+    if (Array.isArray(value[key])) {
+      const text = transcriptText(value[key]);
+      if (text) return text;
+    }
+  }
+  return "";
+}
+
 function why(e) { return (e && (e.errorMsg || e.message || (e.error && e.error.message))) || "Something went wrong. Allow the microphone and try again."; }
 
 export function createCall(publicKey, h) {
@@ -31,7 +48,11 @@ export function createCall(publicKey, h) {
         vapi.on("call-end", () => { live = false; h.state("ended"); });
         vapi.on("speech-start", () => h.state("speaking"));
         vapi.on("speech-end", () => h.state("listening"));
-        vapi.on("message", m => { if (m && m.type === "transcript" && (!m.transcriptType || m.transcriptType === "final")) h.line(m.role, m.transcript); });
+        vapi.on("message", m => {
+          if (!m || m.type !== "transcript" || (m.transcriptType && m.transcriptType !== "final")) return;
+          const text = transcriptText(m.transcript);
+          if (text) h.line(m.role === "user" ? "user" : "assistant", text);
+        });
         vapi.on("error", e => { live = false; h.error(why(e)); });
         await vapi.start(buildAssistant(o));
       } catch (e) { live = false; h.error(why(e)); }
