@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: "Publish this signed APK to the public latest-apk download"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -91,7 +97,7 @@ jobs:
           retention-days: 30
 
       - name: Publish optimized APK download
-        if: github.event_name != 'pull_request'
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_release == true)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
