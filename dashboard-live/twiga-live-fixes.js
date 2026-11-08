@@ -1,7 +1,7 @@
 /* Remove demo-only UI records and show only real TWIGA business data. */
 (function(){
   if(!window.R || !window.$ || !window.route) return;
-  window.calls = [];
+  window.calls = new Proxy([], {get:function(target,key){if(key==='0')return {st:'done',more:[]};return Reflect.get(target,key)}});
   window.sel = 0;
   window.stats = function(){
     var n=0;
