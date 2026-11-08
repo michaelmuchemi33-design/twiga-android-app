@@ -457,14 +457,54 @@ async function fuLoad(){try{var ev=await sb.from("call_events").select("number,s
 R.reports=function(){setTimeout(reportLoad,0);return["Sales and activity calculated from your actual orders and calls.",'<div class="stats" id="repStats">'+S("Sales today","—","Loading")+S("Orders today","—","Loading")+S("Calls today","—","Loading")+'</div>'+C("Recent sales",'<div id="repRows" class="pb sub">Loading…</div>')]};
 async function reportLoad(){try{var s=await L("summary"),o=(await L("listOrders",{limit:100})).orders||[],since=new Date();since.setHours(0,0,0,0);var c=await sb.from("call_events").select("updated_at").eq("business_id",BIZ.id).gte("updated_at",since.toISOString());if(!$("repStats"))return;$("repStats").innerHTML=S("Sales today","KSh "+Number(s.revenueToday||0).toLocaleString(),"Collected today")+S("Orders today",Number(s.ordersToday||0),"Sales and bookings")+S("Calls today",(c.data||[]).length,"Phone activity");$("repRows").innerHTML=T(["Date","Order","Customer","Total","Paid"],o.slice(0,20).map(function(x){return[esc(x.Date||""),esc(x.OrderId),esc(x.Customer),Number(x.Total||0).toLocaleString(),Number(x.Paid||0).toLocaleString()]}),"No sales yet.")}catch(e){if($("repRows"))$("repRows").textContent=e.message}}
 
-R.integrations=function(){setTimeout(intLoad,0);return["Live connection checks. Items marked unverified are not assumed to be connected.",C("Connections",'<div id="intRows" class="pb sub">Checking…</div>')]};
+R.integrations=function(){setTimeout(intLoad,0);return["Connect your Google account and verify the business permissions used by TWIGA.",C("Connections",'<div id="intRows" class="pb sub">Checking…</div><div class="pb"><button class="btn pri" id="googleConnect" data-act="googleConnect">Connect Google Workspace</button><div class="sub" id="googleMsg">Google Calendar, Contacts, Sheets and Drive access is optional and can be disconnected later.</div></div>')]};
+document.addEventListener("click",function(e){
+ var b=e.target.closest('[data-act="googleConnect"]');if(!b)return;
+ var cfg=window.TWIGA_GOOGLE_OAUTH||{},msg=$("googleMsg");
+ if(!cfg.clientId){if(msg)msg.textContent="Google OAuth client ID is not configured in Supabase secrets.";return}
+ if(!window.google||!window.google.accounts||!window.google.accounts.oauth2){if(msg)msg.textContent="Google sign-in is still loading. Please tap Connect again in a moment.";return}
+ try{
+  var client=window.google.accounts.oauth2.initCodeClient({
+   client_id:cfg.clientId,
+   scope:["openid","email","profile"].concat(cfg.scopes||[]).join(" "),
+   ux_mode:"popup",
+   access_type:"offline",
+   include_granted_scopes:true,
+   prompt:"consent",
+   callback:async function(response){
+    if(response.error){if(msg)msg.textContent="Google authorization failed: "+response.error;return}
+    if(!response.code){if(msg)msg.textContent="Google did not return an authorization code.";return}
+    if(msg)msg.textContent="Securing your Google connection…";
+    try{
+     var session=(await sb.auth.getSession()).data.session;
+     if(!session)throw new Error("Sign in to TWIGA again.");
+     var result=await fetch(K.supabaseUrl+"/functions/v1/google-workspace",{method:"POST",headers:{apikey:K.supabaseKey,Authorization:"Bearer "+session.access_token,"Content-Type":"application/json"},body:JSON.stringify({action:"connect",businessId:BIZ.id,authorizationCode:response.code,redirectUri:"postmessage"})});
+     var data=await result.json();
+     if(!result.ok)throw new Error(data.error||"Google connection failed.");
+     if(!data.connected){if(msg)msg.textContent=data.message||"Google did not grant every required permission. Review the consent screen and try again.";return}
+     if(msg)msg.textContent="Connected to "+(data.googleEmail||"Google Workspace")+". Refreshing permissions…";
+     await intLoad();
+    }catch(err){if(msg)msg.textContent=err.message}
+   }
+  });
+  client.requestCode();
+ }catch(err){if(msg)msg.textContent="Google sign-in could not start. Check that https://app.twiga.co.ke is an authorized JavaScript origin in your Google OAuth client."}
+});
 async function intLoad(){try{
  var d=await sb.from("devices").select("id,name,last_seen,ai_enabled").eq("business_id",BIZ.id).order("created_at",{ascending:false}).limit(1),
  a=await sb.from("business_ai").select("prompt").eq("business_id",BIZ.id).maybeSingle(),
  line=await sb.from("ai_lines").select("number").eq("business_id",BIZ.id).limit(1),
  dev=d.data&&d.data[0],hasLine=!!(line.data&&line.data[0]&&line.data[0].number),session=(await sb.auth.getSession()).data.session,
- google={connected:false,scopes:[],googleEmail:"",error:"Google status not checked"};
- if(session){try{var gr=await fetch(K.supabaseUrl+"/functions/v1/google-workspace",{method:"POST",headers:{apikey:K.supabaseKey,Authorization:"Bearer "+session.access_token,"Content-Type":"application/json"},body:JSON.stringify({action:"status",businessId:BIZ.id})});google=await gr.json();if(!gr.ok)google.error=google.error||"Google connection could not be verified"}catch(ge){google.error=ge.message}}
+ google={connected:false,scopes:[],googleEmail:"",error:"Google status not checked"},googleCfg={clientId:"",scopes:[]};
+ if(session){try{
+  var gh={apikey:K.supabaseKey,Authorization:"Bearer "+session.access_token,"Content-Type":"application/json"},
+  gr=await fetch(K.supabaseUrl+"/functions/v1/google-workspace",{method:"POST",headers:gh,body:JSON.stringify({action:"status",businessId:BIZ.id})});
+  google=await gr.json();if(!gr.ok)google.error=google.error||"Google connection could not be verified";
+  var cr=await fetch(K.supabaseUrl+"/functions/v1/google-workspace",{method:"POST",headers:gh,body:JSON.stringify({action:"oauth.config",businessId:BIZ.id})});
+  googleCfg=await cr.json();if(!cr.ok)googleCfg={clientId:"",scopes:[]};
+ }catch(ge){google.error=ge.message}}
+ window.TWIGA_GOOGLE_OAUTH=googleCfg;
+ if(!window.google||!window.google.accounts){if(!window._twigaGsiLoading){window._twigaGsiLoading=new Promise(function(resolve,reject){var sc=document.createElement("script");sc.src="https://accounts.google.com/gsi/client";sc.async=true;sc.defer=true;sc.onload=resolve;sc.onerror=function(){reject(new Error("Google sign-in script could not load"))};document.head.appendChild(sc)})}}
  var scopes=google.scopes||[],scope=function(x){return scopes.indexOf(x)>=0},connected=!!google.connected&&!!google.refreshReady,
  gstatus=function(x){return !google.connected?G("Not connected","or"):!google.refreshReady?G("Reconnect","bad"):scope(x)?G("Connected","ok"):G("Permission missing","or")},
  gdetail=function(x){return !google.connected?"Connect Google Workspace":!google.refreshReady?"Reconnect Google to refresh access":scope(x)?"Granted to "+esc(google.googleEmail||"Google account"):"Reconnect and grant the required permission"};
