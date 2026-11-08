@@ -215,6 +215,7 @@ class InCallServiceImpl : InCallService() {
     override fun onCallRemoved(call: Call) {
         super.onCallRemoved(call)
         callerIdCallbacks.remove(call)?.let(call::unregisterCallback)
+        autoAnswerRequested.remove(call)
         callHandler.removeCall(call)
         if (!bridgeMerged && !bridgeMergeInFlight && (call == customerCall || call == aiCall)) {
             failBridge("One of the calls ended before conference was established")
