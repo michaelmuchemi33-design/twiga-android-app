@@ -612,6 +612,7 @@ V={overview:"Overview",pos:"POS",phone:"Dialer",history:"Call History",ai:"AI Re
   o.push(chk(!!SESS,"Signed in",SESS.user.email||""));
   o.push(chk(true,"Business",BIZ.name+", "+BIZ.status+", paid to "+BIZ.paid_through));
   try{var u=await L("usage");o.push(chk(true,"Cloud storage",(u.used/1048576).toFixed(1)+" MB of 500 MB used"))}catch(x){o.push(chk(false,"Cloud storage",x.message))}
+  try{var hr=await fetch("https://twiga-api.twiga-ke.workers.dev/"),hj=await hr.json();o.push(chk(!!(hr.ok&&hj.ok),"TWIGA API",hj.app+" · "+(hj.features||[]).join(", ")))}catch(x){o.push(chk(false,"TWIGA API",x.message))}
   var dv=await sb.from("devices").select("name,last_seen,ai_enabled").eq("business_id",BIZ.id).order("created_at",{ascending:false}).limit(1),dev=dv.data&&dv.data[0];
   o.push(chk(!!dev,"Phone paired",dev?dev.name:"No phone yet. Open the Dialer page and tap Pair phone."));
   var up=dev&&dev.last_seen&&Date.now()-new Date(dev.last_seen)<60000;
