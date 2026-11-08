@@ -323,11 +323,29 @@ async function aiBookAppointment(env, ctx, args, callId, toolId) {
   const callKey = safeToolKey(callId), toolKey = safeToolKey(toolId);
   const txn = ('vapi-appt-' + callKey + '-' + toolKey).slice(0, 100);
   const eventId = ('AI-' + callKey + '-' + toolKey).slice(0, 80);
+  const googleId = googleSafeEventId(callId, toolId);
   const existingEvent = await env.DB.prepare('SELECT title, start_at, end_at, notes FROM events WHERE business_id = ? AND event_id = ?').bind(ctx.biz.id, eventId).first();
   if (existingEvent) {
     const match = String(existingEvent.notes || '').match(/order:\s*([A-Za-z0-9_-]+)/i);
     const oldOrder = match ? await env.DB.prepare('SELECT order_id AS orderId, total, status FROM orders WHERE business_id = ? AND order_id = ?').bind(ctx.biz.id, match[1]).first() : null;
-    return {ok: true, appointmentId: eventId, orderId: oldOrder ? oldOrder.orderId : '', service: existingEvent.title, date: txt(args.date, 10), time: txt(args.time, 5), status: oldOrder ? oldOrder.status : 'Confirmed', total: oldOrder ? Number(oldOrder.total || 0) : 0};
+    let googleCalendarSynced = /Google event ID:/i.test(String(existingEvent.notes || ''));
+    let googleCalendarMessage = googleCalendarSynced ? 'Google Calendar event already exists.' : 'Google Calendar sync is not confirmed.';
+    if (!googleCalendarSynced) {
+      try {
+        const g = await googleWorkspaceAI(env, {action: 'calendar.ai.create', aiNumber: ctx.aiNumber, event: {
+          id: googleId, summary: existingEvent.title, description: String(existingEvent.notes || ''),
+          start: {dateTime: new Date(existingEvent.start_at).toISOString(), timeZone: 'Africa/Nairobi'},
+          end: {dateTime: new Date(existingEvent.end_at).toISOString(), timeZone: 'Africa/Nairobi'}
+        }});
+        googleCalendarSynced = !!(g.connected && g.event);
+        if (googleCalendarSynced) {
+          googleCalendarMessage = 'Google Calendar updated.';
+          const notes = String(existingEvent.notes || '') + ' Google event ID: ' + String(g.event.id || googleId);
+          try { await ACTIONS.saveEvents(env, ctx, {events: [{id: eventId, title: existingEvent.title, start: existingEvent.start_at, end: existingEvent.end_at, notes: notes}]}); } catch (_) {}
+        } else googleCalendarMessage = 'Google Workspace is not connected; saved in TWIGA calendar only.';
+      } catch (e) { googleCalendarMessage = String(e && e.message || e); }
+    }
+    return {ok: true, appointmentId: eventId, orderId: oldOrder ? oldOrder.orderId : '', service: existingEvent.title, date: txt(args.date, 10), time: txt(args.time, 5), status: oldOrder ? oldOrder.status : 'Confirmed', total: oldOrder ? Number(oldOrder.total || 0) : 0, googleCalendarSynced: googleCalendarSynced, googleCalendarMessage: googleCalendarMessage};
   }
   const catalog = (await ACTIONS.listItems(env, ctx, {})).items || [];
   const service = catalog.find(x => String(x.ItemId) === serviceId && (Number(x.Active) === 1 || x.Active === true) && String(x.Kind).toLowerCase() === 'service');
@@ -363,10 +381,33 @@ async function aiBookAppointment(env, ctx, args, callId, toolId) {
     await ACTIONS.updateOrder(env, ctx, {orderId: order.orderId, status: 'Confirmed'}, txn + '-confirm');
   } catch (e) {
     try { await ACTIONS.updateOrder(env, ctx, {orderId: order.orderId, status: 'Cancelled'}, txn + '-cancel'); } catch (_) {}
-    throw new Error('The appointment could not be saved to the calendar. Please ask staff to confirm it.');
+    throw new Error('The appointment could not be saved to the TWIGA calendar. Please ask staff to confirm it.');
+  }
+  let googleCalendarSynced = false;
+  let googleCalendarMessage = 'Google Workspace is not connected; appointment is saved in TWIGA calendar only.';
+  try {
+    const g = await googleWorkspaceAI(env, {action: 'calendar.ai.create', aiNumber: ctx.aiNumber, event: {
+      id: googleId,
+      summary: service.Name + ' - ' + customer,
+      description: 'Customer: ' + customer + '; phone: ' + phone + '; TWIGA order: ' + order.orderId + '; ' + txt(args.notes, 180),
+      start: {dateTime: start.toISOString(), timeZone: 'Africa/Nairobi'},
+      end: {dateTime: end.toISOString(), timeZone: 'Africa/Nairobi'}
+    }});
+    googleCalendarSynced = !!(g.connected && g.event);
+    if (googleCalendarSynced) {
+      googleCalendarMessage = 'Appointment also added to Google Calendar.';
+      try {
+        await ACTIONS.saveEvents(env, ctx, {events: [{
+          id: eventId, title: service.Name + ' - ' + customer, start: start.toISOString(), end: end.toISOString(),
+          notes: 'Customer: ' + customer + '; phone: ' + phone + '; order: ' + order.orderId + '; Google event ID: ' + String(g.event.id || googleId) + '; ' + txt(args.notes, 180)
+        }]});
+      } catch (_) {}
+    } else googleCalendarMessage = 'Google Workspace is not connected; appointment is saved in TWIGA calendar only.';
+  } catch (e) {
+    googleCalendarMessage = 'Saved in TWIGA calendar, but Google Calendar sync failed: ' + String(e && e.message || e);
   }
   await aiSaveContact(env, ctx, customer, phone);
-  return {ok: true, appointmentId: eventId, orderId: order.orderId, service: service.Name, date: availability.date, time: availability.time, durationMinutes: availability.durationMinutes, total: order.total, status: 'Confirmed'};
+  return {ok: true, appointmentId: eventId, orderId: order.orderId, service: service.Name, date: availability.date, time: availability.time, durationMinutes: availability.durationMinutes, total: order.total, status: 'Confirmed', googleCalendarSynced: googleCalendarSynced, googleCalendarMessage: googleCalendarMessage};
 }
 async function aiRecordCall(env, message, eventType, aiNumber) {
   const call = message.call || {};
