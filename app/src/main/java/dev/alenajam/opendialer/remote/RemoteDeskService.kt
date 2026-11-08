@@ -60,7 +60,7 @@ class RemoteDeskService : Service() {
             .setSmallIcon(android.R.drawable.sym_action_call)
             .setOngoing(true)
             .build()
-        startForeground(1101, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        startForeground(1101, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
     }
 
     private fun loop() {
