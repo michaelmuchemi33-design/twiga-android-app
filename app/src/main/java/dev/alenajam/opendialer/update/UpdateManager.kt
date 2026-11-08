@@ -8,6 +8,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
 import android.os.Build
 import android.telephony.TelephonyManager
 import dev.alenajam.opendialer.remote.CallTracker
@@ -18,6 +21,8 @@ import java.net.URL
 /** Checks the GitHub release for a newer build and installs it with one tap (or silently when Android allows). */
 object UpdateManager {
     private const val API = "https://github.com/michaelmuchemi33-design/twiga-android-app/releases/download/latest-apk/version.json"
+    private const val UPDATE_CHANNEL = "twiga_update"
+    private const val UPDATE_NOTIFICATION_ID = 708
 
     data class Info(val build: Long, val url: String, val size: Long)
 
@@ -53,9 +58,45 @@ object UpdateManager {
             val info = runCatching { check(c) }.getOrNull() ?: return@Thread
             if (!autoEnabled(c)) return@Thread
             if (CallTracker.state(c) != TelephonyManager.EXTRA_STATE_IDLE) return@Thread
-            if (!c.packageManager.canRequestPackageInstalls()) return@Thread
+            // Android 8+ requires per-app unknown-sources approval. Older Android
+            // versions use the system installer flow and do not expose this API.
+            if (Build.VERSION.SDK_INT >= 26 && !c.packageManager.canRequestPackageInstalls()) {
+                notifyInstallPermissionRequired(c, info)
+                return@Thread
+            }
             runCatching { install(c, info) { } }
         }.start()
+    }
+
+    private fun notifyInstallPermissionRequired(c: Context, info: Info) {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            c.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) return
+        val manager = c.getSystemService(NotificationManager::class.java)
+        if (Build.VERSION.SDK_INT >= 26) {
+            manager.createNotificationChannel(
+                NotificationChannel(UPDATE_CHANNEL, "TWIGA app updates", NotificationManager.IMPORTANCE_HIGH)
+            )
+        }
+        val settingsIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+            data = Uri.parse("package:${c.packageName}")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        val pending = PendingIntent.getActivity(
+            c, UPDATE_NOTIFICATION_ID, settingsIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val builder = if (Build.VERSION.SDK_INT >= 26) Notification.Builder(c, UPDATE_CHANNEL)
+            else Notification.Builder(c)
+        manager.notify(
+            UPDATE_NOTIFICATION_ID,
+            builder.setSmallIcon(android.R.drawable.stat_sys_download_done)
+                .setContentTitle("TWIGA update available")
+                .setContentText("Allow TWIGA to install updates, then reopen the app.")
+                .setContentIntent(pending)
+                .setAutoCancel(true)
+                .build()
+        )
     }
 
     /** Downloads the APK and hands it to Android's installer. */
@@ -114,12 +155,20 @@ class InstallResultReceiver : BroadcastReceiver() {
         confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         runCatching { context.startActivity(confirm) }
         val nm = context.getSystemService(NotificationManager::class.java)
-        nm.createNotificationChannel(NotificationChannel("twiga_update", "TWIGA updates", NotificationManager.IMPORTANCE_HIGH))
-        val pi = PendingIntent.getActivity(context, 7, confirm, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        if (Build.VERSION.SDK_INT >= 26) {
+            nm.createNotificationChannel(
+                NotificationChannel("twiga_update", "TWIGA updates", NotificationManager.IMPORTANCE_HIGH)
+            )
+        }
+        val pi = PendingIntent.getActivity(
+            context, 7, confirm,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val builder = if (Build.VERSION.SDK_INT >= 26) Notification.Builder(context, "twiga_update")
+            else Notification.Builder(context)
         nm.notify(
             7,
-            Notification.Builder(context, "twiga_update")
-                .setContentTitle("TWIGA update ready")
+            builder.setContentTitle("TWIGA update ready")
                 .setContentText("Tap to install the new version.")
                 .setSmallIcon(android.R.drawable.stat_sys_download_done)
                 .setContentIntent(pi)
