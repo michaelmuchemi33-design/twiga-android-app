@@ -475,6 +475,10 @@ function draw(){
  if(window.lucide)lucide.createIcons()}
 setInterval(function(){var t=$("tmr");if(t)t.textContent=dur((Date.now()-new Date(t.dataset.t))/1000)},1000);
 function dmsg(t){var m=$("dmsg");if(m)m.textContent=t}
+window.twigaNativePairResult=function(ok,message){
+ dmsg(message|| (ok?"Phone connected.":"Pairing failed."));
+ if(ok){PAIR="";pull()}
+};
 async function send(a,n){
  if(!DEV){dmsg("Pair a phone first.");return}
  if(!online()){dmsg("Phone is offline. Open the TWIGA app on it.");return}
@@ -488,7 +492,7 @@ document.addEventListener("click",async function(e){
  else if(a==="bk"){NUM=NUM.slice(0,-1);$("dn").value=NUM}
  else if(a==="dial"||a==="redial"){var n=(a==="redial"?b.dataset.n:NUM).replace(/[\s()-]/g,"");if(!/^[0-9+*#]{3,20}$/.test(n)){dmsg("Enter a valid number.");return}send("dial",n)}
  else if(a==="cmd")send(b.dataset.a);
- else if(a==="pair"){var r=await sb.rpc("create_pairing",{p_business:BIZ.id});if(r.error)dmsg(r.error.message);else{PAIR=r.data;draw()}}
+ else if(a==="pair"){var r=await sb.rpc("create_pairing",{p_business:BIZ.id});if(r.error)dmsg(r.error.message);else{PAIR=r.data;draw();if(window.TwigaAndroid&&!window.TwigaAndroid.isPaired()){dmsg("Connecting this Android phone…");window.TwigaAndroid.claimPairingCode(PAIR)}}}
 });
 var AI0=R.ai;
 R.ai=function(){
