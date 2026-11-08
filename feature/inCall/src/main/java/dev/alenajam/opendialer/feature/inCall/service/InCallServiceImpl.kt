@@ -30,6 +30,7 @@ class InCallServiceImpl : InCallService() {
     private var customerCall: Call? = null
     private var aiCall: Call? = null
     private var bridgeRequested = false
+    private var bridgeMergeInFlight = false
     private var bridgeMerged = false
     private var bridgeTimeout: Runnable? = null
 
@@ -112,13 +113,15 @@ class InCallServiceImpl : InCallService() {
     private fun tryMergeAiLeg() {
         val customer = customerCall ?: return
         val ai = aiCall ?: return
-        if (bridgeMerged || customer.state != Call.STATE_ACTIVE || ai.state != Call.STATE_ACTIVE) return
+        val customerReady = customer.state == Call.STATE_ACTIVE || customer.state == Call.STATE_HOLDING
+        if (bridgeMerged || !customerReady || ai.state != Call.STATE_ACTIVE) return
 
         val customerCanMerge = customer.conferenceableCalls.contains(ai)
         val aiCanMerge = ai.conferenceableCalls.contains(customer)
         if (!customerCanMerge && !aiCanMerge) return
 
         runCatching {
+            bridgeMergeInFlight = true
             if (customerCanMerge) customer.conference(ai) else ai.conference(customer)
             getSharedPreferences("twiga_remote_desk", MODE_PRIVATE)
                 .edit().putString("ai_bridge_status", "merge_requested").apply()
@@ -129,6 +132,7 @@ class InCallServiceImpl : InCallService() {
                 val merged = calls.any { parent ->
                     parent.children.contains(customer) && parent.children.contains(ai)
                 }
+                bridgeMergeInFlight = false
                 if (merged) {
                     bridgeMerged = true
                     getSharedPreferences("twiga_remote_desk", MODE_PRIVATE)
@@ -168,6 +172,7 @@ class InCallServiceImpl : InCallService() {
         customerCall = null
         aiCall = null
         bridgeRequested = false
+        bridgeMergeInFlight = false
     }
 
     private fun samePhoneNumber(a: String, b: String): Boolean {
@@ -181,9 +186,9 @@ class InCallServiceImpl : InCallService() {
         super.onCallRemoved(call)
         callerIdCallbacks.remove(call)?.let(call::unregisterCallback)
         callHandler.removeCall(call)
-        if (!bridgeMerged && (call == customerCall || call == aiCall)) {
+        if (!bridgeMerged && !bridgeMergeInFlight && (call == customerCall || call == aiCall)) {
             failBridge("One of the calls ended before conference was established")
-        } else if (bridgeMerged && (call == customerCall || call == aiCall)) {
+        } else if (bridgeMerged && calls.isEmpty()) {
             bridgeTimeout?.let(bridgeHandler::removeCallbacks)
             bridgeTimeout = null
             customerCall = null
