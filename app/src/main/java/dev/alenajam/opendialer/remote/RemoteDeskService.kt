@@ -112,8 +112,15 @@ class RemoteDeskService : Service() {
                 "dial" -> {
                     val n = c.optString("number").trim()
                     if (n.isBlank()) throw IllegalArgumentException("No number")
-                    RemoteDesk.prefs(this).edit().putString("dialing", n).apply()
-                    tm.placeCall(Uri.fromParts("tel", n, null), Bundle())
+                    val prefs = RemoteDesk.prefs(this)
+                    val bridgeAi = prefs.getBoolean("ai", false) && prefs.getString("ai_line", "").orEmpty().isNotBlank()
+                    prefs.edit().putString("dialing", n).putBoolean("bridge_next_call", bridgeAi).apply()
+                    try {
+                        tm.placeCall(Uri.fromParts("tel", n, null), Bundle())
+                    } catch (error: Exception) {
+                        prefs.edit().putBoolean("bridge_next_call", false).apply()
+                        throw error
+                    }
                 }
                 "answer" -> tm.acceptRingingCall()
                 "decline", "hangup" -> if (!tm.endCall()) throw IllegalStateException("No call to end")
