@@ -7,6 +7,8 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 import android.view.WindowManager
 import android.webkit.CookieManager
@@ -16,6 +18,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.JavascriptInterface
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
@@ -29,6 +32,7 @@ import dev.alenajam.opendialer.remote.RemoteDesk
 import dev.alenajam.opendialer.remote.RemoteDeskService
 import dev.alenajam.opendialer.update.UpdateManager
 import javax.inject.Inject
+import org.json.JSONObject
 
 /**
  * TWIGA's main screen is the actual responsive business workspace.
@@ -40,6 +44,7 @@ class MainActivity : ComponentActivity() {
 
     private var webView: WebView? = null
     private var pendingWebPermission: PermissionRequest? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     private val microphonePermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -67,6 +72,12 @@ class MainActivity : ComponentActivity() {
     private val fullScreenAccessRequest = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { }
+
+    private val phonePermissions = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        if (RemoteDesk.isPaired(this)) startRemoteDesk()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -125,6 +136,8 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        view.addJavascriptInterface(TwigaAndroidBridge(), "TwigaAndroid")
+
         view.webChromeClient = object : WebChromeClient() {
             override fun onPermissionRequest(request: PermissionRequest) {
                 val trusted = request.origin.scheme == "https" &&
@@ -166,6 +179,67 @@ class MainActivity : ComponentActivity() {
                 if (current != null && current.canGoBack()) current.goBack() else finish()
             }
         })
+    }
+
+    private inner class TwigaAndroidBridge {
+        @JavascriptInterface
+        fun isPaired(): Boolean = RemoteDesk.isPaired(this@MainActivity)
+
+        @JavascriptInterface
+        fun claimPairingCode(code: String) {
+            val clean = code.filter { it.isDigit() }.take(6)
+            if (clean.length != 6 || RemoteDesk.isPaired(this@MainActivity)) return
+            Thread {
+                var success = false
+                var message = "Could not pair this phone."
+                try {
+                    val response = JSONObject(
+                        RemoteDesk.rpc(
+                            "device_claim",
+                            JSONObject().put("p_code", clean).put("p_name", Build.MODEL ?: "Android phone")
+                        )
+                    )
+                    if (response.has("error")) throw IllegalStateException(response.optString("error"))
+                    val token = response.optString("token")
+                    if (token.isBlank()) throw IllegalStateException("The pairing service did not return a device token.")
+                    RemoteDesk.save(this@MainActivity, token, response.optString("business"))
+                    success = true
+                    message = "Phone connected. Enabling call permissions…"
+                } catch (error: Exception) {
+                    message = error.message ?: "Pairing failed. Check your connection and try again."
+                }
+                val ok = success
+                val resultMessage = message
+                mainHandler.post {
+                    val js = "window.twigaNativePairResult && window.twigaNativePairResult($ok, ${JSONObject.quote(resultMessage)})"
+                    webView?.evaluateJavascript(js, null)
+                    if (ok) requestPhonePermissions()
+                }
+            }.start()
+        }
+    }
+
+    private fun requestPhonePermissions() {
+        val required = mutableListOf(
+            Manifest.permission.CALL_PHONE,
+            Manifest.permission.READ_PHONE_STATE,
+            Manifest.permission.READ_CALL_LOG,
+            Manifest.permission.ANSWER_PHONE_CALLS
+        )
+        if (Build.VERSION.SDK_INT >= 33) required.add(Manifest.permission.POST_NOTIFICATIONS)
+        val missing = required.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (missing.isEmpty()) {
+            startRemoteDesk()
+        } else {
+            phonePermissions.launch(missing.toTypedArray())
+        }
+    }
+
+    private fun startRemoteDesk() {
+        if (!RemoteDesk.isPaired(this) || !RemoteDesk.remoteControl(this)) return
+        runCatching { startForegroundService(Intent(this, RemoteDeskService::class.java)) }
     }
 
     private fun requestDefaultDialerIfNeeded() {
