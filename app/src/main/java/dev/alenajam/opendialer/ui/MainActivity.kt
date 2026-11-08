@@ -286,6 +286,6 @@ class MainActivity : ComponentActivity() {
     companion object {
         private const val WORKSPACE_HOST = "app.twiga.co.ke"
         private const val SUPABASE_HOST = "ztyxxikkposfpxsutnfr.supabase.co"
-        private const val WORKSPACE_URL = "https://app.twiga.co.ke/#phone"
+        private const val WORKSPACE_URL = "https://app.twiga.co.ke/"
     }
 }
