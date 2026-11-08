@@ -68,8 +68,9 @@ object CallTracker {
                 if (prev == TelephonyManager.EXTRA_STATE_IDLE) {
                     key = UUID.randomUUID().toString(); dir = "out"
                     val d = RemoteDesk.prefs(c)
-                    number = d.getString("dialing", "") ?: ""
+                    number = (d.getString("dialing", "") ?: "").ifBlank { p.getString("pending_number", "") ?: "" }
                     d.edit().putString("dialing", "").apply()
+                    p.edit().remove("pending_number").apply()
                 }
                 if (prev != st) {
                     connected = true; startMs = now
