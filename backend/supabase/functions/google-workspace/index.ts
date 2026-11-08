@@ -168,7 +168,28 @@ async function authenticateLine(req: Request, body: any) {
   return { admin, businessId, connection, token };
 }
 async function connectGoogle(admin: any, userId: string, businessId: string, body: any) {
-  const accessToken = String(body.accessToken || "");
+  let accessToken = String(body.accessToken || "");
+  let exchangedRefreshToken = String(body.refreshToken || "");
+  if (!accessToken && body.authorizationCode) {
+    const clientId = env("GOOGLE_CLIENT_ID"), clientSecret = env("GOOGLE_CLIENT_SECRET");
+    if (!clientId || !clientSecret) throw new HttpError(500, "Google OAuth client credentials are not configured.");
+    const form = new URLSearchParams({
+      code: String(body.authorizationCode),
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: "authorization_code",
+      redirect_uri: String(body.redirectUri || "postmessage"),
+    });
+    const exchange = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: form,
+    });
+    const tokens = await exchange.json().catch(() => ({}));
+    if (!exchange.ok || !tokens.access_token) throw new HttpError(400, String(tokens.error_description || tokens.error || "Google authorization code exchange failed."));
+    accessToken = String(tokens.access_token);
+    exchangedRefreshToken = String(tokens.refresh_token || exchangedRefreshToken);
+  }
   if (!accessToken) throw new HttpError(400, "Google did not return an access token. Try Connect Google again.");
   const tokenResponse = await fetch("https://oauth2.googleapis.com/tokeninfo?access_token=" + encodeURIComponent(accessToken));
   const tokenInfo = await readJson(tokenResponse);
@@ -183,7 +204,7 @@ async function connectGoogle(admin: any, userId: string, businessId: string, bod
   if (missing.length) return { connected: false, missingScopes: missing, message: "Google did not grant every requested permission. Reconnect and approve the missing access." };
   const profile = await googleJson(accessToken, "https://www.googleapis.com/oauth2/v3/userinfo").catch(() => ({}));
   const old = await getConnection(admin, businessId);
-  const refreshToken = String(body.refreshToken || "") || await decrypt(old?.refresh_token_ciphertext || null);
+  const refreshToken = exchangedRefreshToken || await decrypt(old?.refresh_token_ciphertext || null);
   const expiry = new Date(Date.now() + Math.max(60, Number(tokenInfo.expires_in || 3600)) * 1000).toISOString();
   await saveConnection(admin, {
     business_id: businessId,
@@ -271,6 +292,7 @@ Deno.serve(async (req: Request) => {
       throw new HttpError(403, "Only a TWIGA business owner or administrator can connect or disconnect Google Workspace.");
     }
 
+    if (action === "oauth.config") return reply(req, { clientId: env("GOOGLE_CLIENT_ID"), scopes: REQUIRED_SCOPES });
     if (action === "connect") return reply(req, await connectGoogle(admin, user.id, businessId, body));
     if (action === "status") {
       const connection = await getConnection(admin, businessId);
