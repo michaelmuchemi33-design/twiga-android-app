@@ -72,10 +72,13 @@ class RemoteDeskService : Service() {
 
                 // device_get_ai is the existing authenticated endpoint for the saved business AI
                 // configuration. Its "line" value is the Vapi number configured in the web app.
-                val aiConfig = JSONObject(RemoteDesk.rpc("device_get_ai", JSONObject().put("p_token", token)))
-                val aiLine = aiConfig.optString("line").trim()
                 val out = JSONObject(RemoteDesk.rpc("device_sync", JSONObject().put("p_token", token).put("p_state", CallTracker.state(this))))
                 val aiEnabled = out.optBoolean("ai_enabled")
+                // Keep device heartbeat and queued call commands independent of AI config reads.
+                val aiLine = runCatching {
+                    JSONObject(RemoteDesk.rpc("device_get_ai", JSONObject().put("p_token", token)))
+                        .optString("line").trim()
+                }.getOrDefault(RemoteDesk.prefs(this).getString("ai_line", "").orEmpty())
                 RemoteDesk.prefs(this).edit()
                     .putString("ai_line", aiLine)
                     .putBoolean("ai", aiEnabled)
