@@ -18,9 +18,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Optional "dial and answer from the dashboard" link. It checks in every 15 seconds while idle and
- * every 3 seconds during a call or just after a command. Call reporting itself does not need this
- * service (see CallStateReceiver). It does not record or capture call audio.
+ * Keeps the paired SIM phone connected to the TWIGA workspace.
+ * When AI is enabled, it also downloads the business's configured Vapi line.
+ * The native InCallService can then attempt a carrier conference bridge.
  */
 class RemoteDeskService : Service() {
     @Volatile private var running = false
@@ -69,8 +69,21 @@ class RemoteDeskService : Service() {
                 val token = RemoteDesk.token(this)
                 if (token.isBlank() || !RemoteDesk.remoteControl(this)) { stopSelf(); return }
                 RemoteDesk.flush(this)
+
+                // device_get_ai is the existing authenticated endpoint for the saved business AI
+                // configuration. Its "line" value is the Vapi number configured in the web app.
+                val aiConfig = JSONObject(RemoteDesk.rpc("device_get_ai", JSONObject().put("p_token", token)))
+                val aiLine = aiConfig.optString("line").trim()
                 val out = JSONObject(RemoteDesk.rpc("device_sync", JSONObject().put("p_token", token).put("p_state", CallTracker.state(this))))
-                RemoteDesk.prefs(this).edit().putBoolean("ai", out.optBoolean("ai_enabled")).apply()
+                val aiEnabled = out.optBoolean("ai_enabled")
+                RemoteDesk.prefs(this).edit()
+                    .putString("ai_line", aiLine)
+                    .putBoolean("ai", aiEnabled)
+                    // The SIM auto-answer path is only armed when the owner enabled AI and
+                    // configured a real AI phone number. No blind answering with an empty line.
+                    .putBoolean("auto_answer", aiEnabled && aiLine.isNotBlank())
+                    .apply()
+
                 val cmds = out.optJSONArray("commands") ?: JSONArray()
                 for (i in 0 until cmds.length()) {
                     val c = cmds.getJSONObject(i)
