@@ -297,4 +297,159 @@ async function aiBookAppointment(env, ctx, args, callId, toolId) {
   if (existingEvent) {
     const match = String(existingEvent.notes || '').match(/order:\s*([A-Za-z0-9_-]+)/i);
     const oldOrder = match ? await env.DB.prepare('SELECT order_id AS orderId, total, status FROM orders WHERE business_id = ? AND order_id = ?').bind(ctx.biz.id, match[1]).first() : null;
-    return {ok: true, appointmentId: eventId, orderId: oldOrder ? oldOrder.orderId : '', service: existingEvent.title, date: txt(args.date, 10), time: txt(args.time, 5), status: oldOrder ? oldOrder.status : 'Confirmed', total: oldOrder ? Number(oldOrder.total || 0) : 0}; --- TRUNCATED --- 33,767 chars
+    return {ok: true, appointmentId: eventId, orderId: oldOrder ? oldOrder.orderId : '', service: existingEvent.title, date: txt(args.date, 10), time: txt(args.time, 5), status: oldOrder ? oldOrder.status : 'Confirmed', total: oldOrder ? Number(oldOrder.total || 0) : 0};
+  }
+  const catalog = (await ACTIONS.listItems(env, ctx, {})).items || [];
+  const service = catalog.find(x => String(x.ItemId) === serviceId && (Number(x.Active) === 1 || x.Active === true) && String(x.Kind).toLowerCase() === 'service');
+  if (!service) throw new Error('The selected service is not active in the business catalogue.');
+  const previous = await once(env, ctx.biz.id, txn);
+  let order;
+  let availability;
+  if (previous) {
+    order = previous;
+    const date = txt(args.date, 10), time = txt(args.time, 5);
+    const duration = Math.min(180, Math.max(15, Math.round(Number(args.durationMinutes) || 30)));
+    availability = {available: true, date: date, time: time, durationMinutes: duration};
+  } else {
+    availability = await aiCheckSlot(env, ctx, args);
+    if (!availability.available) throw new Error(availability.reason);
+    order = await ACTIONS.createOrder(env, ctx, {
+      type: 'Appointment', customer: customer, phone: phone, method: 'Booking', paid: false,
+      date: availability.date,
+      notes: 'Time: ' + availability.time + ' (' + availability.durationMinutes + ' minutes). ' + txt(args.notes, 180),
+      items: [{itemId: service.ItemId, name: service.Name, qty: 1, unitPrice: Number(service.Price || 0)}]
+    }, txn);
+  }
+  const start = new Date(availability.date + 'T' + availability.time + ':00+03:00');
+  const end = new Date(start.getTime() + availability.durationMinutes * 60000);
+  try {
+    await ACTIONS.saveEvents(env, ctx, {events: [{
+      id: eventId,
+      title: service.Name + ' - ' + customer,
+      start: start.toISOString(),
+      end: end.toISOString(),
+      notes: 'Customer: ' + customer + '; phone: ' + phone + '; order: ' + order.orderId + '; ' + txt(args.notes, 180)
+    }]});
+    await ACTIONS.updateOrder(env, ctx, {orderId: order.orderId, status: 'Confirmed'}, txn + '-confirm');
+  } catch (e) {
+    try { await ACTIONS.updateOrder(env, ctx, {orderId: order.orderId, status: 'Cancelled'}, txn + '-cancel'); } catch (_) {}
+    throw new Error('The appointment could not be saved to the calendar. Please ask staff to confirm it.');
+  }
+  await aiSaveContact(env, ctx, customer, phone);
+  return {ok: true, appointmentId: eventId, orderId: order.orderId, service: service.Name, date: availability.date, time: availability.time, durationMinutes: availability.durationMinutes, total: order.total, status: 'Confirmed'};
+}
+async function aiRecordCall(env, message, eventType, aiNumber) {
+  const call = message.call || {};
+  const artifact = message.artifact || {};
+  const providerCallId = String(call.id || message.callId || message.id || '');
+  if (!providerCallId || !aiNumber) return {ok: false, skipped: true};
+  const startedAt = safeIso(call.startedAt || call.createdAt || message.startedAt);
+  const endedAt = safeIso(call.endedAt || message.endedAt || (eventType === 'end-of-call-report' ? new Date().toISOString() : ''));
+  let duration = Number(call.durationSeconds || message.durationSeconds || 0);
+  if (!duration && startedAt && endedAt) duration = Math.max(0, Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000));
+  const cost = Number(call.cost || message.cost || 0);
+  const record = {
+    provider_call_id: providerCallId,
+    direction: String(call.type || '').toLowerCase().includes('outbound') ? 'outbound' : 'inbound',
+    from_number: String((call.customer && call.customer.number) || call.fromNumber || ''),
+    to_number: String((call.phoneNumber && call.phoneNumber.number) || call.phoneNumberNumber || aiNumber),
+    status: eventType === 'end-of-call-report' ? 'ended' : String(call.status || message.status || 'in-progress'),
+    started_at: startedAt,
+    ended_at: endedAt,
+    duration_seconds: Number.isFinite(duration) ? duration : 0,
+    transcript: String(artifact.transcript || artifact.transcriptText || message.transcript || ''),
+    summary: String(artifact.summary || message.summary || call.summary || ''),
+    structured_data: artifact.structuredData || message.structuredData || {},
+    cost_usd: Number.isFinite(cost) && cost > 0 ? String(cost) : '',
+    metadata: {
+      event_type: eventType,
+      call_type: call.type || '',
+      recording_url: artifact.recordingUrl || '',
+      stereo_recording_url: artifact.stereoRecordingUrl || '',
+      phone_number: aiNumber
+    }
+  };
+  const r = await fetch(env.SUPABASE_URL + '/rest/v1/rpc/line_record_call', {
+    method: 'POST',
+    headers: {apikey: env.SUPABASE_KEY, 'Content-Type': 'application/json'},
+    body: JSON.stringify({p_secret: env.LINE_SECRET, p_number: aiNumber, p_record: record})
+  });
+  if (!r.ok) throw new Error('AI call record could not be saved.');
+  return await r.json();
+}
+
+function buildAssistant(o) {
+  const biz = String(o.name || 'this business').slice(0, 80);
+  const parts = [];
+  parts.push(o.prompt && o.prompt.trim() ? o.prompt.trim() : '(The owner has not added business details yet. Be helpful in general and offer to take a message.)');
+  if (o.faq && o.faq.trim()) parts.push('QUESTIONS AND ANSWERS (use these answers when asked):\n' + o.faq.trim());
+  if (o.rules && o.rules.trim()) parts.push('RULES (always follow):\n' + o.rules.trim());
+  const baseSystem = 'You are the AI receptionist for ' + biz + ', answering a phone call. Speak in short, warm, natural sentences like a helpful Kenyan receptionist. Use natural Kenyan English phrasing and everyday Kiswahili. Reply in the language the caller uses (English or Kiswahili) and follow them if they switch. Use only the business information below. If you do not know something, say so and offer to take a message or connect a person. Never invent prices, stock or availability. For an order or booking, collect the caller\'s name and phone number, repeat the details back and ask them to confirm. Amounts are in Kenya shillings (KSh). When the caller is finished, say goodbye politely.\n\nBUSINESS INFORMATION:\n' + parts.join('\n\n');
+  const nowKenya = new Intl.DateTimeFormat('en-KE', {timeZone: 'Africa/Nairobi', dateStyle: 'full', timeStyle: 'short'}).format(new Date());
+  const system = baseSystem + '\n\nCURRENT DATE/TIME IN NAIROBI: ' + nowKenya + '. Interpret relative dates in Africa/Nairobi time.\n\nBUSINESS ACTION RULES: Use list_products before quoting prices or stock. Create an order only after collecting the customer name and phone, repeating the items and quantities, and receiving explicit confirmation. Orders are saved unpaid; never claim payment was received and never promise M-Pesa checkout. For appointments, identify a service from list_products, check the requested slot with check_appointment_availability, offer another slot if unavailable, repeat the service/date/time and receive explicit confirmation before book_appointment. Never claim an order or appointment was saved unless the tool returns ok=true.';
+  return {
+    name: 'TWIGA phone receptionist',
+    firstMessage: (o.greeting && o.greeting.trim()) || ('Hello, karibu ' + biz + '. How can I help you today?'),
+    firstMessageMode: 'assistant-waits-for-user',
+    model: {provider: 'openai', model: 'gpt-4o', temperature: 0.5, messages: [{role: 'system', content: system}], tools: twigaTools()},
+    serverMessages: ['tool-calls', 'status-update', 'end-of-call-report'],
+    voice: {provider: '11labs', voiceId: 'EXAVITQu4vr4xnSDxMaL', model: 'eleven_v3'},
+    transcriber: {provider: 'google', model: 'gemini-3.1-flash-lite', language: 'Multilingual'},
+    maxDurationSeconds: 600,
+    backgroundDenoisingEnabled: true
+  };
+}
+
+async function vapiHook(req, env) {
+  if (!env.VAPI_SECRET || req.headers.get('x-vapi-secret') !== env.VAPI_SECRET) return json({error: 'unauthorized'}, 401);
+  let body;
+  try { body = await req.json(); } catch (e) { return json({}, 400); }
+  const m = body.message || {};
+  const call = m.call || {};
+  const num = String((m.phoneNumber && m.phoneNumber.number) || (call.phoneNumber && call.phoneNumber.number) || '');
+  if (m.type === 'assistant-request') {
+    try {
+      const d = await getAiLineConfig(env, num);
+      return json({assistant: buildAssistant({name: d.business, prompt: d.prompt, faq: d.faq, rules: d.rules, greeting: d.greeting})});
+    } catch (e) {
+      return json({error: 'Sorry, this line is not available right now. Please try again later.'});
+    }
+  }
+  if (m.type === 'tool-calls') {
+    const calls = Array.isArray(m.toolCallList) ? m.toolCallList : [];
+    let d;
+    try { d = await getAiLineConfig(env, num); }
+    catch (e) {
+      return json({results: calls.map((t, i) => ({toolCallId: String(t.id || t.toolCallId || ('tool-' + i)), error: String(e && e.message || e)}))});
+    }
+    const ctx = {biz: {id: d.business_id}, role: 'owner'};
+    const callId = String(call.id || m.callId || 'call');
+    const results = [];
+    for (let i = 0; i < calls.length; i++) {
+      const t = calls[i] || {};
+      const toolCallId = String(t.id || t.toolCallId || ('tool-' + i));
+      const fn = t.function || {};
+      const name = String(fn.name || t.name || '');
+      let args = fn.arguments !== undefined ? fn.arguments : (t.arguments || {});
+      try {
+        if (typeof args === 'string') args = JSON.parse(args || '{}');
+        let result;
+        if (name === 'list_products') result = await aiListProducts(env, ctx);
+        else if (name === 'create_order') result = await aiCreateOrder(env, ctx, args || {}, callId, toolCallId);
+        else if (name === 'check_appointment_availability') result = await aiCheckSlot(env, ctx, args || {});
+        else if (name === 'book_appointment') result = await aiBookAppointment(env, ctx, args || {}, callId, toolCallId);
+        else throw new Error('Unknown TWIGA AI action.');
+        results.push({toolCallId: toolCallId, result: JSON.stringify(result)});
+      } catch (e) {
+        results.push({toolCallId: toolCallId, error: String(e && e.message || e)});
+      }
+    }
+    return json({results: results});
+  }
+  if (m.type === 'end-of-call-report' || m.type === 'status-update') {
+    try { await aiRecordCall(env, m, m.type, num); }
+    catch (e) { console.error('TWIGA Vapi call report error', e && e.message); }
+    return json({ok: true});
+  }
+  return json({});
+}
