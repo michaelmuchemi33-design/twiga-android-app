@@ -123,7 +123,7 @@ fun TwigaWorkspaceHome(callbacks: HomeScreenCallbacks) {
                 ) {
                     Text("More from TWIGA", fontSize = 25.sp, fontWeight = FontWeight.Black)
                     TwigaActionCard("Open dialler", "Make a call using your phone's SIM.") { callbacks.onOpenDialpad("") }
-                    TwigaActionCard("Contacts", "Open your contacts and customer records.") { callbacks.onOpenSettings() }
+                    TwigaActionCard("Phone settings", "Manage your default dialler and app settings.") { callbacks.onOpenSettings() }
                     TwigaActionCard("Settings", "Manage phone and app settings.") { callbacks.onOpenSettings() }
                     TwigaActionCard("About TWIGA", "App information and support.") { callbacks.onOpenAbout() }
                     TwigaActionCard("Voicemail", "Review voicemail on this phone.") { callbacks.onOpenVoicemail() }
@@ -168,7 +168,7 @@ private fun TwigaOverview(modifier: Modifier, onTalk: () -> Unit, onDial: () -> 
 
 @Composable
 private fun TwigaQuickAction(title: String, subtitle: String, modifier: Modifier, onClick: () -> Unit) {
-    Card(modifier, onClick = onClick, colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(16.dp)) {
+    Card(onClick = onClick, modifier = modifier, colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(16.dp)) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, fontWeight = FontWeight.Bold, color = TwigaInk)
             Text(subtitle, fontSize = 11.sp, color = TwigaMuted)
