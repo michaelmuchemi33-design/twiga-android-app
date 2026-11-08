@@ -5,15 +5,9 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import dagger.hilt.android.AndroidEntryPoint
 import dev.alenajam.opendialer.core.common.DefaultPhoneManager
 import dev.alenajam.opendialer.feature.appShell.DialerApp
-import dev.alenajam.opendialer.feature.appShell.HomeNavigationItem
-import dev.alenajam.opendialer.feature.appShell.HomeScreenConfiguration
 import dev.alenajam.opendialer.remote.RemoteDesk
 import dev.alenajam.opendialer.remote.RemoteDeskService
 import dev.alenajam.opendialer.update.UpdateManager
@@ -37,14 +31,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             DialerApp(
                 defaultPhoneManager = defaultPhoneManager,
-                homeScreenConfiguration = HomeScreenConfiguration(
-                    topBarAction = { AiToggleAction() },
-                    customNavigationItem = HomeNavigationItem(
-                        label = { Text("Business") },
-                        icon = { Icon(Icons.Default.ShoppingCart, contentDescription = null) },
-                        content = { BusinessTab() },
-                    ),
-                ),
+                homeContent = { callbacks -> TwigaWorkspaceHome(callbacks) },
+                forceLightTheme = true
             )
         }
     }
