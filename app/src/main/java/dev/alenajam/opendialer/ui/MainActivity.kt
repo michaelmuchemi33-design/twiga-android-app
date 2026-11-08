@@ -23,6 +23,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.core.content.ContextCompat.startForegroundService
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -109,7 +110,7 @@ class MainActivity : ComponentActivity() {
 
         UpdateManager.autoCheck(applicationContext)
         if (RemoteDesk.isPaired(this) && RemoteDesk.remoteControl(this)) {
-            runCatching { startForegroundService(Intent(this, RemoteDeskService::class.java)) }
+            runCatching { ContextCompat.startForegroundService(this, Intent(this, RemoteDeskService::class.java)) }
         }
 
         showWorkspace()
