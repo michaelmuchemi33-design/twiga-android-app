@@ -66,7 +66,14 @@ fun TwigaWorkspaceHome(callbacks: HomeScreenCallbacks) {
                 }
             },
             bottomBar = {
-                NavigationBar(containerColor = Color.White) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp).padding(bottom = 8.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    color = Color.White,
+                    shadowElevation = 3.dp,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE7E5E2))
+                ) {
+                NavigationBar(containerColor = Color.White, tonalElevation = 0.dp) {
                     val items = listOf(
                         Triple("Home", Icons.Default.Home, 0),
                         Triple("Calls", Icons.Default.Call, 1),
@@ -89,6 +96,7 @@ fun TwigaWorkspaceHome(callbacks: HomeScreenCallbacks) {
                             )
                         )
                     }
+                }
                 }
             }
         ) { padding ->
