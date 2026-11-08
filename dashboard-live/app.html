@@ -405,7 +405,7 @@ document.addEventListener("click",async function(e){
  var b=e.target.closest("[data-act]");if(!b)return;
  var a=b.dataset.act,id=b.dataset.id;
  try{
-  if(a==="g"){var nativeOAuth=!!window.TwigaAndroid;if(nativeOAuth)window.TwigaAndroid.beginGoogleOAuth();var o=await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:nativeOAuth?"twiga://auth/callback":location.origin+"/"}});if(o.error){if(nativeOAuth)window.TwigaAndroid.cancelGoogleOAuth();$("lerr").textContent=o.error.message}}
+  if(a==="g"){var nativeOAuth=!!(window.TwigaAndroid&&typeof window.TwigaAndroid.beginGoogleOAuth==="function");if(nativeOAuth)window.TwigaAndroid.beginGoogleOAuth();var o=await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:nativeOAuth?"twiga://auth/callback":location.origin+"/"}});if(o.error){if(nativeOAuth&&typeof window.TwigaAndroid.cancelGoogleOAuth==="function")window.TwigaAndroid.cancelGoogleOAuth();$("lerr").textContent=o.error.message}}
   else if(a==="emailLogin"){
     var email=($("authEmail")?.value||"").trim().toLowerCase(),password=$("authPassword")?.value||"";
     if(!email||!password){$("lerr").textContent="Enter your email and password.";return}
@@ -464,7 +464,7 @@ function draw(){
  else side+='<div class="sub">'+(on?"No active call.":DEV?"Open the TWIGA app on the phone and keep it connected.":"Pair your phone to start.")+'</div>';
  if(CMD&&Date.now()-new Date(CMD.created_at)<30000)side+='<div class="sub">'+(CMD.status==="failed"?"Failed: "+esc(CMD.message||""):CMD.status==="done"?"Sent to phone.":"Sending to phone...")+'</div>';
  if(DEV)side+='<div class="opt" style="padding:8px 0"><div><b>AI receptionist</b><span>When on, incoming calls are tagged for the AI. Voice answering on a SIM line requires a carrier/SIP audio bridge. The phone app alone cannot connect AI audio to a cellular call.</span></div><label class="sw"><input type="checkbox" id="aisw" aria-label="AI receptionist"'+(DEV.ai_enabled?" checked":"")+'><s></s></label></div>';
- if(window.TwigaAndroid)side+='<div style="margin:10px 0"><button class="btn sm" data-act="nativeSetup">Enable phone and background access</button><div class="sub">Set TWIGA as your default phone app and allow background operation for reliable call events and remote commands.</div></div>';
+ if(window.TwigaAndroid&&typeof window.TwigaAndroid.requestPhoneSetup==="function")side+='<div style="margin:10px 0"><button class="btn sm" data-act="nativeSetup">Enable phone and background access</button><div class="sub">Set TWIGA as your default phone app and allow background operation for reliable call events and remote commands.</div></div>';
  side+='<div><button class="btn sm" data-act="pair">'+(DEV?"Pair another phone":"Pair phone")+'</button> '+(PAIR?'<b style="font-size:20px;letter-spacing:3px">'+esc(PAIR)+'</b> <span class="sub">Type this in the phone app. Valid for 10 minutes.</span>':"")+'</div><a class="lk" href="https://github.com/michaelmuchemi33-design/unity-ai-receptionist-app/releases/download/latest-apk/unity-ai-receptionist.apk">Download the phone app</a></div></div>';
  var keep=Date.now()-AIT<4000&&$("aisw")?$("aisw").checked:null;
  $("dside").innerHTML=side;if(keep!==null&&$("aisw"))$("aisw").checked=keep;
@@ -492,8 +492,8 @@ document.addEventListener("click",async function(e){
  else if(a==="bk"){NUM=NUM.slice(0,-1);$("dn").value=NUM}
  else if(a==="dial"||a==="redial"){var n=(a==="redial"?b.dataset.n:NUM).replace(/[\s()-]/g,"");if(!/^[0-9+*#]{3,20}$/.test(n)){dmsg("Enter a valid number.");return}send("dial",n)}
  else if(a==="cmd")send(b.dataset.a);
- else if(a==="pair"){var r=await sb.rpc("create_pairing",{p_business:BIZ.id});if(r.error)dmsg(r.error.message);else{PAIR=r.data;draw();if(window.TwigaAndroid&&!window.TwigaAndroid.isPaired()){dmsg("Connecting this Android phone…");window.TwigaAndroid.claimPairingCode(PAIR)}}}
- else if(a==="nativeSetup"&&window.TwigaAndroid){window.TwigaAndroid.requestPhoneSetup()}
+ else if(a==="pair"){var r=await sb.rpc("create_pairing",{p_business:BIZ.id});if(r.error)dmsg(r.error.message);else{PAIR=r.data;draw();if(window.TwigaAndroid&&typeof window.TwigaAndroid.isPaired==="function"&&!window.TwigaAndroid.isPaired()&&typeof window.TwigaAndroid.claimPairingCode==="function"){dmsg("Connecting this Android phone…");window.TwigaAndroid.claimPairingCode(PAIR)}}}
+ else if(a==="nativeSetup"&&window.TwigaAndroid&&typeof window.TwigaAndroid.requestPhoneSetup==="function"){window.TwigaAndroid.requestPhoneSetup()}
 });
 var AI0=R.ai;
 R.ai=function(){
