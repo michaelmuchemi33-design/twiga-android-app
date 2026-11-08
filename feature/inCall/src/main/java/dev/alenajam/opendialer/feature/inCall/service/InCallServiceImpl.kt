@@ -1,5 +1,6 @@
 package dev.alenajam.opendialer.feature.inCall.service
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -81,6 +82,7 @@ class InCallServiceImpl : InCallService() {
      * If this is the configured AI number, remember it as the AI leg. Otherwise,
      * when a customer call becomes active, dial the configured AI number once.
      */
+    @SuppressLint("MissingPermission")
     private fun observeAiLeg(call: Call) {
         val prefs = getSharedPreferences("twiga_remote_desk", MODE_PRIVATE)
         if (!prefs.getBoolean("ai", false)) return
