@@ -14,7 +14,7 @@ export default {
   async fetch(req, env) {
     if (req.method === 'OPTIONS') return new Response(null, {status: 204, headers: cors});
     if (req.method === 'POST' && new URL(req.url).pathname === '/vapi') return vapiHook(req, env);
-    if (req.method === 'GET') return json({ok: true, app: 'twiga-api', features: ['vapi-tools', 'order-create', 'appointment-booking', 'call-report-logging']});
+    if (req.method === 'GET') return json({ok: true, app: 'twiga-api', features: ['vapi-tools', 'order-create', 'appointment-booking', 'google-calendar-sync', 'call-report-logging']});
     try {
       const b = await req.json();
       const ctx = await authorize(env, b.token, b.business_id);
