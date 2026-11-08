@@ -55,3 +55,5 @@ BEGIN
   );
 END;
 $function$;
+
+GRANT EXECUTE ON FUNCTION public.line_get_ai(text, text) TO anon, authenticated, service_role;
