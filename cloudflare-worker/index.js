@@ -214,6 +214,27 @@ async function getAiLineConfig(env, number) {
   if (!d || !d.business || !d.business_id) throw new Error('This TWIGA AI line is not available right now.');
   return d;
 }
+
+async function googleWorkspaceAI(env, payload) {
+  const r = await fetch(env.SUPABASE_URL + '/functions/v1/google-workspace', {
+    method: 'POST',
+    headers: {
+      apikey: env.SUPABASE_KEY,
+      'x-twiga-line-secret': env.LINE_SECRET,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(String(d.error || 'Google Calendar request failed.'));
+  return d;
+}
+function googleSafeEventId(callId, toolId) {
+  const raw = (safeToolKey(callId) + safeToolKey(toolId)).toLowerCase();
+  const alphabet = '0123456789abcdefghijklmnopqrstuv';
+  return 'a' + Array.from(raw).map(ch => alphabet.includes(ch) ? ch : 'a').join('');
+}
+
 async function aiListProducts(env, ctx) {
   const r = await ACTIONS.listItems(env, ctx, {});
   const items = (r.items || []).filter(x => Number(x.Active) === 1 || x.Active === true).map(x => ({
@@ -386,7 +407,7 @@ function buildAssistant(o) {
   if (o.rules && o.rules.trim()) parts.push('RULES (always follow):\n' + o.rules.trim());
   const baseSystem = 'You are the AI receptionist for ' + biz + ', answering a phone call. Speak in short, warm, natural sentences like a helpful Kenyan receptionist. Use natural Kenyan English phrasing and everyday Kiswahili. Reply in the language the caller uses (English or Kiswahili) and follow them if they switch. Use only the business information below. If you do not know something, say so and offer to take a message or connect a person. Never invent prices, stock or availability. For an order or booking, collect the caller\'s name and phone number, repeat the details back and ask them to confirm. Amounts are in Kenya shillings (KSh). When the caller is finished, say goodbye politely.\n\nBUSINESS INFORMATION:\n' + parts.join('\n\n');
   const nowKenya = new Intl.DateTimeFormat('en-KE', {timeZone: 'Africa/Nairobi', dateStyle: 'full', timeStyle: 'short'}).format(new Date());
-  const system = baseSystem + '\n\nCURRENT DATE/TIME IN NAIROBI: ' + nowKenya + '. Interpret relative dates in Africa/Nairobi time.\n\nBUSINESS ACTION RULES: Use list_products before quoting prices or stock. Create an order only after collecting the customer name and phone, repeating the items and quantities, and receiving explicit confirmation. Orders are saved unpaid; never claim payment was received and never promise M-Pesa checkout. For appointments, identify a service from list_products, check the requested slot with check_appointment_availability, offer another slot if unavailable, repeat the service/date/time and receive explicit confirmation before book_appointment. Never claim an order or appointment was saved unless the tool returns ok=true.';
+  const system = baseSystem + '\n\nCURRENT DATE/TIME IN NAIROBI: ' + nowKenya + '. Interpret relative dates in Africa/Nairobi time.\n\nBUSINESS ACTION RULES: Use list_products before quoting prices or stock. Create an order only after collecting the customer name and phone, repeating the items and quantities, and receiving explicit confirmation. Orders are saved unpaid; never claim payment was received and never promise M-Pesa checkout. For appointments, identify a service from list_products, check the requested slot with check_appointment_availability, offer another slot if unavailable, repeat the service/date/time and receive explicit confirmation before book_appointment. Never claim an order or appointment was saved unless the tool returns ok=true. If the appointment tool returns googleCalendarSynced=false, explain that it is saved in TWIGA calendar only and Google Calendar was not updated. Never claim Google Calendar sync unless the tool returns googleCalendarSynced=true.';
   return {
     name: 'TWIGA phone receptionist',
     firstMessage: (o.greeting && o.greeting.trim()) || ('Hello, karibu ' + biz + '. How can I help you today?'),
@@ -422,7 +443,7 @@ async function vapiHook(req, env) {
     catch (e) {
       return json({results: calls.map((t, i) => ({toolCallId: String(t.id || t.toolCallId || ('tool-' + i)), error: String(e && e.message || e)}))});
     }
-    const ctx = {biz: {id: d.business_id}, role: 'owner'};
+    const ctx = {biz: {id: d.business_id}, role: 'owner', aiNumber: num};
     const callId = String(call.id || m.callId || 'call');
     const results = [];
     for (let i = 0; i < calls.length; i++) {
