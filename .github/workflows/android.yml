@@ -29,12 +29,16 @@ jobs:
           import pathlib, re
           html = pathlib.Path("dashboard-live/app.html").read_text()
           scripts = re.findall(r"<script\b[^>]*>(.*?)</script>", html, flags=re.I | re.S)
+          scripts = [script for script in scripts if script.strip()]
           if not scripts:
               raise SystemExit("No inline dashboard scripts found")
-          pathlib.Path("/tmp/twiga-dashboard-inline.js").write_text("\n".join(scripts))
+          out = pathlib.Path("/tmp/twiga-dashboard-scripts")
+          out.mkdir(exist_ok=True)
+          for index, script in enumerate(scripts):
+              (out / f"inline-{index}.js").write_text(script)
           print(f"Extracted {len(scripts)} inline script blocks")
           PY
-          node --check /tmp/twiga-dashboard-inline.js
+          for file in /tmp/twiga-dashboard-scripts/*.js; do node --check "$file"; done
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
