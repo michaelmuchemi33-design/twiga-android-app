@@ -28,3 +28,8 @@
 -dontwarn javax.annotation.Nullable
 -dontwarn com.google.j2objc.annotations.RetainedWith
 -dontwarn com.google.j2objc.annotations.Weak
+# WebView JavaScript bridge methods are discovered by annotation at runtime.
+-keepattributes RuntimeVisibleAnnotations
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
