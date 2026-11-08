@@ -21,6 +21,8 @@ AI-created orders are recorded as unpaid. The receptionist must never claim paym
 
 Vapi end-of-call reports are written to Supabase `twiga_call_records` through the secured `line_record_call` RPC. The dashboard Call History page reads those records alongside native SIM call events.
 
+AI appointment availability checks both the TWIGA ledger and the connected Google Calendar. Confirmed bookings are written to both calendars when a Google Workspace connection exists. If Google is not connected or sync fails, the booking remains in the TWIGA calendar and the assistant must disclose that Google Calendar was not updated. The `google-workspace` Edge Function exposes `calendar.ai.list` and `calendar.ai.create` for this server-to-server path; those actions authenticate the AI line through `line_get_ai`, while all existing user actions still require a valid user session.
+
 ## Required Cloudflare bindings
 
 | Binding | Type | Purpose |
