@@ -72,7 +72,7 @@ class PosActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TwigaPosScreen(onBack: () -> Unit) {
+fun TwigaPosScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("twiga_pos", Context.MODE_PRIVATE) }
     var products by remember { mutableStateOf(loadProducts(prefs)) }
