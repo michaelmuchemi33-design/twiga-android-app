@@ -42,7 +42,7 @@ class InCallServiceImpl : InCallService() {
     private fun reportCallerId(number: String) {
         if (number.isBlank()) return
         sendBroadcast(Intent("dev.alenajam.opendialer.TELECOM_CALL_DETAILS").apply {
-            setPackage(packageName)
+            setClassName(packageName, "dev.alenajam.opendialer.remote.TelecomCallDetailsReceiver")
             putExtra("number", number)
         })
     }
