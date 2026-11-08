@@ -67,8 +67,11 @@ class MainActivity : ComponentActivity() {
     private val defaultDialerRequest = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
-        if (defaultPhoneManager.isDefaultDialer() && RemoteDesk.isPaired(this)) requestPhonePermissions()
-        requestFullScreenCallAccessIfNeeded()
+        if (defaultPhoneManager.isDefaultDialer() && RemoteDesk.isPaired(this)) {
+            requestPhonePermissions()
+        } else {
+            requestFullScreenCallAccessIfNeeded()
+        }
     }
 
     private val fullScreenAccessRequest = registerForActivityResult(
