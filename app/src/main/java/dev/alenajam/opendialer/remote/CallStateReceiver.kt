@@ -13,8 +13,12 @@ class CallStateReceiver : BroadcastReceiver() {
     @Suppress("DEPRECATION")
     override fun onReceive(context: Context, intent: Intent) {
         if (!RemoteDesk.isPaired(context)) return
-        val st = intent.getStringExtra(TelephonyManager.EXTRA_STATE) ?: return
-        CallTracker.onPhone(context, st, intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER).orEmpty())
+        if (intent.action == "dev.alenajam.opendialer.TELECOM_CALL_DETAILS") {
+            CallTracker.enrichNumber(context, intent.getStringExtra("number").orEmpty())
+        } else {
+            val st = intent.getStringExtra(TelephonyManager.EXTRA_STATE) ?: return
+            CallTracker.onPhone(context, st, intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER).orEmpty())
+        }
         val pending = goAsync()
         Thread {
             try { RemoteDesk.flush(context) } finally { pending.finish() }
