@@ -96,7 +96,7 @@ class InCallServiceImpl : InCallService() {
             call.answer(VideoProfile.STATE_AUDIO_ONLY)
         } catch (error: Exception) {
             autoAnswerRequested.remove(call)
-            prefs.edit().putString("ai_bridge_status", "auto_answer_failed").apply()
+            prefs.edit().putBoolean("bridge_next_call", false).putString("ai_bridge_status", "auto_answer_failed").apply()
         }
     }
 
@@ -221,6 +221,10 @@ class InCallServiceImpl : InCallService() {
         super.onCallRemoved(call)
         callerIdCallbacks.remove(call)?.let(call::unregisterCallback)
         autoAnswerRequested.remove(call)
+        if (!bridgeMerged && call != customerCall && call != aiCall) {
+            getSharedPreferences("twiga_remote_desk", MODE_PRIVATE).edit()
+                .putBoolean("bridge_next_call", false).apply()
+        }
         callHandler.removeCall(call)
         if (!bridgeMerged && !bridgeMergeInFlight && (call == customerCall || call == aiCall)) {
             failBridge("One of the calls ended before conference was established")
