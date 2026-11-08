@@ -44,6 +44,7 @@ class MainActivity : ComponentActivity() {
 
     private var webView: WebView? = null
     private var pendingWebPermission: PermissionRequest? = null
+    @Volatile private var googleOAuthInProgress = false
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private val microphonePermission = registerForActivityResult(
@@ -66,6 +67,7 @@ class MainActivity : ComponentActivity() {
     private val defaultDialerRequest = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
+        if (defaultPhoneManager.isDefaultDialer() && RemoteDesk.isPaired(this)) requestPhonePermissions()
         requestFullScreenCallAccessIfNeeded()
     }
 
@@ -95,6 +97,7 @@ class MainActivity : ComponentActivity() {
         }
 
         showWorkspace()
+        handleOAuthCallback(intent)
         requestDefaultDialerIfNeeded()
     }
 
@@ -124,6 +127,12 @@ class MainActivity : ComponentActivity() {
             ): Boolean {
                 val uri = request?.url ?: return false
                 val host = uri.host.orEmpty().lowercase()
+                if (googleOAuthInProgress && (host == "accounts.google.com" || host == "oauth2.googleapis.com")) {
+                    return runCatching {
+                        startActivity(Intent(Intent.ACTION_VIEW, uri))
+                        true
+                    }.getOrDefault(true)
+                }
                 if (host == WORKSPACE_HOST || host == SUPABASE_HOST ||
                     host == "accounts.google.com" || host.endsWith(".google.com") ||
                     host.endsWith(".gstatic.com") || host.endsWith(".googleusercontent.com")
@@ -186,6 +195,23 @@ class MainActivity : ComponentActivity() {
         fun isPaired(): Boolean = RemoteDesk.isPaired(this@MainActivity)
 
         @JavascriptInterface
+        fun beginGoogleOAuth() { googleOAuthInProgress = true }
+
+        @JavascriptInterface
+        fun cancelGoogleOAuth() { googleOAuthInProgress = false }
+
+        @JavascriptInterface
+        fun requestPhoneSetup() {
+            runOnUiThread {
+                if (!defaultPhoneManager.isDefaultDialer()) requestDefaultDialerManually()
+                else {
+                    requestPhonePermissions()
+                    requestBatteryOptimizationExemption()
+                }
+            }
+        }
+
+        @JavascriptInterface
         fun claimPairingCode(code: String) {
             val clean = code.filter { it.isDigit() }.take(6)
             if (clean.length != 6 || RemoteDesk.isPaired(this@MainActivity)) return
@@ -240,6 +266,46 @@ class MainActivity : ComponentActivity() {
     private fun startRemoteDesk() {
         if (!RemoteDesk.isPaired(this) || !RemoteDesk.remoteControl(this)) return
         runCatching { startForegroundService(Intent(this, RemoteDeskService::class.java)) }
+    }
+
+    private fun requestDefaultDialerManually() {
+        if (defaultPhoneManager.isDefaultDialer()) {
+            requestPhonePermissions()
+            requestBatteryOptimizationExemption()
+            return
+        }
+        defaultPhoneManager.createRequestDefaultDialerIntent()?.let { defaultDialerRequest.launch(it) }
+    }
+
+    private fun requestBatteryOptimizationExemption() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || !RemoteDesk.isPaired(this)) return
+        val power = getSystemService(android.os.PowerManager::class.java)
+        if (power.isIgnoringBatteryOptimizations(packageName)) return
+        runCatching {
+            startActivity(Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = Uri.parse("package:$packageName")
+            })
+        }
+    }
+
+    private fun handleOAuthCallback(source: Intent?) {
+        val uri = source?.data ?: return
+        if (uri.scheme != "twiga" || uri.host != "auth" || uri.path != "/callback") return
+        googleOAuthInProgress = false
+        val callback = Uri.Builder()
+            .scheme("https")
+            .authority(WORKSPACE_HOST)
+            .path("/")
+            .encodedQuery(uri.encodedQuery)
+            .encodedFragment(uri.encodedFragment)
+            .build()
+        webView?.loadUrl(callback.toString())
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleOAuthCallback(intent)
     }
 
     private fun requestDefaultDialerIfNeeded() {
