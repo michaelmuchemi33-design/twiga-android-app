@@ -10,6 +10,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.telecom.Call
 import android.telecom.CallAudioState
+import android.telecom.VideoProfile
 import android.telecom.CallEndpoint
 import android.telecom.InCallService
 import android.telecom.TelecomManager
@@ -32,6 +33,7 @@ class InCallServiceImpl : InCallService() {
     private var aiCall: Call? = null
     private var bridgeRequested = false
     private var bridgeMergeInFlight = false
+    private val autoAnswerRequested = mutableSetOf<Call>()
     private var bridgeMerged = false
     private var bridgeTimeout: Runnable? = null
 
@@ -57,6 +59,7 @@ class InCallServiceImpl : InCallService() {
             }
 
             override fun onStateChanged(call: Call, state: Int) {
+                maybeAutoAnswer(call)
                 observeAiLeg(call)
             }
 
@@ -67,6 +70,7 @@ class InCallServiceImpl : InCallService() {
         callerIdCallbacks[call] = callback
         call.registerCallback(callback)
         callHandler.addCall(call, this)
+        maybeAutoAnswer(call)
         observeAiLeg(call)
     }
 
@@ -76,6 +80,24 @@ class InCallServiceImpl : InCallService() {
             setClassName(packageName, "dev.alenajam.opendialer.remote.TelecomCallDetailsReceiver")
             putExtra("number", number)
         })
+    }
+
+    /** Auto-answer incoming SIM calls only when the owner has enabled the AI receptionist. */
+    private fun maybeAutoAnswer(call: Call) {
+        if (call.state != Call.STATE_RINGING) return
+        val prefs = getSharedPreferences("twiga_remote_desk", MODE_PRIVATE)
+        if (!prefs.getBoolean("auto_answer", false)) return
+        val aiNumber = prefs.getString("ai_line", "").orEmpty().trim()
+        val caller = call.details.handle?.schemeSpecificPart.orEmpty()
+        if (aiNumber.isNotBlank() && samePhoneNumber(caller, aiNumber)) return
+        if (!autoAnswerRequested.add(call)) return
+        try {
+            call.answer(VideoProfile.STATE_AUDIO_ONLY)
+            prefs.edit().putString("ai_bridge_status", "answering_customer").apply()
+        } catch (error: Exception) {
+            autoAnswerRequested.remove(call)
+            prefs.edit().putString("ai_bridge_status", "auto_answer_failed").apply()
+        }
     }
 
     /**
