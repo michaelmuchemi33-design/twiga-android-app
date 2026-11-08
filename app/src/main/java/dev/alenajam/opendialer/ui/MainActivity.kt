@@ -252,7 +252,10 @@ class MainActivity : ComponentActivity() {
                 mainHandler.post {
                     val js = "window.twigaNativePairResult && window.twigaNativePairResult($ok, ${JSONObject.quote(resultMessage)})"
                     webView?.evaluateJavascript(js, null)
-                    if (ok) requestPhonePermissions()
+                    if (ok) {
+                        startRemoteDesk()
+                        requestPhonePermissions()
+                    }
                 }
             }.start()
         }
