@@ -92,8 +92,8 @@ class InCallServiceImpl : InCallService() {
         if (aiNumber.isNotBlank() && samePhoneNumber(caller, aiNumber)) return
         if (!autoAnswerRequested.add(call)) return
         try {
+            prefs.edit().putBoolean("bridge_next_call", true).putString("ai_bridge_status", "answering_customer").apply()
             call.answer(VideoProfile.STATE_AUDIO_ONLY)
-            prefs.edit().putString("ai_bridge_status", "answering_customer").apply()
         } catch (error: Exception) {
             autoAnswerRequested.remove(call)
             prefs.edit().putString("ai_bridge_status", "auto_answer_failed").apply()
@@ -118,7 +118,9 @@ class InCallServiceImpl : InCallService() {
             return
         }
 
+        if (!prefs.getBoolean("bridge_next_call", false)) return
         if (call.state == Call.STATE_ACTIVE && customerCall == null && !bridgeRequested && !bridgeMerged) {
+            prefs.edit().putBoolean("bridge_next_call", false).apply()
             customerCall = call
             bridgeRequested = true
             prefs.edit().putString("ai_bridge_status", "calling_ai").apply()
@@ -194,9 +196,12 @@ class InCallServiceImpl : InCallService() {
         runCatching {
             aiCall?.takeIf { it.state != Call.STATE_DISCONNECTED }?.disconnect()
         }
+        // A managed AI call must never leave the customer connected to silence.
         runCatching {
-            customerCall?.takeIf { it.state == Call.STATE_HOLDING }?.unhold()
+            customerCall?.takeIf { it.state != Call.STATE_DISCONNECTED }?.disconnect()
         }
+        getSharedPreferences("twiga_remote_desk", MODE_PRIVATE)
+            .edit().putBoolean("bridge_next_call", false).apply()
         getSharedPreferences("twiga_remote_desk", MODE_PRIVATE)
             .edit().putString("ai_bridge_status", "failed: " + reason.take(120)).apply()
         customerCall = null
