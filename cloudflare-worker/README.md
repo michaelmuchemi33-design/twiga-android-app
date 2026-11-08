@@ -54,4 +54,4 @@ Its Server URL Secret must match the Cloudflare `VAPI_SECRET` binding.
 
 ## SIM-call architecture
 
-The Android phone remains on the business's existing SIM. TWIGA controls the SIM call through Android Telecom and joins the Vapi AI line as a second call using the carrier's conference-call feature. This is not direct Android SIM-audio capture; the carrier must support call waiting/conference calling on the target handset and line.
+The Android phone remains on the business's existing SIM. Incoming calls are answered by the default-dialer/Telecom integration, and outgoing calls can be initiated from the TWIGA Dialer page or Android dialer. The paired phone places the customer call on its SIM; the native InCallService joins the Vapi AI line as a second call using the carrier's conference-call feature. This is not direct Android SIM-audio capture, and autonomous outbound campaign scheduling is not enabled yet. The carrier must support call waiting/conference calling on the target handset and line.
