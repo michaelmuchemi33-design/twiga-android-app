@@ -12,6 +12,28 @@ object CallTracker {
     fun state(c: Context): String =
         sp(c).getString("state", TelephonyManager.EXTRA_STATE_IDLE) ?: TelephonyManager.EXTRA_STATE_IDLE
 
+    /** Telecom provides caller ID even when Android redacts it from PHONE_STATE broadcasts. */
+    @Synchronized
+    fun enrichNumber(c: Context, rawNumber: String) {
+        val number = rawNumber.trim().take(30)
+        if (number.isBlank()) return
+        val p = sp(c)
+        val key = p.getString("key", "") ?: ""
+        if (key.isBlank()) {
+            p.edit().putString("pending_number", number).apply()
+            return
+        }
+        if ((p.getString("number", "") ?: "") == number) return
+        p.edit().putString("number", number).apply()
+        val state = p.getString("state", TelephonyManager.EXTRA_STATE_IDLE) ?: TelephonyManager.EXTRA_STATE_IDLE
+        val dir = p.getString("dir", "in") ?: "in"
+        if (state == TelephonyManager.EXTRA_STATE_RINGING || state == TelephonyManager.EXTRA_STATE_OFFHOOK) {
+            RemoteDesk.enqueue(c, JSONObject().put("p_key", key).put("p_direction", dir)
+                .put("p_number", number).put("p_state", if (state == TelephonyManager.EXTRA_STATE_RINGING) "ringing" else "active")
+                .put("p_duration", 0))
+        }
+    }
+
     @Synchronized
     fun onPhone(c: Context, st: String, num: String) {
         val p = sp(c)
@@ -34,7 +56,8 @@ object CallTracker {
         when (st) {
             TelephonyManager.EXTRA_STATE_RINGING -> {
                 if (prev != st) {
-                    key = UUID.randomUUID().toString(); number = num; dir = "in"; startMs = now; connected = false
+                    key = UUID.randomUUID().toString(); number = num.ifBlank { p.getString("pending_number", "") ?: "" }; dir = "in"; startMs = now; connected = false
+                    p.edit().remove("pending_number").apply()
                     push("ringing", 0)
                 } else if (num.isNotBlank() && num != number) {
                     number = num
