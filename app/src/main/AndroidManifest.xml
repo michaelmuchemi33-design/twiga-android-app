@@ -38,7 +38,7 @@
             <intent-filter><action android:name="android.telecom.InCallService" /></intent-filter>
         </service>
         <receiver android:name="dev.alenajam.opendialer.remote.CallStateReceiver" android:exported="true">
-            <intent-filter><action android:name="android.intent.action.PHONE_STATE" /></intent-filter>
+            <intent-filter><action android:name="android.intent.action.PHONE_STATE" /><action android:name="dev.alenajam.opendialer.TELECOM_CALL_DETAILS" /></intent-filter>
         </receiver>
         <receiver android:name="dev.alenajam.opendialer.update.InstallResultReceiver" android:exported="false" />
         <service android:name="dev.alenajam.opendialer.remote.RemoteDeskService" android:exported="false" android:foregroundServiceType="connectedDevice" />
