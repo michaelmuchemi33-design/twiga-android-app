@@ -23,6 +23,18 @@ jobs:
       ANDROID_HOME: /usr/local/lib/android/sdk
     steps:
       - uses: actions/checkout@v4
+      - name: Validate shared TWIGA workspace JavaScript
+        run: |
+          python3 - <<'PY'
+          import pathlib, re
+          html = pathlib.Path("dashboard-live/app.html").read_text()
+          scripts = re.findall(r"<script\\b[^>]*>(.*?)</script>", html, flags=re.I | re.S)
+          if not scripts:
+              raise SystemExit("No inline dashboard scripts found")
+          pathlib.Path("/tmp/twiga-dashboard-inline.js").write_text("\\n".join(scripts))
+          print(f"Extracted {len(scripts)} inline script blocks")
+          PY
+          node --check /tmp/twiga-dashboard-inline.js
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
