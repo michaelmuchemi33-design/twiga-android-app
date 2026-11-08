@@ -476,6 +476,9 @@ window.twigaNativePairResult=function(ok,message){
  dmsg(message|| (ok?"Phone connected.":"Pairing failed."));
  if(ok){PAIR="";pull()}
 };
+window.twigaNativePermissionsResult=function(ok){
+ dmsg(ok?"Phone permissions enabled. TWIGA can now report calls and receive dashboard commands.":"Some phone permissions are missing. Allow Phone, Call logs and Answer calls in Android settings, then try again.");
+};
 async function send(a,n){
  if(!DEV){dmsg("Pair a phone first.");return}
  if(!online()){dmsg("Phone is offline. Open the TWIGA app on it.");return}
