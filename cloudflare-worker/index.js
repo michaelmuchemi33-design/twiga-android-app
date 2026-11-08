@@ -294,7 +294,7 @@ async function aiCheckSlot(env, ctx, args) {
   for (const event of (events.results || [])) {
     const eventStart = new Date(event.start_at);
     const eventEnd = event.end_at ? new Date(event.end_at) : new Date(eventStart.getTime() + 30 * 60000);
-    if (eventStart < end && eventEnd > start) return {available: false, reason: 'That time overlaps an existing calendar event. Please offer another time.'};
+    if (eventStart < end && eventEnd > start) return {available: false, reason: 'That time overlaps an existing TWIGA calendar event. Please offer another time.'};
   }
   const existing = await env.DB.prepare("SELECT order_id, notes FROM orders WHERE business_id = ? AND type = 'Appointment' AND date = ? AND status <> 'Cancelled'").bind(ctx.biz.id, date).all();
   for (const appointment of (existing.results || [])) {
@@ -304,7 +304,16 @@ async function aiCheckSlot(env, ctx, args) {
     const oldEnd = new Date(oldStart.getTime() + 30 * 60000);
     if (oldStart < end && oldEnd > start) return {available: false, reason: 'That time overlaps an existing appointment. Please offer another time.'};
   }
-  return {available: true, date: date, time: time, durationMinutes: duration};
+  const google = await googleWorkspaceAI(env, {action: 'calendar.ai.list', aiNumber: ctx.aiNumber, timeMin: dayStart, timeMax: dayEnd});
+  const googleCalendarConnected = !!google.connected;
+  for (const event of (google.items || [])) {
+    const eventStart = event.start && event.start.dateTime ? new Date(event.start.dateTime) : event.start && event.start.date ? new Date(event.start.date + 'T00:00:00+03:00') : null;
+    const eventEnd = event.end && event.end.dateTime ? new Date(event.end.dateTime) : event.end && event.end.date ? new Date(event.end.date + 'T00:00:00+03:00') : null;
+    if (eventStart && eventEnd && eventStart < end && eventEnd > start) {
+      return {available: false, reason: 'That time overlaps an existing Google Calendar event. Please offer another time.', googleCalendarConnected: googleCalendarConnected};
+    }
+  }
+  return {available: true, date: date, time: time, durationMinutes: duration, googleCalendarConnected: googleCalendarConnected};
 }
 async function aiBookAppointment(env, ctx, args, callId, toolId) {
   const customer = txt(args.customerName, 120);
