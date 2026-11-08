@@ -102,7 +102,13 @@ class InCallServiceImpl : InCallService() {
             prefs.edit().putString("ai_bridge_status", "calling_ai").apply()
             try {
                 val telecom = getSystemService(TelecomManager::class.java)
-                telecom.placeCall(Uri.fromParts("tel", aiNumber, null), Bundle())
+                // Use the same SIM/account as the customer leg; conference merging across
+                // different SIM subscriptions is not supported by most carrier stacks.
+                val extras = Bundle()
+                customerCall?.details?.accountHandle?.let { account ->
+                    extras.putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, account)
+                }
+                telecom.placeCall(Uri.fromParts("tel", aiNumber, null), extras)
                 scheduleBridgeFallback()
             } catch (error: Exception) {
                 prefs.edit().putString("ai_bridge_status", "failed_to_call_ai").apply()
