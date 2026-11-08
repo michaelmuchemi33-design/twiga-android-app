@@ -127,7 +127,7 @@ class MainActivity : ComponentActivity() {
             domStorageEnabled = true
             databaseEnabled = true
             mediaPlaybackRequiresUserGesture = false
-            cacheMode = WebSettings.LOAD_DEFAULT
+            cacheMode = WebSettings.LOAD_NO_CACHE
             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
             allowFileAccess = false
             allowContentAccess = false
@@ -352,6 +352,12 @@ class MainActivity : ComponentActivity() {
                 data = Uri.fromParts("package", packageName, null)
             }
         )
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Re-check on foreground return; UpdateManager throttles network checks to once per six hours.
+        UpdateManager.autoCheck(applicationContext)
     }
 
     override fun onDestroy() {
