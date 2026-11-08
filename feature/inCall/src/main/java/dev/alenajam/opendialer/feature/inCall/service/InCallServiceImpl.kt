@@ -9,10 +9,12 @@ import android.telecom.CallEndpoint
 import android.telecom.InCallService
 import androidx.annotation.RequiresApi
 import dagger.hilt.android.AndroidEntryPoint
+import dev.alenajam.opendialer.remote.CallTracker
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class InCallServiceImpl : InCallService() {
+    private val callerIdCallbacks = mutableMapOf<Call, Call.Callback>()
     @Inject
     lateinit var callHandler: CallsHandler
 
@@ -27,11 +29,20 @@ class InCallServiceImpl : InCallService() {
 
     override fun onCallAdded(call: Call) {
         super.onCallAdded(call)
+        CallTracker.enrichNumber(applicationContext, call.details.handle?.schemeSpecificPart.orEmpty())
+        val callback = object : Call.Callback() {
+            override fun onDetailsChanged(call: Call, details: Call.Details) {
+                CallTracker.enrichNumber(applicationContext, details.handle?.schemeSpecificPart.orEmpty())
+            }
+        }
+        callerIdCallbacks[call] = callback
+        call.registerCallback(callback)
         callHandler.addCall(call, this)
     }
 
     override fun onCallRemoved(call: Call) {
         super.onCallRemoved(call)
+        callerIdCallbacks.remove(call)?.let(call::unregisterCallback)
         callHandler.removeCall(call)
     }
 
