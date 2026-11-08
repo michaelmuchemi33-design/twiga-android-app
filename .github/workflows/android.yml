@@ -39,6 +39,7 @@ jobs:
           print(f"Extracted {len(scripts)} inline script blocks")
           PY
           for file in /tmp/twiga-dashboard-scripts/*.js; do node --check "$file"; done
+          node --input-type=module --check < cloudflare-worker/index.js
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
