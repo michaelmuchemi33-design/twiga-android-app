@@ -77,8 +77,21 @@ class MainActivity : ComponentActivity() {
 
     private val phonePermissions = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) {
-        if (RemoteDesk.isPaired(this)) startRemoteDesk()
+    ) { results ->
+        val required = listOf(
+            Manifest.permission.CALL_PHONE,
+            Manifest.permission.READ_PHONE_STATE,
+            Manifest.permission.READ_CALL_LOG,
+            Manifest.permission.ANSWER_PHONE_CALLS
+        )
+        val granted = required.all { permission ->
+            results[permission] == true || ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+        }
+        webView?.evaluateJavascript("window.twigaNativePermissionsResult && window.twigaNativePermissionsResult($granted)", null)
+        if (granted && RemoteDesk.isPaired(this)) {
+            startRemoteDesk()
+            requestBatteryOptimizationExemption()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -204,10 +217,7 @@ class MainActivity : ComponentActivity() {
         fun requestPhoneSetup() {
             runOnUiThread {
                 if (!defaultPhoneManager.isDefaultDialer()) requestDefaultDialerManually()
-                else {
-                    requestPhonePermissions()
-                    requestBatteryOptimizationExemption()
-                }
+                else requestPhonePermissions()
             }
         }
 
@@ -258,6 +268,7 @@ class MainActivity : ComponentActivity() {
         }
         if (missing.isEmpty()) {
             startRemoteDesk()
+            requestBatteryOptimizationExemption()
         } else {
             phonePermissions.launch(missing.toTypedArray())
         }
