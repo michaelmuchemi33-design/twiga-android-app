@@ -64,16 +64,23 @@ internal object TwigaRetellApi {
     suspend fun saveKey(url: String, key: String, session: TwigaSession, businessId: String, apiKey: String) =
         post(url, key, session, "save_key", businessId, JSONObject().put("apiKey", apiKey))
 
+    suspend fun linkExistingAgent(url: String, key: String, session: TwigaSession, businessId: String, agentId: String) =
+        post(url, key, session, "link_existing_agent", businessId, JSONObject().put("agentId", agentId))
+
+    suspend fun listPhoneNumbers(url: String, key: String, session: TwigaSession, businessId: String) =
+        post(url, key, session, "list_phone_numbers", businessId)
+
     suspend fun saveSettings(
         url: String, key: String, session: TwigaSession, businessId: String,
         provider: String, voiceId: String, voiceModel: String, model: String,
         ambientVolume: Double, inboundPrompt: String, outboundPrompt: String,
-        recordingEnabled: Boolean, recordingNotice: String
+        recordingEnabled: Boolean, recordingNotice: String, bridgeNumber: String
     ) = post(url, key, session, "save_settings", businessId, JSONObject()
         .put("provider", provider).put("voiceId", voiceId).put("voiceModel", voiceModel)
         .put("model", model).put("ambientVolume", ambientVolume)
         .put("inboundPrompt", inboundPrompt).put("outboundPrompt", outboundPrompt)
-        .put("recordingEnabled", recordingEnabled).put("recordingNotice", recordingNotice))
+        .put("recordingEnabled", recordingEnabled).put("recordingNotice", recordingNotice)
+        .put("bridgeNumber", bridgeNumber))
 
     suspend fun provision(url: String, key: String, session: TwigaSession, businessId: String) =
         post(url, key, session, "provision_agent", businessId)
@@ -102,8 +109,11 @@ internal fun TwigaRetellWorkspace(
     var recordingEnabled by remember { mutableStateOf(false) }
     var recordingNotice by remember { mutableStateOf("This call may be recorded to help us serve you.") }
     var provider by remember { mutableStateOf("vapi") }
-    var voiceId by remember { mutableStateOf("fish_audio-Willa") }
-    var voiceModel by remember { mutableStateOf("s2.1-pro") }
+    var voiceId by remember { mutableStateOf("retell-Willa") }
+    var voiceModel by remember { mutableStateOf("") }
+    var existingAgentId by remember { mutableStateOf("") }
+    var bridgeNumber by remember { mutableStateOf("") }
+    var retellNumbers by remember { mutableStateOf(emptyList<Pair<String, String>>()) }
     var model by remember { mutableStateOf("gpt-6-luna") }
     var ambient by remember { mutableFloatStateOf(0.12f) }
     var inboundPrompt by remember { mutableStateOf("") }
@@ -160,8 +170,10 @@ internal fun TwigaRetellWorkspace(
             keyLast4 = result.optString("keyLast4", "")
             recordingEnabled = result.optBoolean("recordingEnabled", false)
             recordingNotice = result.optString("recordingNotice", "This call may be recorded to help us serve you.")
-            voiceId = config.optString("retell_voice_id", "fish_audio-Willa")
-            voiceModel = config.optString("retell_voice_model", "s2.1-pro")
+            voiceId = config.optString("retell_voice_id", "retell-Willa")
+            voiceModel = config.optString("retell_voice_model", "")
+            existingAgentId = config.optString("retell_agent_id", "")
+            bridgeNumber = result.optString("aiBridgeNumber", "")
             model = config.optString("retell_model", "gpt-6-luna")
             ambient = config.optDouble("retell_ambient_sound_volume", 0.12).toFloat().coerceIn(0f, 0.3f)
             inboundPrompt = config.optString("inbound_prompt", "")
@@ -242,28 +254,27 @@ internal fun TwigaRetellWorkspace(
         Card {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Willa · British · Middle aged", fontWeight = FontWeight.SemiBold)
-                Text("Fish Audio Willa · s2.1-pro", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Retell-native Willa voice · no Fish Audio account or API key required", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("English (UK) and Kiswahili (Kenya) are always enabled together.", style = MaterialTheme.typography.bodySmall)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AssistChip(onClick = {}, label = { Text("English · en-GB") })
                     AssistChip(onClick = {}, label = { Text("Kiswahili · sw-KE") })
                 }
-                Text("Voice model", style = MaterialTheme.typography.labelLarge)
+                Text("Voice", style = MaterialTheme.typography.labelLarge)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(selected = voiceId == "fish_audio-Willa", onClick = { voiceId = "fish_audio-Willa"; voiceModel = "s2.1-pro" })
+                    RadioButton(selected = voiceId == "retell-Willa", onClick = { voiceId = "retell-Willa"; voiceModel = "" })
                     Column {
-                        Text("Willa · Fish Audio")
-                        Text("Best current Willa choice for English + Kiswahili.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Willa · Retell native")
+                        Text("Retell handles speech generation directly. No external Fish Audio voice provider is required.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                Text("Fish Audio Willa uses s2.1-pro; Retell lists this provider/model combination as supporting both English and Swahili.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Divider()
                 Text("Language model", style = MaterialTheme.typography.labelLarge)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(selected = model == "gpt-6-luna", onClick = { model = "gpt-6-luna" })
                     Column {
                         Text("GPT-6 Luna · $0.0032/min (LLM only)")
-                        Text("This is the language-model component, not the full call price. Current listed base components: $0.055/min Retell voice infrastructure + $0.015/min Fish Audio TTS + $0.0032/min GPT-6 Luna = about $0.0732/min before telephony and optional add-ons.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("This is the LLM component only. Retell-native speech and telephony are charged under Retell's applicable voice and usage rates; carrier airtime and conference-call charges may also apply.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -303,7 +314,7 @@ internal fun TwigaRetellWorkspace(
                         loading = true; error = ""; message = ""
                         scope.launch {
                             try {
-                                TwigaRetellApi.saveSettings(url, key, session, businessId, provider, voiceId, voiceModel, model, ambient.toDouble(), inboundPrompt, outboundPrompt, recordingEnabled, recordingNotice)
+                                TwigaRetellApi.saveSettings(url, key, session, businessId, provider, voiceId, voiceModel, model, ambient.toDouble(), inboundPrompt, outboundPrompt, recordingEnabled, recordingNotice, bridgeNumber)
                                 message = "Voice settings saved for " + businessName + "."
                             } catch (e: Exception) { error = e.message ?: "Could not save settings." }
                             finally { loading = false }
@@ -317,7 +328,7 @@ internal fun TwigaRetellWorkspace(
                         loading = true; error = ""; message = ""
                         scope.launch {
                             try {
-                                TwigaRetellApi.saveSettings(url, key, session, businessId, "retell", voiceId, voiceModel, model, ambient.toDouble(), inboundPrompt, outboundPrompt, recordingEnabled, recordingNotice)
+                                TwigaRetellApi.saveSettings(url, key, session, businessId, "retell", voiceId, voiceModel, model, ambient.toDouble(), inboundPrompt, outboundPrompt, recordingEnabled, recordingNotice, bridgeNumber)
                                 val result = TwigaRetellApi.provision(url, key, session, businessId)
                                 val saved = result.optJSONObject("config")
                                 provider = "retell"
@@ -342,7 +353,7 @@ internal fun TwigaRetellWorkspace(
         Card {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("In-app voice test", fontWeight = FontWeight.SemiBold)
-                Text("This uses a Retell WebRTC call inside TWIGA. It does not require a phone number. SIM inbound/outbound calling still needs a supported phone/SIP connection.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("This is an in-app internet voice test. Cellular SIM AI calls use the Android app's carrier conference bridge and require a working AI bridge number plus carrier conference-call support.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(callStatus, fontWeight = FontWeight.Medium)
                 if (accessToken.isBlank()) {
                     Button(onClick = { startCall() }, enabled = provider == "retell" && agentId.isNotBlank() && keyConfigured && !loading, modifier = Modifier.fillMaxWidth()) {
