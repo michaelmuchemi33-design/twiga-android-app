@@ -19,7 +19,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
 /**
- * Native Telecom entry point. When the owner has enabled AI and configured a Vapi
+ * Native Telecom entry point. When the owner has enabled AI and configured a Retell or Vapi
  * phone number, TWIGA can attempt to add that AI number as a second cellular call
  * and merge both legs using the carrier's conference-call service.
  *
