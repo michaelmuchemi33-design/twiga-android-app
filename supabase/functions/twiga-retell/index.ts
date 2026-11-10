@@ -34,7 +34,8 @@ function buildPrompt(b:Row,p:Row|null,items:Row[],inbound:string,outbound:string
     "FOLLOW-UP: Identify whether human follow-up is needed, collect a callback number if volunteered, ask for a suitable time, and summarize the exact requested action. Respect requests not to be contacted again.",
     "INBOUND RULES: "+(inbound || "Greet the customer, ask how to help, and guide the conversation toward a clear enquiry, appointment request, order request or message."),
     "OUTBOUND RULES: "+(outbound || "For an authorised outgoing call, identify yourself and the business, explain the reason, ask whether this is a convenient time, and stop politely if the person declines."),
-    "BUSINESS KNOWLEDGE:\n"+facts,
+    "BUSINESS KNOWLEDGE (at agent setup):\n"+facts,
+    "CURRENT BUSINESS CONTEXT (refreshed from this business's own TWIGA data at the start of every call; this overrides older static details): {{twiga_business_context}}",
     "PRIVACY: Only collect information needed for the request. Never ask for passwords, PINs, card numbers or API credentials. Never disclose another customer's information. Follow the business's recording notice and consent process."
   ].join("\n\n");
 }
@@ -220,16 +221,19 @@ Deno.serve(async (req:Request) => {
       const {data:secret}=await admin.rpc("twiga_get_provider_secret",{p_business_id:businessId,p_provider:"retell"});
       if(!secret) return reply({error:"Retell credentials are missing for this business."},503);
       const [profileResult,productsResult]=await Promise.all([
-        admin.from("twiga_business_profiles").select("business_summary,opening_hours,service_area").eq("business_id",businessId).maybeSingle(),
-        admin.from("twiga_products").select("name,price,currency,stock_quantity").eq("business_id",businessId).eq("is_active",true).limit(40)
+        admin.from("twiga_business_profiles").select("business_summary,what_they_sell,what_they_do,products_and_services,target_customers,unique_selling_points,service_area,opening_hours,delivery_and_payment,returns_and_refunds,frequently_asked_questions,brand_voice,reply_language,assistant_instructions").eq("business_id",businessId).maybeSingle(),
+        admin.from("twiga_products").select("name,description,category,price,currency,unit,stock_quantity").eq("business_id",businessId).eq("is_active",true).order("name").limit(80)
       ]);
+      const liveContext={
+        businessName:businessResult.data?.name || "the business",
+        businessType:businessResult.data?.business_type || "business",
+        profile:profileResult.data || {},
+        activeProducts:productsResult.data || []
+      };
       const dynamic={
         business_name:String(businessResult.data?.name || "the business"),
         business_type:String(businessResult.data?.business_type || "business"),
-        business_summary:String(profileResult.data?.business_summary || ""),
-        opening_hours:String(profileResult.data?.opening_hours || ""),
-        service_area:String(profileResult.data?.service_area || ""),
-        products_json:JSON.stringify(productsResult.data || []),
+        twiga_business_context:JSON.stringify(liveContext).slice(0,24000),
         twiga_business_id:businessId
       };
       const webCall=await retell(String(secret),"/v2/create-web-call","POST",{agent_id:config.retell_agent_id,retell_llm_dynamic_variables:dynamic,metadata:{twiga_business_id:businessId,twiga_user_id:user.id,source:"twiga_android_app"}});
