@@ -2,7 +2,7 @@ name: Unity AI Receptionist Android CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, feature/twiga-business-assistant-app ]
   pull_request:
     branches: [ main, feature/twiga-business-assistant-app ]
   workflow_dispatch:
