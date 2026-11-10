@@ -63,6 +63,7 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.json:json:20240303")
     implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("com.google.android.gms:play-services-auth:22.0.0")
     implementation("ai.vapi.android:vapi:1.0.7")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
