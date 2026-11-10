@@ -84,8 +84,8 @@ Deno.serve(async (req) => {
         return reply({ error: "Choose a client and enter a valid amount." }, 400);
       if (!["mpesa", "bank", "cash", "card", "other"].includes(method))
         return reply({ error: "Unsupported payment method." }, 400);
-      if (periodStart && !/^\\d{4}-\\d{2}-\\d{2}$/.test(periodStart)) return reply({ error: "Invalid period start date." }, 400);
-      if (periodEnd && !/^\\d{4}-\\d{2}-\\d{2}$/.test(periodEnd)) return reply({ error: "Invalid period end date." }, 400);
+      if (periodStart && !/^\d{4}-\d{2}-\d{2}$/.test(periodStart)) return reply({ error: "Invalid period start date." }, 400);
+      if (periodEnd && !/^\d{4}-\d{2}-\d{2}$/.test(periodEnd)) return reply({ error: "Invalid period end date." }, 400);
       const { data: business, error: businessError } = await admin.from("businesses")
         .select("id").eq("id", businessId).maybeSingle();
       if (businessError || !business) return reply({ error: "Client not found." }, 404);
@@ -107,7 +107,7 @@ Deno.serve(async (req) => {
       const paidThrough = payload.paidThrough ? String(payload.paidThrough) : null;
       if (!businessId || !["ACTIVE", "SUSPENDED", "TRIAL"].includes(status))
         return reply({ error: "Choose a client and a valid access status." }, 400);
-      if (paidThrough && !/^\\d{4}-\\d{2}-\\d{2}$/.test(paidThrough))
+      if (paidThrough && !/^\d{4}-\d{2}-\d{2}$/.test(paidThrough))
         return reply({ error: "Invalid paid-through date." }, 400);
       const update: Record<string, unknown> = { status };
       if (paidThrough) update.paid_through = paidThrough;
