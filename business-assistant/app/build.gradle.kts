@@ -7,6 +7,12 @@ plugins {
 }
 val twigaProps = Properties().apply { val local = rootProject.file("twiga.properties"); if (local.exists()) local.inputStream().use { load(it) } }
 fun setting(name: String, env: String): String = providers.gradleProperty(name).orNull ?: System.getenv(env) ?: twigaProps.getProperty(name) ?: ""
+val releaseKeystorePath = System.getenv("TWIGA_ANDROID_KEYSTORE_PATH") ?: ""
+val releaseStorePassword = setting("TWIGA_ANDROID_KEYSTORE_PASSWORD", "TWIGA_ANDROID_KEYSTORE_PASSWORD")
+val releaseKeyAlias = setting("TWIGA_ANDROID_KEY_ALIAS", "TWIGA_ANDROID_KEY_ALIAS")
+val releaseKeyPassword = setting("TWIGA_ANDROID_KEY_PASSWORD", "TWIGA_ANDROID_KEY_PASSWORD")
+val hasReleaseSigning = releaseKeystorePath.isNotBlank() && releaseStorePassword.isNotBlank() &&
+    releaseKeyAlias.isNotBlank() && releaseKeyPassword.isNotBlank()
 android {
     namespace = "co.ke.twiga.businessassistant"
     compileSdk = 35
@@ -22,6 +28,22 @@ android {
         buildConfigField("String", "VAPI_PUBLIC_KEY", "\"${setting("TWIGA_VAPI_PUBLIC_KEY","TWIGA_VAPI_PUBLIC_KEY").ifBlank { "2874d463-b31e-4d5a-84d7-e6cbe0a90b15" }}\"")
         buildConfigField("String", "VAPI_ASSISTANT_ID", "\"${setting("TWIGA_VAPI_ASSISTANT_ID","TWIGA_VAPI_ASSISTANT_ID").ifBlank { "ea3ae8f7-fb6f-430e-9c33-96d9a919ade3" }}\"")
         buildConfigField("String", "TWIGA_REPLY_API_URL", "\"${setting("TWIGA_REPLY_API_URL","TWIGA_REPLY_API_URL")}\"")
+    }
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseKeystorePath)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = false
+            if (hasReleaseSigning) signingConfig = signingConfigs.getByName("release")
+        }
     }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
