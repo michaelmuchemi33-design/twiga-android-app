@@ -12,6 +12,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -177,7 +180,7 @@ fun TwigaPlatformAdminWorkspace(url: String, key: String, session: TwigaSession)
     var error by remember { mutableStateOf("") }
     var showPayment by remember { mutableStateOf(false) }
     var selectedBusiness by remember { mutableStateOf("") }
-    var amount by remember { mutableStateOf("") }
+    var amount by remember { mutableStateOf("375") }
     var method by remember { mutableStateOf("mpesa") }
     var reference by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
@@ -252,6 +255,13 @@ fun TwigaPlatformAdminWorkspace(url: String, key: String, session: TwigaSession)
                 Text("Clients, one-off payments and support", fontSize = 12.sp, color = Muted)
             }
             TextButton(onClick = { refresh() }) { Icon(Icons.Default.Refresh, null); Text("Refresh") }
+        }
+        Card(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 10.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+            Column(Modifier.padding(12.dp)) {
+                Text("TWIGA one-off plan: KSh 375 per 7 days", fontWeight = FontWeight.Bold, color = Ink)
+                Text("KSh 1,500 covers four weekly payments (28 days). No automatic renewal. After the paid-through date there are 3 grace days; then TWIGA cloud features pause until payment is confirmed. The phone, normal calls and normal WhatsApp stay usable.", fontSize = 11.sp, color = Muted)
+                Text("PayPlus checkout is not live yet. Only record a payment after the Kenya merchant payment is actually confirmed.", fontSize = 11.sp, color = Muted, modifier = Modifier.padding(top = 4.dp))
+            }
         }
         if (error.isNotBlank()) Text(error, color = Color(0xFFB3261E), modifier = Modifier.padding(vertical = 8.dp))
         if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -431,7 +441,8 @@ fun TwigaPlatformAdminWorkspace(url: String, key: String, session: TwigaSession)
                     OutlinedTextField(reference, { reference = it }, label = { Text("M-Pesa / bank reference (optional)") }, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(paidThrough, { paidThrough = it }, label = { Text("Paid through date YYYY-MM-DD (optional)") }, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(note, { note = it }, label = { Text("Note (optional)") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
-                    Text("This records a payment only. It does not create an automatic subscription or renewals.", fontSize = 11.sp, color = Muted)
+                    Text("KSh 375 = 7 days. Enter a multiple of KSh 375 for more weeks. Leave paid-through blank to calculate the period automatically. This is a one-off payment, not an automatic renewal.", fontSize = 11.sp, color = Muted)
+                    Text("PayPlus checkout is not enabled yet; confirm the payment first, then record it here.", fontSize = 11.sp, color = Muted)
                 }
             },
             confirmButton = {
@@ -441,7 +452,7 @@ fun TwigaPlatformAdminWorkspace(url: String, key: String, session: TwigaSession)
                     else scope.launch {
                         try {
                             TwigaAdminSupportApi.recordPayment(url, key, session, selectedBusiness, parsed, method, reference, note, paidThrough)
-                            amount = ""; reference = ""; note = ""; paidThrough = ""; showPayment = false; refresh()
+                            amount = "375"; reference = ""; note = ""; paidThrough = ""; showPayment = false; refresh()
                         } catch (e: Exception) { error = e.message ?: "Payment could not be saved." }
                     }
                 }) { Text("Save payment") }
@@ -476,6 +487,7 @@ private fun StatusPill(value: String) {
 
 @Composable
 fun TwigaSupportWorkspace(url: String, key: String, session: TwigaSession?, businessId: String?) {
+    val supportContext = LocalContext.current
     var messages by remember { mutableStateOf(listOf(SupportLine("assistant", "Hello! I’m TWIGA Support. Tell me what you need help with."))) }
     var question by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
@@ -488,6 +500,9 @@ fun TwigaSupportWorkspace(url: String, key: String, session: TwigaSession?, busi
 
     Column(Modifier.fillMaxSize()) {
         Text("TWIGA Support", fontSize = 25.sp, fontWeight = FontWeight.Bold, color = Ink)
+        TextButton(onClick = {
+            supportContext.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/254101122065?text=Hello%20TWIGA%20Support")))
+        }) { Text("WhatsApp support • 0101122065") }
         Text("Ask about setup, payments, voice, products or troubleshooting.", color = Muted, fontSize = 12.sp)
         Spacer(Modifier.height(10.dp))
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
