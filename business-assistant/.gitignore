@@ -1,0 +1,4 @@
+twiga.properties
+.gradle/
+**/build/
+local.properties
