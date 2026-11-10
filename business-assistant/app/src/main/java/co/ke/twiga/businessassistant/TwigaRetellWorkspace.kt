@@ -31,6 +31,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import org.json.JSONArray
 import java.util.concurrent.TimeUnit
 
 internal object TwigaRetellApi {
@@ -248,6 +249,66 @@ internal fun TwigaRetellWorkspace(
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Validate & securely save key") }
                 Text("Only the business owner or TWIGA platform admin can replace this key. The app never stores the private key locally. In Retell Settings > API Keys, mark this same key as the Webhook Key so call events can be verified. Restricted keys need Build > Agent > Edit and Deploy > Call > Edit.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+
+        Card {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Existing Retell agent & SIM bridge number", fontWeight = FontWeight.SemiBold)
+                OutlinedTextField(
+                    existingAgentId, { existingAgentId = it }, modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Existing Retell agent ID") }, singleLine = true
+                )
+                Button(
+                    onClick = {
+                        loading = true; error = ""; message = ""
+                        scope.launch {
+                            try {
+                                val linked = TwigaRetellApi.linkExistingAgent(url, key, session, businessId, existingAgentId.trim())
+                                agentId = linked.optJSONObject("config")?.optString("retell_agent_id", existingAgentId) ?: existingAgentId
+                                llmId = linked.optJSONObject("config")?.optString("retell_llm_id", "") ?: ""
+                                provider = "retell"
+                                message = "Existing Retell agent linked to " + businessName + ". Save settings and update/publish it to apply TWIGA business knowledge."
+                            } catch (e: Exception) { error = e.message ?: "Could not link existing Retell agent." }
+                            finally { loading = false }
+                        }
+                    },
+                    enabled = keyConfigured && existingAgentId.isNotBlank() && !loading,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Link my existing Retell agent") }
+                OutlinedTextField(
+                    bridgeNumber, { bridgeNumber = it }, modifier = Modifier.fillMaxWidth(),
+                    label = { Text("AI bridge phone number (E.164)") }, singleLine = true,
+                    placeholder = { Text("+1… or +254…") }
+                )
+                Text("This is the AI provider's phone number that the TWIGA handset calls as a second SIM call, then merges with the customer call. It must be assigned to the selected Retell agent (or the selected Vapi assistant). Carrier conference support and airtime are required.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedButton(
+                    onClick = {
+                        loading = true; error = ""
+                        scope.launch {
+                            try {
+                                val result = TwigaRetellApi.listPhoneNumbers(url, key, session, businessId)
+                                val rows = result.optJSONArray("phoneNumbers") ?: JSONArray()
+                                retellNumbers = (0 until rows.length()).mapNotNull { index ->
+                                    val item = rows.optJSONObject(index) ?: return@mapNotNull null
+                                    val number = item.optString("phone_number").ifBlank { item.optString("number") }
+                                    if (number.isBlank()) null else number to item.optString("inbound_agent_id")
+                                }
+                                message = if (retellNumbers.isEmpty()) "No Retell phone numbers were returned. Import or configure a phone number in Retell first." else "Select the Retell number attached to your agent below."
+                            } catch (e: Exception) { error = e.message ?: "Could not list Retell phone numbers." }
+                            finally { loading = false }
+                        }
+                    },
+                    enabled = keyConfigured && !loading,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Load my Retell phone numbers") }
+                retellNumbers.forEach { (number, assignedAgent) ->
+                    AssistChip(
+                        onClick = { bridgeNumber = number },
+                        label = { Text(number + if (assignedAgent == agentId && agentId.isNotBlank()) " · this agent" else " · agent " + assignedAgent.take(10)) }
+                    )
+                }
+                Text("Saving an empty number clears the SIM-to-AI bridge. Use only a number you control and that is assigned to this business's active AI assistant.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
