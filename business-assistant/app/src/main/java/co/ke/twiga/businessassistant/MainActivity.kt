@@ -167,9 +167,9 @@ class TwigaApi(private val url:String, private val key:String) {
     }
     suspend fun addProduct(s:TwigaSession,businessId:String,name:String,sku:String,category:String,description:String,price:Double,stock:Double,imageKey:String) {
         val data=JSONObject().put("business_id",businessId).put("created_by",s.userId).put("name",name)
-            .put("sku",sku.ifBlank { JSONObject.NULL }).put("category",category).put("description",description)
+            .put("sku",if(sku.isBlank()) JSONObject.NULL else sku).put("category",category).put("description",description)
             .put("price",price).put("currency","KES").put("unit","piece").put("stock_quantity",stock)
-            .put("image_key",imageKey.ifBlank { JSONObject.NULL }).put("is_active",true)
+            .put("image_key",if(imageKey.isBlank()) JSONObject.NULL else imageKey).put("is_active",true)
         call("/rest/v1/twiga_products",s.token,"POST",data)
     }
     suspend fun uploadProductImage(replyApiUrl:String,s:TwigaSession,businessId:String,contentType:String,bytes:ByteArray):String = withContext(Dispatchers.IO) {
