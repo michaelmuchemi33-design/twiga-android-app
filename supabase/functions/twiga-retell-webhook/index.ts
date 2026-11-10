@@ -91,6 +91,38 @@ Deno.serve(async(req:Request)=>{
       const phone=String(custom.customer_phone || call.from_number || "").trim();
       const {data:biz}=await admin.from("businesses").select("created_by").eq("id",config.business_id).maybeSingle();
 
+      // Save a concrete appointment as a pending request only when the caller agreed an exact ISO time.
+      const appointmentStartRaw=String(custom.appointment_start_iso || "").trim();
+      const appointmentDuration=Math.min(180,Math.max(15,Number(custom.appointment_duration_minutes || 30)));
+      const appointmentService=String(custom.appointment_service || "").trim();
+      if(appointment && appointmentStartRaw && biz?.created_by && /(?:Z|[+-]\d{2}:\d{2})$/.test(appointmentStartRaw)) {
+        const appointmentStart=new Date(appointmentStartRaw);
+        const now=Date.now();
+        if(Number.isFinite(appointmentStart.getTime()) &&
+           appointmentStart.getTime()>now-5*60*1000 &&
+           appointmentStart.getTime()<now+366*86400000) {
+          const appointmentMarker="Retell call ID: "+callId;
+          const {data:existingAppointment}=await admin.from("twiga_appointments").select("id")
+            .eq("business_id",config.business_id).ilike("notes","%"+appointmentMarker+"%").limit(1).maybeSingle();
+          if(!existingAppointment) {
+            const appointmentNotes=[
+              "PENDING REQUEST — business must confirm with customer before treating as booked.",
+              appointmentService ? "Service: "+appointmentService : "",
+              "Requested duration minutes: "+appointmentDuration,
+              "Request details: "+appointment,
+              "Call summary: "+(summary || ""),
+              appointmentMarker
+            ].filter(Boolean).join("\n");
+            const {error:appointmentError}=await admin.from("twiga_appointments").insert({
+              business_id:config.business_id,created_by:biz.created_by,
+              customer_name:caller.slice(0,160),phone:phone.slice(0,60) || null,
+              scheduled_at:appointmentStart.toISOString(),notes:appointmentNotes,status:"requested"
+            });
+            if(appointmentError) console.error("Retell appointment request save failed",appointmentError.message);
+          }
+        }
+      }
+
       if(biz?.created_by && custom.customer_name && phone) {
         const {data:existingCustomer}=await admin.from("twiga_customers")
           .select("id").eq("business_id",config.business_id).eq("phone",phone).limit(1).maybeSingle();
