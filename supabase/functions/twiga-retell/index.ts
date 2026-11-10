@@ -78,13 +78,16 @@ Deno.serve(async (req:Request) => {
       return reply({error:"Only the business owner, business admin or TWIGA platform admin can change AI settings."},403);
 
     if(action==="get_config") {
-      const [configResult,keyResult]=await Promise.all([
+      const [configResult,keyResult,recordingResult]=await Promise.all([
         admin.from("twiga_business_voice_configs").select("*").eq("business_id",businessId).maybeSingle(),
-        admin.from("twiga_provider_secret_refs").select("secret_last4,updated_at").eq("business_id",businessId).eq("provider","retell").maybeSingle()
+        admin.from("twiga_provider_secret_refs").select("secret_last4,updated_at").eq("business_id",businessId).eq("provider","retell").maybeSingle(),
+        admin.from("twiga_business_settings").select("call_recording_enabled,recording_notice").eq("business_id",businessId).maybeSingle()
       ]);
       return reply({
         config:configResult.data || {business_id:businessId,provider:"vapi",retell_voice_id:"fish_audio-Willa",retell_voice_model:"s2.1-pro",retell_model:"gpt-6-luna",retell_language_codes:["en-GB","sw-KE"],retell_ambient_sound:"call-center",retell_ambient_sound_volume:0.12},
         keyConfigured:!!keyResult.data,keyLast4:keyResult.data?.secret_last4 || "",keyUpdatedAt:keyResult.data?.updated_at || null,
+        recordingEnabled:recordingResult.data?.call_recording_enabled===true,
+        recordingNotice:recordingResult.data?.recording_notice || "This call may be recorded to help us serve you.",
         canManage,isPlatformAdmin
       });
     }
@@ -107,6 +110,8 @@ Deno.serve(async (req:Request) => {
       if(!["s2.1-pro","s2-pro"].includes(voiceModel)) return reply({error:"Unsupported voice model."},400);
       if(!["gpt-6-luna","gpt-5.6-luna"].includes(model)) return reply({error:"Unsupported Retell model."},400);
       const ambient=Math.min(0.3,Math.max(0,Number(body.ambientVolume ?? 0.12)));
+      const recordingEnabled=body.recordingEnabled===true;
+      const recordingNotice=String(body.recordingNotice || "This call may be recorded to help us serve you.").trim().slice(0,500);
       const config={
         provider:body.provider==="retell"?"retell":"vapi",
         retell_voice_id:voiceId,retell_voice_model:voiceModel,retell_model:model,
@@ -124,17 +129,23 @@ Deno.serve(async (req:Request) => {
         : await admin.from("twiga_business_voice_configs").insert({...config,business_id:businessId})
             .select("business_id,provider,retell_agent_id,retell_llm_id,retell_voice_id,retell_voice_model,retell_model,retell_language_codes,retell_ambient_sound,retell_ambient_sound_volume,inbound_prompt,outbound_prompt,last_provisioned_at,updated_at").single();
       if(savedResult.error) throw savedResult.error;
-      return reply({saved:true,config:savedResult.data});
+      const {error:recordingSaveError}=await admin.from("twiga_business_settings").upsert({
+        business_id:businessId,call_recording_enabled:recordingEnabled,recording_notice:recordingNotice,
+        updated_at:new Date().toISOString()
+      },{onConflict:"business_id"});
+      if(recordingSaveError) throw recordingSaveError;
+      return reply({saved:true,config:savedResult.data,recordingEnabled,recordingNotice});
     }
 
     if(action==="provision_agent") {
       const {data:secret,error:secretError}=await admin.rpc("twiga_get_provider_secret",{p_business_id:businessId,p_provider:"retell"});
       if(secretError || !secret) return reply({error:"Connect a valid Retell key for this business first."},400);
-      const [bizResult,profileResult,productsResult,configResult]=await Promise.all([
+      const [bizResult,profileResult,productsResult,configResult,recordingResult]=await Promise.all([
         admin.from("businesses").select("id,name,business_type,created_by").eq("id",businessId).single(),
         admin.from("twiga_business_profiles").select("*").eq("business_id",businessId).maybeSingle(),
         admin.from("twiga_products").select("name,description,price,currency,stock_quantity").eq("business_id",businessId).eq("is_active",true).order("name").limit(80),
-        admin.from("twiga_business_voice_configs").select("*").eq("business_id",businessId).maybeSingle()
+        admin.from("twiga_business_voice_configs").select("*").eq("business_id",businessId).maybeSingle(),
+        admin.from("twiga_business_settings").select("call_recording_enabled,recording_notice").eq("business_id",businessId).maybeSingle()
       ]);
       const biz=bizResult.data,config=configResult.data;
       if(bizResult.error || !biz) return reply({error:"Business not found."},404);
@@ -142,7 +153,12 @@ Deno.serve(async (req:Request) => {
       if(!config) return reply({error:"Save the voice settings before provisioning."},400);
       const check=await retell(String(secret),"/get-concurrency");
       if(!check.ok) return reply({error:"Retell key no longer works. Replace it in AI settings."},400);
-      const prompt=buildPrompt(biz,profileResult.data,productsResult.data || [],config.inbound_prompt || "",config.outbound_prompt || "");
+      const recordingEnabled=recordingResult.data?.call_recording_enabled===true;
+      const recordingNotice=String(recordingResult.data?.recording_notice || "This call may be recorded to help us serve you.");
+      const prompt=buildPrompt(biz,profileResult.data,productsResult.data || [],config.inbound_prompt || "",config.outbound_prompt || "") +
+        "\\n\\nCALL RECORDING POLICY: " + (recordingEnabled
+          ? "Recording and transcript storage is enabled for this business. Before discussing the customer's request, clearly say this exact notice: " + recordingNotice + " If the customer does not consent, politely end the AI call and invite them to contact the business directly."
+          : "Recording and transcript storage is disabled. Do not claim the call is being recorded. Do not promise that audio or transcript will be stored.");
       const requested=String(config.retell_model || "gpt-6-luna");
       const llmBody={
         model:requested,start_speaker:"agent",
@@ -169,7 +185,7 @@ Deno.serve(async (req:Request) => {
         enable_backchannel:true,backchannel_frequency:0.45,
         webhook_url:url+"/functions/v1/twiga-retell-webhook",
         webhook_events:["call_started","call_ended","call_analyzed"],webhook_timeout_ms:10000,
-        data_storage_setting:"everything",opt_in_signed_url:true,
+        data_storage_setting:recordingResult.data?.call_recording_enabled===true ? "everything" : "basic_attributes_only",opt_in_signed_url:true,
         signed_url_expiration_ms:86400000,max_call_duration_ms:600000,end_call_after_silence_ms:30000,
         begin_message_delay_ms:350,
         post_call_analysis_data:[
