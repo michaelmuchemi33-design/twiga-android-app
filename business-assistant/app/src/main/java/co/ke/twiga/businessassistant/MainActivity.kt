@@ -501,7 +501,7 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
                                     "Business Profile" -> loadProfile()
                                     "POS Products" -> reloadProducts()
                                     "WhatsApp" -> refreshWhatsApp()
-                                    "Voice", "Support", "Admin & Billing" -> Unit
+                                    "Voice", "Support", "Admin & Billing", "Google Workspace", "Plan & payments" -> Unit
                                     else -> reload(item)
                                 }
                             },colors=CardDefaults.cardColors(containerColor=Color.White)) {
@@ -515,6 +515,8 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
                     }
                     "Business Profile" -> BusinessProfileWorkspace(profile,profileLoading,{profile=it},{saveProfile()})
                     "Support" -> TwigaSupportWorkspace(url,key,session,business?.id)
+                    "Google Workspace" -> if(business!=null) GoogleWorkspaceWorkspace(api,session!!,business!!.id) else Text("Select a business to connect Google Workspace.")
+                    "Plan & payments" -> TwigaPlanWorkspace()
                     "Admin & Billing" -> if(platformAdminAvailable) TwigaPlatformAdminWorkspace(url,key,session!!) else Text("Platform admin access is not enabled for this account.",color=Muted)
                     "Products" -> ProductsWorkspace(products,productLoading,{productDialog=true;productPhotoKey="";productPhotoLabel=""},{reloadProducts()})
                     "WhatsApp" -> WhatsAppWorkspace(
