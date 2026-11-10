@@ -52,17 +52,32 @@ alter table public.twiga_appointments enable row level security;
 alter table public.twiga_tasks enable row level security;
 alter table public.twiga_voice_sessions enable row level security;
 
-do $$
+create or replace function public.twiga_is_business_member(target_business_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $
+  select exists (
+    select 1 from public.business_members bm
+    where bm.business_id = target_business_id and bm.user_id = auth.uid()
+  );
+$;
+revoke all on function public.twiga_is_business_member(uuid) from public;
+grant execute on function public.twiga_is_business_member(uuid) to authenticated;
+
+do $
 declare t text;
 begin
   foreach t in array array['twiga_customers','twiga_orders','twiga_appointments','twiga_tasks'] loop
     execute format('drop policy if exists %I on public.%I', t || '_member_access', t);
     execute format(
-      'create policy %I on public.%I for all to authenticated using (exists (select 1 from public.business_members bm where bm.business_id = %I.business_id and bm.user_id = auth.uid())) with check (exists (select 1 from public.business_members bm where bm.business_id = %I.business_id and bm.user_id = auth.uid()))',
-      t || '_member_access', t, t, t
+      'create policy %I on public.%I for all to authenticated using (public.twiga_is_business_member(business_id)) with check (public.twiga_is_business_member(business_id))',
+      t || '_member_access', t
     );
     execute format('grant select, insert, update, delete on public.%I to authenticated', t);
   end loop;
-end $$;
+end $;
 revoke all on public.twiga_voice_sessions from anon, authenticated;
 grant all on public.twiga_voice_sessions to service_role;
