@@ -69,6 +69,10 @@ class MainActivity : ComponentActivity() {
 }
 
 data class TwigaSession(val token:String, val userId:String, val email:String)
+data class TwigaVoiceLaunch(
+    val token:String, val publicKey:String, val assistantId:String,
+    val accountName:String, val voiceLabel:String, val voiceModel:String
+)
 data class TwigaRecord(val id:String, val name:String, val detail:String, val status:String)
 data class TwigaBusinessProfile(
     val businessSummary:String = "", val whatTheySell:String = "", val whatTheyDo:String = "",
@@ -242,9 +246,17 @@ class TwigaApi(private val url:String, private val key:String) {
         replyCall(replyApiUrl,"/api/whatsapp/send",s,"POST",
             JSONObject().put("businessId",businessId).put("phone",phone).put("message",message))
     }
-    suspend fun voiceTicket(s:TwigaSession,businessId:String):String {
-        val raw=call("/functions/v1/twiga-vapi-session",s.token,"POST",JSONObject().put("businessId",businessId))
-        return JSONObject(raw).getString("voiceSessionToken")
+    suspend fun voiceTicket(s:TwigaSession,businessId:String):TwigaVoiceLaunch {
+        val result=JSONObject(call("/functions/v1/twiga-vapi-session",s.token,"POST",JSONObject().put("businessId",businessId)))
+        val route=result.optJSONObject("vapiAccount") ?: throw IllegalStateException("No Vapi voice route is configured.")
+        val publicKey=route.optString("publicKey")
+        val assistantId=route.optString("assistantId")
+        if(publicKey.isBlank() || assistantId.isBlank()) throw IllegalStateException("The selected Vapi voice route is incomplete.")
+        return TwigaVoiceLaunch(
+            result.getString("voiceSessionToken"), publicKey, assistantId,
+            route.optString("name","TWIGA voice"), route.optString("voiceLabel",""),
+            route.optString("voiceModel","")
+        )
     }
 }
 
@@ -756,8 +768,7 @@ private fun Brand() {
 
 @Composable
 private fun VoiceWorkspace(key:String,assistant:String,businessId:String,session:TwigaSession?,api:TwigaApi,setStatus:(String)->Unit,addLine:(String)->Unit,status:String,lines:List<String>,setKey:(String)->Unit,setAssistant:(String)->Unit) {
-    var publicKey by remember(key){mutableStateOf(key)}
-    var assistantId by remember(assistant){mutableStateOf(assistant)}
+    var activeRoute by remember { mutableStateOf("") }
     var sdk by remember { mutableStateOf<Vapi?>(null) }
     var connecting by remember { mutableStateOf(false) }
     val lifecycle=LocalLifecycleOwner.current.lifecycle
@@ -779,8 +790,13 @@ private fun VoiceWorkspace(key:String,assistant:String,businessId:String,session
     Column(Modifier.fillMaxSize()) {
         Text("Talk to TWIGA",fontSize=25.sp,fontWeight=FontWeight.Bold)
         Text("In-app voice. No phone number required.",color=Muted)
-        OutlinedTextField(publicKey,{publicKey=it;setKey(it)},label={Text("Vapi public key")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-        OutlinedTextField(assistantId,{assistantId=it;setAssistant(it)},label={Text("Vapi assistant ID")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+        Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=Color.White)) {
+            Column(Modifier.padding(13.dp)) {
+                Text("Automatic voice routing",fontWeight=FontWeight.Bold,color=Ink,fontSize=14.sp)
+                Text("TWIGA selects the next enabled Vapi account for each new session. Voice account keys are managed privately by the server.",fontSize=11.sp,color=Muted)
+                if(activeRoute.isNotBlank()) Text(activeRoute,fontSize=11.sp,color=Orange,fontWeight=FontWeight.SemiBold,modifier=Modifier.padding(top=6.dp))
+            }
+        }
         Spacer(Modifier.height(10.dp))
         Card(Modifier.fillMaxWidth().weight(1f),colors=CardDefaults.cardColors(containerColor=Color.White)) {
             Column(Modifier.padding(14.dp)) {
@@ -799,12 +815,20 @@ private fun VoiceWorkspace(key:String,assistant:String,businessId:String,session
                 connecting=true;setStatus("Securing voice session…")
                 scope.launch {
                     try {
-                        val ticket=api.voiceTicket(session,businessId)
-                        val v=Vapi(context,lifecycle,Vapi.Configuration(publicKey=publicKey))
+                        val launch=api.voiceTicket(session,businessId)
+                        activeRoute=listOf(launch.accountName,launch.voiceLabel,launch.voiceModel).filter{it.isNotBlank()}.joinToString(" · ")
+                        val v=Vapi(context,lifecycle,Vapi.Configuration(publicKey=launch.publicKey))
                         sdk=v
-                        setStatus("Connecting to TWIGA…")
-                        v.start(assistantId=assistantId,metadata=mapOf("businessId" to businessId,"userId" to session.userId,"twigaVoiceSession" to ticket))
-                            .onSuccess{setStatus("Connected");addLine("Secure TWIGA voice session connected.")}
+                        setStatus("Connecting with ${launch.accountName}…")
+                        v.start(assistantId=launch.assistantId,metadata=mapOf(
+                            "businessId" to businessId,
+                            "userId" to session.userId,
+                            "twigaVoiceSession" to launch.token,
+                            "twigaVoiceAccount" to launch.accountName,
+                            "twigaVoiceLabel" to launch.voiceLabel,
+                            "twigaVoiceModel" to launch.voiceModel
+                        ))
+                            .onSuccess{setStatus("Connected");addLine("Secure TWIGA voice session connected using ${launch.accountName}.")}
                             .onFailure{setStatus("Connection failed: ${it.message}");sdk=null}
                     } catch(e:Exception) { setStatus("Could not start voice: ${e.message}") }
                     connecting=false
