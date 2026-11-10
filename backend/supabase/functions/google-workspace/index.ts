@@ -251,6 +251,35 @@ async function ensureSheet(admin: any, connection: Conn, token: string) {
   return { spreadsheetId: id, spreadsheetUrl: url };
 }
 
+async function businessHasPaidAccess(admin: any, businessId: string): Promise<boolean> {
+  const { data: rows, error } = await admin.from("twiga_subscriptions")
+    .select("status,trial_ends_at,grace_period_ends_at,current_period_end")
+    .eq("business_id", businessId).order("created_at", { ascending: false }).limit(1);
+  if (error) throw new HttpError(500, "Could not verify TWIGA access.");
+  const sub = rows?.[0];
+  const now = Date.now();
+  if (sub) {
+    const status = String(sub.status || "").toLowerCase();
+    if (status === "trialing") {
+      if (sub.trial_ends_at) return new Date(sub.trial_ends_at).getTime() > now;
+      const { data: business } = await admin.from("businesses").select("status,paid_through")
+        .eq("id", businessId).maybeSingle();
+      return !!business && business.status === "TRIAL" &&
+        new Date(String(business.paid_through) + "T23:59:59+03:00").getTime() + 3 * 86400000 > now;
+    }
+    return ["active", "past_due"].includes(status) && !!sub.grace_period_ends_at &&
+      new Date(sub.grace_period_ends_at).getTime() > now;
+  }
+  const { data: business } = await admin.from("businesses").select("status,paid_through")
+    .eq("id", businessId).maybeSingle();
+  if (!business || !["TRIAL", "ACTIVE"].includes(String(business.status))) return false;
+  return new Date(String(business.paid_through) + "T23:59:59+03:00").getTime() + 3 * 86400000 > now;
+}
+function csvCell(value: unknown): string {
+  const text = String(value ?? "");
+  return '"' + text.replace(/"/g, '""') + '"';
+}
+
 Deno.serve(async (req: Request) => {
   const headers = corsFor(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers });
@@ -260,8 +289,11 @@ Deno.serve(async (req: Request) => {
     const body = await req.json();
     const action = String(body.action || "");
     if (action === "calendar.ai.list" || action === "calendar.ai.create") {
-      const { connection, token } = await authenticateLine(req, body);
+      const { connection, token, admin, businessId } = await authenticateLine(req, body);
       if (!connection || !token) return reply(req, { connected: false, items: [] });
+      if (action === "calendar.ai.create" && !await businessHasPaidAccess(admin, businessId)) {
+        throw new HttpError(402, "TWIGA is paused because the three-day payment grace period has ended. Pay to restore TWIGA booking features. Your phone and WhatsApp apps are unaffected.");
+      }
       if (action === "calendar.ai.list") {
         const start = String(body.timeMin || new Date().toISOString());
         const end = String(body.timeMax || new Date(Date.now() + 30 * 86400000).toISOString());
@@ -288,6 +320,10 @@ Deno.serve(async (req: Request) => {
     const businessId = String(body.businessId || "");
     if (!businessId || businessId.length > 100) throw new HttpError(400, "A valid TWIGA business is required.");
     const { user, role, admin } = await authenticate(req, businessId);
+    const paidActions = ["connect", "disconnect", "calendar.create", "calendar.update", "calendar.delete", "sheets.export-orders", "drive.export-calls", "appointments.sync"];
+    if (paidActions.includes(action) && !await businessHasPaidAccess(admin, businessId)) {
+      throw new HttpError(402, "TWIGA is paused because the three-day payment grace period has ended. Pay to restore TWIGA Workspace features. Your phone and WhatsApp apps are unaffected.");
+    }
     if ((action === "connect" || action === "disconnect") && !["owner", "admin"].includes(role)) {
       throw new HttpError(403, "Only a TWIGA business owner or administrator can connect or disconnect Google Workspace.");
     }
@@ -383,6 +419,78 @@ Deno.serve(async (req: Request) => {
       });
       await admin.from("twiga_google_connections").update({ last_sync_at: new Date().toISOString() }).eq("business_id", businessId);
       return reply(req, { exported: orders.length, spreadsheetUrl: sheet.spreadsheetUrl });
+    }
+    if (action === "appointments.sync") {
+      const { data: business } = await admin.from("businesses").select("name").eq("id", businessId).maybeSingle();
+      const { data: appointments, error: appointmentError } = await admin.from("twiga_appointments")
+        .select("id,customer_name,phone,scheduled_at,notes,status,google_event_id")
+        .eq("business_id", businessId).is("google_event_id", null)
+        .order("scheduled_at", { ascending: true }).limit(100);
+      if (appointmentError) throw new HttpError(500, "Could not load TWIGA appointments to sync.");
+      let synced = 0;
+      for (const appointment of appointments || []) {
+        const start = new Date(appointment.scheduled_at);
+        if (!Number.isFinite(start.getTime())) continue;
+        const end = new Date(start.getTime() + 30 * 60000);
+        const event = {
+          summary: (business?.name ? String(business.name) + " — " : "") + String(appointment.customer_name || "TWIGA booking"),
+          description: [
+            appointment.phone ? "Phone: " + appointment.phone : "",
+            appointment.notes || "",
+            "TWIGA appointment " + appointment.id,
+          ].filter(Boolean).join("\n"),
+          start: { dateTime: start.toISOString(), timeZone: "Africa/Nairobi" },
+          end: { dateTime: end.toISOString(), timeZone: "Africa/Nairobi" },
+        };
+        const created = await googleJson(token, "https://www.googleapis.com/calendar/v3/calendars/primary/events", {
+          method: "POST", body: JSON.stringify(event),
+        });
+        const { error: saveError } = await admin.from("twiga_appointments").update({
+          google_event_id: created.id, google_event_url: created.htmlLink || null, google_synced_at: new Date().toISOString(),
+        }).eq("id", appointment.id).eq("business_id", businessId);
+        if (saveError) throw new HttpError(500, "Google Calendar event was created but the TWIGA sync record could not be saved.");
+        synced += 1;
+      }
+      return reply(req, { synced, remaining: (appointments || []).length - synced });
+    }
+    if (action === "drive.export-calls") {
+      const { data: settings } = await admin.from("twiga_business_settings")
+        .select("call_recording_enabled").eq("business_id", businessId).maybeSingle();
+      const allowTranscript = settings?.call_recording_enabled === true;
+      const { data: calls, error: callsError } = await admin.from("twiga_call_records")
+        .select("id,channel,direction,from_number,to_number,status,started_at,ended_at,duration_seconds,summary,transcript")
+        .eq("business_id", businessId).order("created_at", { ascending: false }).limit(500);
+      if (callsError) throw new HttpError(500, "Could not load TWIGA call records.");
+      const rows: unknown[][] = [[
+        "Call ID", "Channel", "Direction", "From", "To", "Status", "Started", "Ended",
+        "Duration seconds", "Summary", ...(allowTranscript ? ["Transcript"] : []),
+      ]];
+      for (const c of calls || []) rows.push([
+        c.id, c.channel, c.direction, c.from_number, c.to_number, c.status,
+        c.started_at, c.ended_at, c.duration_seconds, c.summary,
+        ...(allowTranscript ? [c.transcript] : []),
+      ]);
+      const csv = rows.map(row => row.map(csvCell).join(",")).join("\r\n");
+      const boundary = "twiga_" + crypto.randomUUID().replaceAll("-", "");
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const metadata = { name: "TWIGA-call-records-" + stamp + ".csv", mimeType: "text/csv" };
+      const body = new Blob([
+        "--" + boundary + "\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n",
+        JSON.stringify(metadata),
+        "\r\n--" + boundary + "\r\nContent-Type: text/csv; charset=UTF-8\r\n\r\n",
+        csv,
+        "\r\n--" + boundary + "--",
+      ]);
+      const uploaded = await readJson(await fetch(
+        "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,webViewLink",
+        { method: "POST", headers: { authorization: "Bearer " + token, "content-type": "multipart/related; boundary=" + boundary }, body },
+      ));
+      await admin.from("twiga_google_connections").update({ last_sync_at: new Date().toISOString() })
+        .eq("business_id", businessId);
+      return reply(req, {
+        exported: calls?.length || 0, file: uploaded, transcriptIncluded: allowTranscript,
+        note: allowTranscript ? "Transcript export is enabled by the business recording setting." : "Only call metadata and summaries were exported because call transcription/recording export is not enabled.",
+      });
     }
     if (action === "drive.status") {
       const sheet = await ensureSheet(admin, connection, token);
