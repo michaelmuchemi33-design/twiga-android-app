@@ -432,14 +432,19 @@ internal fun TwigaVoiceRouter(
         loading = false
     }
     Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier.fillMaxWidth().padding(bottom = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Surface(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = MaterialTheme.shapes.medium
         ) {
-            FilterChip(selected = provider == "vapi", onClick = { provider = "vapi" }, label = { Text("Vapi") })
-            FilterChip(selected = provider == "retell", onClick = { provider = "retell" }, label = { Text("Retell · Willa") })
-            if (loading) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+            Row(Modifier.padding(horizontal = 12.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (provider == "retell") "Active voice: Retell · Willa" else "Active voice: Vapi",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.labelLarge
+                )
+                if (loading) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+            }
         }
         Box(Modifier.weight(1f)) {
             if (provider == "retell") {
