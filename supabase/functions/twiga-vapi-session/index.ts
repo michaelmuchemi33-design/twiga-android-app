@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
   const subscription = subscriptionRows?.[0];
   let paidAccess = false;
   if (subscription?.status === "trialing") {
-    if (subscription.trial_ends_at) paidAccess = new Date(subscription.trial_ends_at).getTime() > Date.now();
+    if (subscription.trial_ends_at) paidAccess = new Date(subscription.trial_ends_at).getTime() + 3 * 86400000 > Date.now();
     else {
       const { data: trialBusiness } = await admin.from("businesses").select("status,paid_through").eq("id", businessId).maybeSingle();
       paidAccess = !!trialBusiness && trialBusiness.status === "TRIAL" &&
