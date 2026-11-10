@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       ANDROID_HOME: /usr/local/lib/android/sdk
-      HAS_RELEASE_KEY: ${{ env.HAS_RELEASE_KEY == 'true' }}
+      HAS_RELEASE_KEY: ${{ secrets.TWIGA_ANDROID_KEYSTORE_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v5
