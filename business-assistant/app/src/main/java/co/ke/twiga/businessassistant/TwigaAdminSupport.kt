@@ -41,7 +41,7 @@ private data class PlatformTicket(
     val id: String, val subject: String, val message: String, val contact: String,
     val status: String, val channel: String, val createdAt: String
 )
-private data class SupportLine(val role: String, val content: String)
+internal data class SupportLine(val role: String, val content: String)
 
 internal object TwigaAdminSupportApi {
     private val client = OkHttpClient.Builder().callTimeout(35, TimeUnit.SECONDS).build()
