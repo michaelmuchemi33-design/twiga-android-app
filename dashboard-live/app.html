@@ -630,9 +630,87 @@ R.ai=function(){
  var base=AI0?AI0():["",""];
  setTimeout(loadAi,0);
  return[base[0],'<div class="card pg"><h2>My business and AI</h2><div class="pb" style="margin-top:10px"><label>What we offer: services, prices, hours, location, rules<br><textarea id="aip" rows="10" maxlength="20000" style="width:100%"></textarea></label><div class="sub" id="aic">0 / 20000</div><label>Greeting<br><input type="text" id="aig" maxlength="500" style="width:100%"></label><label>Message for missed calls<br><input type="text" id="aim" maxlength="500" style="width:100%"></label><div><button class="btn pri" data-act="aisave">Save</button></div><div class="sub" id="aimsg"></div></div></div>'+base[1]]};
+var activeVoiceProvider="vapi",retellKeyConfigured=false;
+async function twigaRetell(action,extra){
+ var out=await sb.functions.invoke("twiga-retell",{body:Object.assign({action:action,businessId:BIZ.id},extra||{})});
+ if(out.error)throw out.error;
+ if(out.data&&out.data.error)throw new Error(out.data.error);
+ return out.data||{};
+}
+function setVoiceProvider(provider){
+ activeVoiceProvider=provider==="retell"?"retell":"vapi";
+ if($("retellSetup"))$("retellSetup").hidden=activeVoiceProvider!=="retell";
+ if($("useVapi"))$("useVapi").className=activeVoiceProvider==="vapi"?"btn pri":"btn";
+ if($("useRetell"))$("useRetell").className=activeVoiceProvider==="retell"?"btn pri":"btn";
+ if($("providerMsg"))$("providerMsg").textContent=activeVoiceProvider==="retell"?"Retell AI is selected. Connect the Retell API key, link your existing voice agent and choose its phone number.":"Vapi is selected. Use the phone number assigned to your Vapi assistant.";
+}
+async function loadVoiceConfig(){
+ if(!$("useRetell"))return;
+ try{
+  var d=await twigaRetell("get_config"),x=d.config||{};
+  retellKeyConfigured=d.keyConfigured===true;
+  setVoiceProvider(x.provider||"vapi");
+  if($("retellAgentId"))$("retellAgentId").value=x.retell_agent_id||"";
+  if($("retellVoice"))$("retellVoice").value=x.retell_voice_id||"retell-Willa";
+  if($("retellModel"))$("retellModel").value=x.retell_model||"gpt-6-luna";
+  if($("retellInbound"))$("retellInbound").value=x.inbound_prompt||"";
+  if($("retellOutbound"))$("retellOutbound").value=x.outbound_prompt||"";
+  if($("retellRecording"))$("retellRecording").checked=d.recordingEnabled===true;
+  if($("retellNotice"))$("retellNotice").value=d.recordingNotice||"This call may be recorded to help us serve you.";
+  if($("ail")&&d.aiBridgeNumber)$("ail").value=d.aiBridgeNumber;
+  if($("providerMsg"))$("providerMsg").textContent=(x.provider||"vapi").toUpperCase()+" is selected. "+(retellKeyConfigured?"Retell key is saved securely (ending "+(d.keyLast4||"****")+").":"Add a Retell key only when switching to Retell.");
+ }catch(e){if($("providerMsg"))$("providerMsg").textContent=e.message||"Could not load provider settings."}
+}
+async function saveVoiceProvider(){
+ var extra={provider:activeVoiceProvider,voiceId:$("retellVoice")?$("retellVoice").value:"retell-Willa",model:$("retellModel")?$("retellModel").value:"gpt-6-luna",inboundPrompt:$("retellInbound")?$("retellInbound").value:"",outboundPrompt:$("retellOutbound")?$("retellOutbound").value:"",recordingEnabled:$("retellRecording")?$("retellRecording").checked:false,recordingNotice:$("retellNotice")?$("retellNotice").value:"This call may be recorded to help you.",bridgeNumber:$("ail")?$("ail").value.trim():""};
+ var key=$("retellKey")?$("retellKey").value.trim():"";
+ if(activeVoiceProvider==="retell"&&key){var saved=await twigaRetell("save_key",{apiKey:key});retellKeyConfigured=true;$("retellKey").value="";if($("retellStatus"))$("retellStatus").textContent=saved.message||"Retell API key saved securely."}
+ if(activeVoiceProvider==="retell"&&!retellKeyConfigured)throw new Error("Paste and save this business's Retell API key first.");
+ var d=await twigaRetell("save_settings",extra);
+ if($("retellStatus"))$("retellStatus").textContent="Saved. Active provider: "+activeVoiceProvider.toUpperCase()+".";
+ if($("aimsg"))$("aimsg").textContent="AI provider settings saved.";
+ return d;
+}
+async function loadRetellAgents(){
+ var d=await twigaRetell("list_agents"),rows=d.agents||[];
+ $("retellAgents").innerHTML='<option value="">Choose an existing voice agent…</option>'+rows.map(function(a){return '<option value="'+esc(a.agent_id)+'">'+esc(a.agent_name)+" · "+esc(a.agent_id)+'</option>'}).join("");
+ if($("retellStatus"))$("retellStatus").textContent=rows.length?"Found "+rows.length+" Retell voice agents. Select one, then link it.":"No Retell voice agents were found under this API key.";
+}
+async function loadRetellNumbers(){
+ var d=await twigaRetell("list_phone_numbers"),rows=d.phoneNumbers||[];
+ $("retellNumbers").innerHTML='<option value="">Choose a Retell number…</option>'+rows.map(function(n){var num=n.phone_number||n.number||"";return '<option value="'+esc(num)+'">'+esc(num)+(n.inbound_agent_id?" · assigned":" · not assigned")+'</option>'}).join("");
+ if($("retellStatus"))$("retellStatus").textContent=rows.length?"Choose the number assigned to the linked Retell agent.":"No Retell phone numbers found. Buy or import a number into Retell before enabling the SIM AI bridge.";
+}
+async function linkRetellAgent(){
+ var id=$("retellAgentId").value.trim()||$("retellAgents").value;
+ if(!id)throw new Error("Load and choose the existing Retell agent first.");
+ await twigaRetell("link_existing_agent",{agentId:id});
+ if($("retellStatus"))$("retellStatus").textContent="Existing Retell agent linked to this business. Its response engine will be preserved.";
+ await loadVoiceConfig();
+}
+async function buildRetellAgent(){
+ await saveVoiceProvider();
+ var d=await twigaRetell("provision_agent");
+ if($("retellStatus"))$("retellStatus").textContent=d.message||"Retell agent updated and published.";
+}
 async function loadAi(){
  var r=await sb.from("business_ai").select("prompt,greeting,auto_reply,faq,rules").eq("business_id",BIZ.id).maybeSingle(),d=r.data||{};
- if($("aip")){$("aip").value=d.prompt||"";$("aig").value=d.greeting||"";$("aim").value=d.auto_reply||"";if($("aif"))$("aif").value=d.faq||"";if($("air"))$("air").value=d.rules||"";$("aic").textContent=$("aip").value.length+" / 20000";var ln=await sb.from("ai_lines").select("number").eq("business_id",BIZ.id).maybeSingle();if($("ail"))$("ail").value=(ln.data&&ln.data.number)||""}}
+ if($("aip")){$("aip").value=d.prompt||"";$("aig").value=d.greeting||"";$("aim").value=d.auto_reply||"";if($("aif"))$("aif").value=d.faq||"";if($("air"))$("air").value=d.rules||"";$("aic").textContent=$("aip").value.length+" / 20000";var ln=await sb.from("ai_lines").select("number").eq("business_id",BIZ.id).maybeSingle();if($("ail"))$("ail").value=(ln.data&&ln.data.number)||""}
+ await loadVoiceConfig();
+}
+document.addEventListener("click",async function(e){
+ var b=e.target.closest("#useVapi");if(b){setVoiceProvider("vapi");return}
+ b=e.target.closest("#useRetell");if(b){setVoiceProvider("retell");return}
+ b=e.target.closest("#saveProviderChoice");if(b){try{b.disabled=true;await saveVoiceProvider()}catch(x){if($("retellStatus"))$("retellStatus").textContent=x.message||"Could not save provider settings."}finally{b.disabled=false}return}
+ b=e.target.closest("#loadRetellAgents");if(b){try{await loadRetellAgents()}catch(x){if($("retellStatus"))$("retellStatus").textContent=x.message||"Could not load Retell agents."}return}
+ b=e.target.closest("#loadRetellNumbers");if(b){try{await loadRetellNumbers()}catch(x){if($("retellStatus"))$("retellStatus").textContent=x.message||"Could not load Retell phone numbers."}return}
+ b=e.target.closest("#linkRetellAgent");if(b){try{await linkRetellAgent()}catch(x){if($("retellStatus"))$("retellStatus").textContent=x.message||"Could not link the Retell agent."}return}
+ b=e.target.closest("#buildRetellAgent");if(b){try{b.disabled=true;await buildRetellAgent()}catch(x){if($("retellStatus"))$("retellStatus").textContent=x.message||"Could not build/update the Retell agent."}finally{b.disabled=false}return}
+});
+document.addEventListener("change",function(e){
+ if(e.target.id==="retellAgents"&&e.target.value)$("retellAgentId").value=e.target.value;
+ if(e.target.id==="retellNumbers"&&e.target.value&&$("ail"))$("ail").value=e.target.value;
+});
 document.addEventListener("input",function(e){if(e.target.id==="aip"&&$("aic"))$("aic").textContent=e.target.value.length+" / 20000"});
 document.addEventListener("click",async function(e){
  var b=e.target.closest('[data-act="aisave"]');if(!b)return;
