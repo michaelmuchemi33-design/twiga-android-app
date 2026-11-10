@@ -153,12 +153,8 @@ Deno.serve(async (req:Request) => {
       if(!config) return reply({error:"Save the voice settings before provisioning."},400);
       const check=await retell(String(secret),"/get-concurrency");
       if(!check.ok) return reply({error:"Retell key no longer works. Replace it in AI settings."},400);
-      const recordingEnabled=recordingResult.data?.call_recording_enabled===true;
-      const recordingNotice=String(recordingResult.data?.recording_notice || "This call may be recorded to help us serve you.");
       const prompt=buildPrompt(biz,profileResult.data,productsResult.data || [],config.inbound_prompt || "",config.outbound_prompt || "") +
-        "\\n\\nCALL RECORDING POLICY: " + (recordingEnabled
-          ? "Recording and transcript storage is enabled for this business. Before discussing the customer's request, clearly say this exact notice: " + recordingNotice + " If the customer does not consent, politely end the AI call and invite them to contact the business directly."
-          : "Recording and transcript storage is disabled. Do not claim the call is being recorded. Do not promise that audio or transcript will be stored.");
+        "\\n\\nCALL RECORDING POLICY: The current recording preference and exact notice arrive in this call's fresh TWIGA business context. If recordingEnabled is true, announce recordingNotice immediately and request consent before discussing the enquiry. If recordingEnabled is false, do not claim the call is recorded. Never invent consent.";
       const requested=String(config.retell_model || "gpt-6-luna");
       const llmBody={
         model:requested,start_speaker:"agent",
@@ -185,7 +181,7 @@ Deno.serve(async (req:Request) => {
         enable_backchannel:true,backchannel_frequency:0.45,
         webhook_url:url+"/functions/v1/twiga-retell-webhook",
         webhook_events:["call_started","call_ended","call_analyzed"],webhook_timeout_ms:10000,
-        data_storage_setting:recordingResult.data?.call_recording_enabled===true ? "everything" : "basic_attributes_only",opt_in_signed_url:true,
+        data_storage_setting:"basic_attributes_only",opt_in_signed_url:true,
         signed_url_expiration_ms:86400000,max_call_duration_ms:600000,end_call_after_silence_ms:30000,
         begin_message_delay_ms:350,
         post_call_analysis_data:[
@@ -236,15 +232,20 @@ Deno.serve(async (req:Request) => {
       if(config?.provider!=="retell" || !config.retell_agent_id) return reply({error:"Retell is not selected and published for this business."},409);
       const {data:secret}=await admin.rpc("twiga_get_provider_secret",{p_business_id:businessId,p_provider:"retell"});
       if(!secret) return reply({error:"Retell credentials are missing for this business."},503);
-      const [profileResult,productsResult]=await Promise.all([
+      const [profileResult,productsResult,recordingResult]=await Promise.all([
         admin.from("twiga_business_profiles").select("business_summary,what_they_sell,what_they_do,products_and_services,target_customers,unique_selling_points,service_area,opening_hours,delivery_and_payment,returns_and_refunds,frequently_asked_questions,brand_voice,reply_language,assistant_instructions").eq("business_id",businessId).maybeSingle(),
-        admin.from("twiga_products").select("name,description,category,price,currency,unit,stock_quantity").eq("business_id",businessId).eq("is_active",true).order("name").limit(80)
+        admin.from("twiga_products").select("name,description,category,price,currency,unit,stock_quantity").eq("business_id",businessId).eq("is_active",true).order("name").limit(80),
+        admin.from("twiga_business_settings").select("call_recording_enabled,recording_notice").eq("business_id",businessId).maybeSingle()
       ]);
+      const recordingEnabled=recordingResult.data?.call_recording_enabled===true;
+      const recordingNotice=String(recordingResult.data?.recording_notice || "This call may be recorded to help us serve you.");
       const liveContext={
         businessName:businessResult.data?.name || "the business",
         businessType:businessResult.data?.business_type || "business",
         profile:profileResult.data || {},
-        activeProducts:productsResult.data || []
+        activeProducts:productsResult.data || [],
+        recordingEnabled,
+        recordingNotice
       };
       const dynamic={
         business_name:String(businessResult.data?.name || "the business"),
@@ -252,7 +253,13 @@ Deno.serve(async (req:Request) => {
         twiga_business_context:JSON.stringify(liveContext).slice(0,24000),
         twiga_business_id:businessId
       };
-      const webCall=await retell(String(secret),"/v2/create-web-call","POST",{agent_id:config.retell_agent_id,retell_llm_dynamic_variables:dynamic,metadata:{twiga_business_id:businessId,twiga_user_id:user.id,source:"twiga_android_app"}});
+      const webCall=await retell(String(secret),"/v2/create-web-call","POST",{
+        agent_id:config.retell_agent_id,
+        retell_llm_dynamic_variables:dynamic,
+        data_storage_setting:recordingEnabled ? "everything" : "basic_attributes_only",
+        opt_in_signed_url:recordingEnabled,
+        metadata:{twiga_business_id:businessId,twiga_user_id:user.id,source:"twiga_android_app"}
+      });
       if(!webCall.ok || !webCall.data.access_token) return reply({error:webCall.message || "Retell could not start the web call."},502);
       return reply({accessToken:webCall.data.access_token,callId:webCall.data.call_id,provider:"retell",expiresInSeconds:30});
     }
