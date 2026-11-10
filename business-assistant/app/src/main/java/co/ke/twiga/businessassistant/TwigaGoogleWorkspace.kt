@@ -49,8 +49,8 @@ internal fun GoogleWorkspaceWorkspace(api: TwigaApi, session: TwigaSession, busi
     var title by remember { mutableStateOf("") }
     var customer by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
-    var start by remember { mutableStateOf("2026-11-10T15:00:00+03:00") }
-    var end by remember { mutableStateOf("2026-11-10T15:30:00+03:00") }
+    var start by remember { mutableStateOf(googleDefaultTime(60)) }
+    var end by remember { mutableStateOf(googleDefaultTime(90)) }
     var notes by remember { mutableStateOf("") }
 
     fun showStatus() {
@@ -274,4 +274,13 @@ internal fun GoogleWorkspaceWorkspace(api: TwigaApi, session: TwigaSession, busi
         if (resultText.isNotBlank()) Text(resultText, fontSize = 12.sp, color = Muted, modifier = Modifier.padding(top = 10.dp))
         Text("Each business owner connects their own Google account. TWIGA stores OAuth tokens encrypted; the owner can disconnect at any time.", fontSize = 11.sp, color = Muted, modifier = Modifier.padding(top = 12.dp))
     }
+}
+
+private fun googleDefaultTime(addMinutes: Int): String {
+    val zone = java.util.TimeZone.getTimeZone("Africa/Nairobi")
+    val calendar = java.util.Calendar.getInstance(zone)
+    calendar.add(java.util.Calendar.MINUTE, addMinutes)
+    return java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", java.util.Locale.US).apply {
+        timeZone = zone
+    }.format(calendar.time)
 }
