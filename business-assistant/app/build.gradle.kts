@@ -1,9 +1,10 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
-import java.util.Properties
 val twigaProps = Properties().apply { val local = rootProject.file("twiga.properties"); if (local.exists()) local.inputStream().use { load(it) } }
 fun setting(name: String, env: String): String = providers.gradleProperty(name).orNull ?: System.getenv(env) ?: twigaProps.getProperty(name) ?: ""
 android {
@@ -33,6 +34,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.json:json:20240303")
