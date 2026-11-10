@@ -78,18 +78,28 @@ Deno.serve(async (req:Request) => {
       return reply({error:"Only the business owner, business admin or TWIGA platform admin can change AI settings."},403);
 
     if(action==="get_config") {
-      const [configResult,keyResult,recordingResult]=await Promise.all([
+      const [configResult,keyResult,recordingResult,lineResult]=await Promise.all([
         admin.from("twiga_business_voice_configs").select("*").eq("business_id",businessId).maybeSingle(),
         admin.from("twiga_provider_secret_refs").select("secret_last4,updated_at").eq("business_id",businessId).eq("provider","retell").maybeSingle(),
-        admin.from("twiga_business_settings").select("call_recording_enabled,recording_notice").eq("business_id",businessId).maybeSingle()
+        admin.from("twiga_business_settings").select("call_recording_enabled,recording_notice").eq("business_id",businessId).maybeSingle(),
+        admin.from("ai_lines").select("number").eq("business_id",businessId).maybeSingle()
       ]);
       return reply({
-        config:configResult.data || {business_id:businessId,provider:"vapi",retell_voice_id:"fish_audio-Willa",retell_voice_model:"s2.1-pro",retell_model:"gpt-6-luna",retell_language_codes:["en-GB","sw-KE"],retell_ambient_sound:"call-center",retell_ambient_sound_volume:0.12},
+        config:configResult.data || {business_id:businessId,provider:"vapi",retell_voice_id:"retell-Willa",retell_voice_model:null,retell_model:"gpt-6-luna",retell_language_codes:["en-GB","sw-KE"],retell_ambient_sound:"call-center",retell_ambient_sound_volume:0.12},
         keyConfigured:!!keyResult.data,keyLast4:keyResult.data?.secret_last4 || "",keyUpdatedAt:keyResult.data?.updated_at || null,
         recordingEnabled:recordingResult.data?.call_recording_enabled===true,
-        recordingNotice:recordingResult.data?.recording_notice || "This call may be recorded to help us serve you.",
+        recordingNotice:recordingResult.data?.recording_notice || "This call may be recorded to help you.",
+        aiBridgeNumber:lineResult.data?.number || "",
         canManage,isPlatformAdmin
       });
+    }
+
+    if(action==="list_phone_numbers") {
+      const {data:secret,error:secretError}=await admin.rpc("twiga_get_provider_secret",{p_business_id:businessId,p_provider:"retell"});
+      if(secretError || !secret) return reply({error:"Connect a valid Retell key for this business first."},400);
+      const result=await retell(String(secret),"/v2/list-phone-numbers","GET");
+      if(!result.ok) return reply({error:"Could not list Retell phone numbers: "+result.message},502);
+      return reply({phoneNumbers:result.data.phone_numbers || result.data.items || [],hasMore:!!result.data.has_more});
     }
 
     if(action==="save_key") {
@@ -103,11 +113,11 @@ Deno.serve(async (req:Request) => {
     }
 
     if(action==="save_settings") {
-      const voiceId=String(body.voiceId || "fish_audio-Willa");
-      const voiceModel=String(body.voiceModel || "s2.1-pro");
+      const voiceId=String(body.voiceId || "retell-Willa");
+      const voiceModel=voiceId==="retell-Willa" ? null : String(body.voiceModel || "eleven_turbo_v2_5");
       const model=String(body.model || "gpt-6-luna");
-      if(!["fish_audio-Willa","retell-Willa","11labs-Willa","cartesia-Willa"].includes(voiceId)) return reply({error:"Unsupported Willa voice option."},400);
-      if(!["s2.1-pro","s2-pro"].includes(voiceModel)) return reply({error:"Unsupported voice model."},400);
+      if(!["retell-Willa","11labs-Willa","cartesia-Willa"].includes(voiceId)) return reply({error:"Unsupported Willa voice option."},400);
+      if(voiceModel!==null && !["eleven_turbo_v2","eleven_flash_v2","eleven_turbo_v2_5","eleven_flash_v2_5","eleven_multilingual_v2","eleven_v3","sonic-3","sonic-3-latest","sonic-3.5","tts-1","gpt-4o-mini-tts","speech-02-turbo","speech-2.8-turbo","s1","s2-pro","s2.1-pro"].includes(voiceModel)) return reply({error:"Unsupported voice model."},400);
       if(!["gpt-6-luna","gpt-5.6-luna"].includes(model)) return reply({error:"Unsupported Retell model."},400);
       const ambient=Math.min(0.3,Math.max(0,Number(body.ambientVolume ?? 0.12)));
       const recordingEnabled=body.recordingEnabled===true;
@@ -134,6 +144,24 @@ Deno.serve(async (req:Request) => {
         updated_at:new Date().toISOString()
       },{onConflict:"business_id"});
       if(recordingSaveError) throw recordingSaveError;
+      if(Object.prototype.hasOwnProperty.call(body,"bridgeNumber")) {
+        const bridgeNumber=String(body.bridgeNumber || "").trim();
+        if(bridgeNumber && !/^\\+[1-9][0-9]{6,14}$/.test(bridgeNumber))
+          return reply({error:"The AI bridge number must be in international E.164 format, for example +2547XXXXXXXX."},400);
+        if(bridgeNumber) {
+          const {data:claimed,error:claimError}=await admin.from("ai_lines").select("business_id").eq("number",bridgeNumber).maybeSingle();
+          if(claimError) throw claimError;
+          if(claimed && claimed.business_id!==businessId)
+            return reply({error:"That AI number is already assigned to another business."},409);
+          const {error:deleteError}=await admin.from("ai_lines").delete().eq("business_id",businessId);
+          if(deleteError) throw deleteError;
+          const {error:lineError}=await admin.from("ai_lines").insert({number:bridgeNumber,business_id:businessId});
+          if(lineError) throw lineError;
+        } else {
+          const {error:deleteError}=await admin.from("ai_lines").delete().eq("business_id",businessId);
+          if(deleteError) throw deleteError;
+        }
+      }
       let recordingAppliedToAgent=false;
       if(config.provider==="retell" && savedResult.data?.retell_agent_id) {
         const {data:retellSecret}=await admin.rpc("twiga_get_provider_secret",{p_business_id:businessId,p_provider:"retell"});
@@ -149,6 +177,25 @@ Deno.serve(async (req:Request) => {
         recordingAppliedToAgent=true;
       }
       return reply({saved:true,config:savedResult.data,recordingEnabled,recordingNotice,recordingAppliedToAgent});
+    }
+
+    if(action==="link_existing_agent") {
+      const agentId=String(body.agentId || "").trim();
+      if(!agentId || agentId.length>255) return reply({error:"Enter the existing Retell agent ID."},400);
+      const {data:secret,error:secretError}=await admin.rpc("twiga_get_provider_secret",{p_business_id:businessId,p_provider:"retell"});
+      if(secretError || !secret) return reply({error:"Connect and validate this business's Retell API key first."},400);
+      const found=await retell(String(secret),"/get-agent/"+encodeURIComponent(agentId));
+      if(!found.ok) return reply({error:"Retell could not find that agent using this API key: "+found.message},404);
+      const agent=found.data || {};
+      const engine=agent.response_engine || {};
+      const llmId=String(engine.llm_id || agent.llm_id || "");
+      const {data:existing}=await admin.from("twiga_business_voice_configs").select("business_id").eq("business_id",businessId).maybeSingle();
+      const update={provider:"retell",retell_agent_id:agentId,retell_llm_id:llmId || null,retell_voice_id:String(agent.voice_id || "retell-Willa"),retell_voice_model:agent.voice_model || null,updated_by:user.id,updated_at:new Date().toISOString()};
+      const saved=existing
+        ? await admin.from("twiga_business_voice_configs").update(update).eq("business_id",businessId).select("business_id,provider,retell_agent_id,retell_llm_id,retell_voice_id,retell_voice_model,retell_model,retell_language_codes,inbound_prompt,outbound_prompt").single()
+        : await admin.from("twiga_business_voice_configs").insert({...update,business_id:businessId}).select("business_id,provider,retell_agent_id,retell_llm_id,retell_voice_id,retell_voice_model,retell_model,retell_language_codes,inbound_prompt,outbound_prompt").single();
+      if(saved.error) throw saved.error;
+      return reply({linked:true,config:saved.data,agentName:agent.agent_name || null,agentId});
     }
 
     if(action==="provision_agent") {
@@ -187,8 +234,8 @@ Deno.serve(async (req:Request) => {
       const agentBody={
         agent_name:("TWIGA - "+biz.name).slice(0,120),
         response_engine:{type:"retell-llm",llm_id:llmId},
-        voice_id:config.retell_voice_id || "fish_audio-Willa",
-        voice_model:config.retell_voice_model || "s2.1-pro",
+        voice_id:config.retell_voice_id || "retell-Willa",
+        voice_model:config.retell_voice_id === "retell-Willa" ? null : (config.retell_voice_model || null),
         language:["en-GB","sw-KE"],voice_emotion:"calm",
         ambient_sound:"call-center",ambient_sound_volume:Number(config.retell_ambient_sound_volume ?? 0.12),
         responsiveness:0.92,interruption_sensitivity:0.8,
