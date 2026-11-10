@@ -41,6 +41,10 @@ private data class PlatformTicket(
     val id: String, val subject: String, val message: String, val contact: String,
     val status: String, val channel: String, val createdAt: String
 )
+private data class PlatformVapiAccount(
+    val id: String, val name: String, val publicKey: String, val assistantId: String,
+    val voiceLabel: String, val voiceModel: String, val enabled: Boolean, val priority: Int
+)
 internal data class SupportLine(val role: String, val content: String)
 
 internal object TwigaAdminSupportApi {
@@ -100,6 +104,19 @@ internal object TwigaAdminSupportApi {
     ): JSONObject = post(url, key, session, "twiga-platform-admin",
         JSONObject().put("action", "update_ticket").put("ticketId", ticketId).put("status", status))
 
+    suspend fun saveVapiAccount(
+        url: String, key: String, session: TwigaSession, name: String, publicKey: String,
+        assistantId: String, voiceLabel: String, voiceModel: String, priority: Int
+    ): JSONObject = post(url, key, session, "twiga-platform-admin", JSONObject()
+        .put("action", "save_vapi_account").put("name", name).put("publicKey", publicKey)
+        .put("assistantId", assistantId).put("voiceLabel", voiceLabel)
+        .put("voiceModel", voiceModel).put("priority", priority).put("enabled", true))
+
+    suspend fun setVapiAccountEnabled(
+        url: String, key: String, session: TwigaSession, accountId: String, enabled: Boolean
+    ): JSONObject = post(url, key, session, "twiga-platform-admin", JSONObject()
+        .put("action", "set_vapi_account_enabled").put("accountId", accountId).put("enabled", enabled))
+
     suspend fun chat(
         url: String, key: String, session: TwigaSession?, businessId: String?,
         messages: List<SupportLine>
@@ -152,6 +169,7 @@ fun TwigaPlatformAdminWorkspace(url: String, key: String, session: TwigaSession)
     var clients by remember { mutableStateOf(emptyList<PlatformClient>()) }
     var payments by remember { mutableStateOf(emptyList<PlatformPayment>()) }
     var tickets by remember { mutableStateOf(emptyList<PlatformTicket>()) }
+    var vapiAccounts by remember { mutableStateOf(emptyList<PlatformVapiAccount>()) }
     var clientCount by remember { mutableIntStateOf(0) }
     var paidTotal by remember { mutableDoubleStateOf(0.0) }
     var openTickets by remember { mutableIntStateOf(0) }
@@ -164,6 +182,13 @@ fun TwigaPlatformAdminWorkspace(url: String, key: String, session: TwigaSession)
     var reference by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     var paidThrough by remember { mutableStateOf("") }
+    var showVapiDialog by remember { mutableStateOf(false) }
+    var vapiName by remember { mutableStateOf("") }
+    var vapiPublicKey by remember { mutableStateOf("") }
+    var vapiAssistantId by remember { mutableStateOf("") }
+    var vapiVoiceLabel by remember { mutableStateOf("") }
+    var vapiVoiceModel by remember { mutableStateOf("eleven_flash_v2_5") }
+    var vapiPriority by remember { mutableStateOf("100") }
     val scope = rememberCoroutineScope()
 
     fun refresh() {
@@ -196,6 +221,15 @@ fun TwigaPlatformAdminWorkspace(url: String, key: String, session: TwigaSession)
                         j.optString("id"), j.optString("subject"), j.optString("message"),
                         j.optString("contact"), j.optString("status"), j.optString("channel"),
                         j.optString("created_at")
+                    )
+                }
+                val vapiRows = result.optJSONArray("vapiAccounts") ?: JSONArray()
+                vapiAccounts = (0 until vapiRows.length()).map { i ->
+                    val j = vapiRows.getJSONObject(i)
+                    PlatformVapiAccount(
+                        j.optString("id"), j.optString("name"), j.optString("vapi_public_key"),
+                        j.optString("assistant_id"), j.optString("voice_label"), j.optString("voice_model"),
+                        j.optBoolean("enabled"), j.optInt("priority", 100)
                     )
                 }
                 val metrics = result.optJSONObject("metrics") ?: JSONObject()
@@ -263,6 +297,39 @@ fun TwigaPlatformAdminWorkspace(url: String, key: String, session: TwigaSession)
                     }
                 }
             }
+            item {
+                Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Rotating Vapi accounts", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text("The app rotates across enabled public SDK profiles.", fontSize = 11.sp, color = Muted)
+                    }
+                    Button(onClick = { showVapiDialog = true }) { Icon(Icons.Default.Add, null); Text("Add") }
+                }
+            }
+            if (vapiAccounts.isEmpty()) item { Text("No voice accounts configured.", color = Muted) }
+            items(vapiAccounts, key = { "vapi-${it.id}" }) { account ->
+                Card(Modifier.fillMaxWidth().padding(bottom = 7.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                    Column(Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(account.name, fontWeight = FontWeight.SemiBold)
+                                Text(listOf(account.voiceLabel, account.voiceModel).filter { it.isNotBlank() }.joinToString(" • ").ifBlank { "Voice profile not labelled" }, fontSize = 11.sp, color = Muted)
+                            }
+                            StatusPill(if (account.enabled) "ACTIVE" else "DISABLED")
+                        }
+                        Text("Assistant: ${account.assistantId}", fontSize = 10.sp, color = Muted)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = {
+                                scope.launch {
+                                    try { TwigaAdminSupportApi.setVapiAccountEnabled(url, key, session, account.id, !account.enabled); refresh() }
+                                    catch (e: Exception) { error = e.message ?: "Could not update Vapi account." }
+                                }
+                            }) { Text(if (account.enabled) "Disable" else "Enable") }
+                            Text("Rotation priority ${account.priority}", color = Muted, fontSize = 11.sp, modifier = Modifier.align(Alignment.CenterVertically))
+                        }
+                    }
+                }
+            }
             item { Text("Recent payments", fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)) }
             if (payments.isEmpty()) item { Text("No payments recorded yet.", color = Muted) }
             items(payments, key = { it.id }) { payment ->
@@ -305,6 +372,45 @@ fun TwigaPlatformAdminWorkspace(url: String, key: String, session: TwigaSession)
                 }
             }
         }
+    }
+
+    if (showVapiDialog) {
+        AlertDialog(
+            onDismissRequest = { showVapiDialog = false },
+            title = { Text("Add Vapi voice account") },
+            text = {
+                Column(Modifier.fillMaxWidth().heightIn(max = 560.dp).verticalScroll(rememberScrollState())) {
+                    Text("Enter the public SDK key and assistant ID from this Vapi workspace. Do not paste a private Vapi API key here; keep private keys in Composio.", fontSize = 11.sp, color = Muted)
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(vapiName, { vapiName = it }, label = { Text("Account name") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(vapiPublicKey, { vapiPublicKey = it }, label = { Text("Vapi public SDK key") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    OutlinedTextField(vapiAssistantId, { vapiAssistantId = it }, label = { Text("Assistant ID") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    OutlinedTextField(vapiVoiceLabel, { vapiVoiceLabel = it }, label = { Text("Voice label (optional)") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(vapiVoiceModel, { vapiVoiceModel = it }, label = { Text("Voice model (label only)") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(vapiPriority, { vapiPriority = it }, label = { Text("Rotation priority (1 = first)") }, modifier = Modifier.fillMaxWidth())
+                    Text("The assistant itself must already be configured in its Vapi workspace with the voice/model you want.", fontSize = 10.sp, color = Muted)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val priority = vapiPriority.toIntOrNull() ?: 100
+                    if (vapiName.isBlank() || vapiPublicKey.isBlank() || vapiAssistantId.isBlank()) {
+                        error = "Enter an account name, public SDK key and assistant ID."
+                    } else scope.launch {
+                        try {
+                            TwigaAdminSupportApi.saveVapiAccount(
+                                url, key, session, vapiName.trim(), vapiPublicKey.trim(),
+                                vapiAssistantId.trim(), vapiVoiceLabel.trim(), vapiVoiceModel.trim(), priority
+                            )
+                            vapiName = ""; vapiPublicKey = ""; vapiAssistantId = ""
+                            vapiVoiceLabel = ""; vapiVoiceModel = "eleven_flash_v2_5"; vapiPriority = "100"
+                            showVapiDialog = false; refresh()
+                        } catch (e: Exception) { error = e.message ?: "Vapi account could not be saved." }
+                    }
+                }) { Text("Save voice account") }
+            },
+            dismissButton = { TextButton(onClick = { showVapiDialog = false }) { Text("Cancel") } }
+        )
     }
 
     if (showPayment) {
