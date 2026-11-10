@@ -45,12 +45,16 @@ Deno.serve(async(req:Request)=>{
     if(!(await verifySignature(raw,String(secret),signature))) return reply({error:"Invalid Retell webhook signature"},401);
 
     const event=String(payload.event || "");
+    const {data:recordingSettings,error:recordingSettingsError}=await admin.from("twiga_business_settings")
+      .select("call_recording_enabled").eq("business_id",config.business_id).maybeSingle();
+    if(recordingSettingsError) return reply({error:"Could not verify this business's call recording preference"},503);
+    const recordingEnabled=recordingSettings?.call_recording_enabled===true;
     const start=call.start_timestamp ? new Date(Number(call.start_timestamp)).toISOString() : null;
     const end=call.end_timestamp ? new Date(Number(call.end_timestamp)).toISOString() : null;
     const duration=start && end ? Math.max(0,Math.round((new Date(end).getTime()-new Date(start).getTime())/1000)) : 0;
     const analysis:Row=call.call_analysis || {};
     const custom:Row=analysis.custom_analysis_data || {};
-    const recordingUrl=String(call.recording_url || "");
+    const recordingUrl=recordingEnabled ? String(call.recording_url || "") : "";
     const metadata:Row={
       twiga_agent_id:agentId,
       retell_call_type:call.call_type || null,
@@ -58,11 +62,12 @@ Deno.serve(async(req:Request)=>{
       custom_analysis_data:custom,
       recording_url:recordingUrl || null,
       recording_url_expires_at:recordingUrl ? new Date(Date.now()+24*60*60*1000).toISOString() : null,
-      recording_stored_in_retell:true,
-      recording_copied_to_r2:false
+      recording_stored_in_retell:recordingEnabled && !!recordingUrl,
+      recording_copied_to_r2:false,
+      content_storage_enabled:recordingEnabled
     };
-    const summary=String(analysis.call_summary || analysis.call_summary_text || "");
-    const transcript=String(call.transcript || "");
+    const summary=recordingEnabled ? String(analysis.call_summary || analysis.call_summary_text || "") : "";
+    const transcript=recordingEnabled ? String(call.transcript || "") : "";
     const status=event==="call_started" ? "in_progress" : (event==="call_ended" || event==="call_analyzed" ? "completed" : "in_progress");
     const callRecord={
       business_id:config.business_id,provider:"retell",provider_call_id:callId,
