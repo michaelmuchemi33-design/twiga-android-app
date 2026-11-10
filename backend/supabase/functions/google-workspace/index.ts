@@ -432,7 +432,7 @@ Deno.serve(async (req: Request) => {
       for (const appointment of appointments || []) {
         const start = new Date(appointment.scheduled_at);
         if (!Number.isFinite(start.getTime())) continue;
-        const durationMatch = String(appointment.notes || "").match(/Requested duration minutes:\\s*(\\d+)/i);
+        const durationMatch = String(appointment.notes || "").match(/Requested duration minutes:\s*(\d+)/i);
         const durationMinutes = Math.min(180, Math.max(15, Number(durationMatch?.[1] || 30)));
         const end = new Date(start.getTime() + durationMinutes * 60000);
         const pendingRequest = String(appointment.status || "").toLowerCase() === "requested";
