@@ -190,6 +190,36 @@ fun AboutScreen(
                 )
             }
 
+            Text(
+                modifier = Modifier.padding(top = 4.dp),
+                text = stringResource(R.string.about_section_legal),
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            Column {
+                AboutLinkCard(
+                    title = stringResource(R.string.privacy_policy),
+                    description = stringResource(R.string.privacy_policy_description),
+                    uri = stringResource(R.string.url_privacy_policy),
+                    roundTop = true,
+                    roundBottom = false
+                )
+                AboutLinkCard(
+                    title = stringResource(R.string.user_agreement),
+                    description = stringResource(R.string.user_agreement_description),
+                    uri = stringResource(R.string.url_user_agreement),
+                    roundTop = false,
+                    roundBottom = false
+                )
+                AboutLinkCard(
+                    title = stringResource(R.string.twiga_support),
+                    description = stringResource(R.string.twiga_support_description),
+                    uri = stringResource(R.string.url_twiga_support),
+                    roundTop = false,
+                    roundBottom = true
+                )
+            }
+
             val fontName = stringResource(R.string.font_name)
             val fontAuthor = stringResource(R.string.font_author)
             val fontUri = stringResource(R.string.url_font)
