@@ -25,7 +25,7 @@ jobs:
       - name: Accept Android SDK licences and install Android 17 SDK 37.0
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37" "build-tools;37.0.0" "platform-tools"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;37.0.0" "platform-tools"
 
       - name: Detect permanent signing configuration
         id: signing
