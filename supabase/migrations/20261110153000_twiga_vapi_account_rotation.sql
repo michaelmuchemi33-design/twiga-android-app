@@ -37,5 +37,5 @@ $$;
 revoke all on function public.twiga_next_vapi_account() from public,anon,authenticated;
 grant execute on function public.twiga_next_vapi_account() to service_role;
 insert into public.twiga_vapi_accounts(name,vapi_public_key,assistant_id,voice_label,voice_model,priority,enabled)
-values ('TWIGA Primary Vapi','2874d463-b31e-4d5a-84d7-e6cbe0a90b15','ea3ae8f7-fb6f-430e-9c33-96d9a919ade3','Sarah · ElevenLabs','eleven_v3',1,true)
+values ('TWIGA Primary Vapi','2874d463-b31e-4d5a-84d7-e6cbe0a90b15','ea3ae8f7-fb6f-430e-9c33-96d9a919ade3','Sarah · ElevenLabs preset','eleven_v3 · streaming latency optimization 4',1,true)
 on conflict(vapi_public_key,assistant_id) do update set name=excluded.name,voice_label=excluded.voice_label,voice_model=excluded.voice_model,priority=excluded.priority,enabled=true,updated_at=now();
