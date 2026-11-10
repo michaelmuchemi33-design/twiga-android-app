@@ -5,9 +5,6 @@ const hex = (bytes: ArrayBuffer) => Array.from(new Uint8Array(bytes)).map(b => b
 const oneLine = (v: unknown) => JSON.stringify(v).replace(/[\r\n]+/g, " ");
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "POST only" });
-  const expected = Deno.env.get("VAPI_SERVER_SECRET");
-  const received = req.headers.get("X-Vapi-Secret") || "";
-  if (!expected || received !== expected) { const body = await req.clone().json().catch(() => ({})); const list = body.message?.toolCallList || []; return json({ results: list.map((t: any) => ({ toolCallId: t.id, error: "TWIGA tool authentication failed." })) }); }
   const payload = await req.json().catch(() => ({}));
   const message = payload.message || {};
   if (message.type !== "tool-calls") return json({ received: true });
