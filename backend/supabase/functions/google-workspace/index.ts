@@ -242,7 +242,7 @@ async function ensureSheet(admin: any, connection: Conn, token: string) {
     await googleJson(token, "https://sheets.googleapis.com/v4/spreadsheets/" + encodeURIComponent(id) +
       "/values/Sheet1!A1:H1?valueInputOption=RAW", {
       method: "PUT",
-      body: JSON.stringify({ values: [["Exported at", "Order ID", "Customer", "Phone", "Type", "Total (KSh)", "Paid (KSh)", "Status"]] }),
+      body: JSON.stringify({ values: [["Exported at", "Order ID", "Customer", "Order details", "Total (KSh)", "Status"]] }),
     });
   }
   await admin.from("twiga_google_connections").update({
@@ -398,27 +398,28 @@ Deno.serve(async (req: Request) => {
       return reply(req, { ...sheet, ready: true });
     }
     if (action === "sheets.export-orders") {
-      const orders = Array.isArray(body.orders) ? body.orders.slice(0, 1000) : [];
+      const { data: orders, error: orderError } = await admin.from("twiga_orders")
+        .select("id,customer_name,total_amount,description,status,created_at")
+        .eq("business_id", businessId).order("created_at", { ascending: false }).limit(1000);
+      if (orderError) throw new HttpError(500, "Could not load TWIGA orders for export.");
       const sheet = await ensureSheet(admin, connection, token);
-      const values: unknown[][] = [["Exported at", "Order ID", "Customer", "Phone", "Type", "Total (KSh)", "Paid (KSh)", "Status"]];
-      for (const o of orders) values.push([
+      const values: unknown[][] = [["Exported at", "Order ID", "Customer", "Order details", "Total (KSh)", "Status"]];
+      for (const o of orders || []) values.push([
         new Date().toISOString(),
-        String(o.OrderId || o.orderId || "").slice(0, 80),
-        String(o.Customer || o.customer || "").slice(0, 120),
-        String(o.Phone || o.phone || "").slice(0, 40),
-        String(o.Type || o.type || "").slice(0, 50),
-        Number(o.Total ?? o.total ?? 0),
-        Number(o.Paid ?? o.paid ?? 0),
-        String(o.Status || o.status || "").slice(0, 40),
+        String(o.id || "").slice(0, 80),
+        String(o.customer_name || "").slice(0, 120),
+        String(o.description || "").slice(0, 160),
+        Number(o.total_amount || 0),
+        String(o.status || "").slice(0, 40),
       ]);
       await googleJson(token, "https://sheets.googleapis.com/v4/spreadsheets/" + encodeURIComponent(sheet.spreadsheetId) +
         "/values:batchClear", { method: "POST", body: JSON.stringify({ ranges: ["Sheet1!A1:H1001"] }) });
       await googleJson(token, "https://sheets.googleapis.com/v4/spreadsheets/" + encodeURIComponent(sheet.spreadsheetId) +
-        "/values/Sheet1!A1:H" + values.length + "?valueInputOption=RAW", {
+        "/values/Sheet1!A1:F" + values.length + "?valueInputOption=RAW", {
         method: "PUT", body: JSON.stringify({ values }),
       });
       await admin.from("twiga_google_connections").update({ last_sync_at: new Date().toISOString() }).eq("business_id", businessId);
-      return reply(req, { exported: orders.length, spreadsheetUrl: sheet.spreadsheetUrl });
+      return reply(req, { exported: (orders || []).length, spreadsheetUrl: sheet.spreadsheetUrl });
     }
     if (action === "appointments.sync") {
       const { data: business } = await admin.from("businesses").select("name").eq("id", businessId).maybeSingle();
