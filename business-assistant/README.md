@@ -54,7 +54,7 @@ The Supabase project must already have the `businesses` and `business_members` t
 1. In Vapi, open the TWIGA assistant used by the app (do not attach a phone number).
 2. Create a Bearer Token custom credential configured to send the header `X-Vapi-Secret` **without** a Bearer prefix. Use the same secret value configured as `VAPI_SERVER_SECRET` in Supabase.
 3. Set the assistant Server URL to `https://ztyxxikkposfpxsutnfr.supabase.co/functions/v1/twiga-vapi-tools` and attach that credential.
-4. Add these Function tools to the assistant's model. For each tool, set its server URL to the same Edge Function and attach the credential if the Vapi dashboard requires per-tool credentials.
+4. Add these Function tools to the assistant's model. For each tool, set its server URL to the same Edge Function and attach the same credential to each tool's server configuration.
 
 ### Tool definitions
 
