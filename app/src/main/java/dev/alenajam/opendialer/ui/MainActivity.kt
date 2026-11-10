@@ -47,6 +47,7 @@ class MainActivity : ComponentActivity() {
 
     private var webView: WebView? = null
     private var pendingDialNumber: String? = null
+    private var phonePermissionRequestInFlight = false
     private var pendingWebPermission: PermissionRequest? = null
     @Volatile private var googleOAuthInProgress = false
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -85,6 +86,7 @@ class MainActivity : ComponentActivity() {
     private val phonePermissions = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { results ->
+        phonePermissionRequestInFlight = false
         val required = listOf(
             Manifest.permission.CALL_PHONE,
             Manifest.permission.READ_PHONE_STATE,
@@ -296,7 +298,8 @@ class MainActivity : ComponentActivity() {
                 pendingDialNumber = null
                 placeSimCall(pending)
             }
-        } else {
+        } else if (!phonePermissionRequestInFlight) {
+            phonePermissionRequestInFlight = true
             phonePermissions.launch(missing.toTypedArray())
         }
     }
