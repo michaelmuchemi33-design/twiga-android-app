@@ -640,6 +640,7 @@ async function twigaRetell(action,extra){
 function setVoiceProvider(provider){
  var nextProvider=provider==="retell"?"retell":"vapi";
  if(nextProvider!==configuredVoiceProvider)providerLineConfirmed=false;
+ if(nextProvider!=="retell")selectedRetellNumber="";
  activeVoiceProvider=nextProvider;
  if($("retellSetup"))$("retellSetup").hidden=activeVoiceProvider!=="retell";
  if($("useVapi"))$("useVapi").className=activeVoiceProvider==="vapi"?"btn pri":"btn";
@@ -663,7 +664,7 @@ async function loadVoiceConfig(){
   if($("retellRecording"))$("retellRecording").checked=d.recordingEnabled===true;
   if($("retellNotice"))$("retellNotice").value=d.recordingNotice||"This call may be recorded to help us serve you.";
   if($("ail")&&d.aiBridgeNumber)$("ail").value=d.aiBridgeNumber;
-  if($("providerMsg"))$("providerMsg").textContent=(x.provider||"vapi").toUpperCase()+" is selected. "+(retellKeyConfigured?"Retell key is saved securely (ending "+(d.keyLast4||"****")+").":"Add a Retell key only when switching to Retell.");
+  if($("providerMsg"))$("providerMsg").textContent=(x.provider||"vapi").toUpperCase()+" is selected. "+(retellKeyConfigured?"Retell key is saved securely (ending "+(d.keyLast4||"****")+").":(activeVoiceProvider==="retell"?"Paste and save this business Retell API key below.":"Retell key is not needed while Vapi is selected."));
  }catch(e){if($("providerMsg"))$("providerMsg").textContent=e.message||"Could not load provider settings."}
 }
 async function saveRetellKey(){
@@ -703,7 +704,7 @@ async function linkRetellAgent(){
  if(!id)throw new Error("Load and choose the existing Retell agent first.");
  await twigaRetell("link_existing_agent",{agentId:id});
  if($("retellStatus"))$("retellStatus").textContent="Existing Retell agent linked to this business. Its response engine will be preserved.";
- await loadVoiceConfig();
+ await loadVoiceConfig();setVoiceProvider("retell");
 }
 async function buildRetellAgent(){
  await saveVoiceProvider();
