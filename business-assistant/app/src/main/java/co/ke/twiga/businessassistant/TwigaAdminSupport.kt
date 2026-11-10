@@ -21,6 +21,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -186,6 +188,8 @@ fun TwigaPlatformAdminWorkspace(url: String, key: String, session: TwigaSession)
     var note by remember { mutableStateOf("") }
     var paidThrough by remember { mutableStateOf("") }
     var showVapiDialog by remember { mutableStateOf(false) }
+    var showAiSetup by remember { mutableStateOf(false) }
+    var aiSetupClient by remember { mutableStateOf<PlatformClient?>(null) }
     var vapiName by remember { mutableStateOf("") }
     var vapiPublicKey by remember { mutableStateOf("") }
     var vapiAssistantId by remember { mutableStateOf("") }
@@ -291,6 +295,7 @@ fun TwigaPlatformAdminWorkspace(url: String, key: String, session: TwigaSession)
                         }
                         Text("Paid through: ${client.paidThrough.ifBlank { "Not set" }}", color = Muted, fontSize = 12.sp)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = { aiSetupClient = client; showAiSetup = true }) { Text("AI Setup", color = Orange) }
                             TextButton(onClick = {
                                 scope.launch {
                                     try { TwigaAdminSupportApi.setAccess(url, key, session, client.id, "ACTIVE", ""); refresh() }
@@ -459,6 +464,33 @@ fun TwigaPlatformAdminWorkspace(url: String, key: String, session: TwigaSession)
             },
             dismissButton = { TextButton(onClick = { showPayment = false }) { Text("Cancel") } }
         )
+    if (showAiSetup && aiSetupClient != null) {
+        Dialog(
+            onDismissRequest = { showAiSetup = false; aiSetupClient = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Card(
+                Modifier.fillMaxWidth(0.97f).heightIn(min = 560.dp, max = 780.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                shape = RoundedCornerShape(18.dp)
+            ) {
+                Column(Modifier.fillMaxSize().padding(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Remote AI setup", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Ink)
+                            Text(aiSetupClient!!.name + " · " + aiSetupClient!!.ownerEmail, fontSize = 11.sp, color = Muted)
+                        }
+                        TextButton(onClick = { showAiSetup = false; aiSetupClient = null }) { Text("Close") }
+                    }
+                    Divider()
+                    Box(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp)) {
+                        TwigaRetellWorkspace(url, key, session, aiSetupClient!!.id, aiSetupClient!!.name)
+                    }
+                }
+            }
+        }
+    }
+
     }
 }
 
