@@ -359,6 +359,117 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
     }},confirmButton={TextButton(onClick={ { addRecord() } },enabled=name.isNotBlank()){Text("Save")}},dismissButton={TextButton(onClick={dialog=false}){Text("Cancel")}})
 }
 
+
+@Composable
+private fun BusinessProfileWorkspace(
+    profile:TwigaBusinessProfile,
+    loading:Boolean,
+    onChange:(TwigaBusinessProfile)->Unit,
+    onSave:()->Unit
+) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom=20.dp)) {
+        Text("Business knowledge",fontSize=24.sp,fontWeight=FontWeight.Bold,color=Ink)
+        Text("Tell TWIGA what this business does. This information is saved separately for the selected business and used when answering WhatsApp customers.",color=Muted,fontSize=13.sp)
+        Spacer(Modifier.height(14.dp))
+        @Composable fun field(label:String,value:String,change:(String)->Unit,lines:Int=2) {
+            OutlinedTextField(value,change,label={Text(label)},modifier=Modifier.fillMaxWidth().padding(bottom=9.dp),minLines=lines)
+        }
+        field("Business overview",profile.businessSummary,{onChange(profile.copy(businessSummary=it))},3)
+        field("What does this business sell?",profile.whatTheySell,{onChange(profile.copy(whatTheySell=it))},3)
+        field("What services or work does the business do?",profile.whatTheyDo,{onChange(profile.copy(whatTheyDo=it))},3)
+        field("Products and services explained",profile.productsAndServices,{onChange(profile.copy(productsAndServices=it))},3)
+        field("Who are the target customers?",profile.targetCustomers,{onChange(profile.copy(targetCustomers=it))})
+        field("What makes this business different?",profile.uniqueSellingPoints,{onChange(profile.copy(uniqueSellingPoints=it))},3)
+        field("Location and delivery/service area",profile.serviceArea,{onChange(profile.copy(serviceArea=it))})
+        field("Opening hours",profile.openingHours,{onChange(profile.copy(openingHours=it))})
+        field("Payments and delivery rules",profile.deliveryAndPayment,{onChange(profile.copy(deliveryAndPayment=it))},3)
+        field("Returns, refunds and cancellations",profile.returnsAndRefunds,{onChange(profile.copy(returnsAndRefunds=it))},3)
+        field("Frequently asked questions and answers",profile.frequentlyAskedQuestions,{onChange(profile.copy(frequentlyAskedQuestions=it))},4)
+        field("Brand voice / personality",profile.brandVoice,{onChange(profile.copy(brandVoice=it))})
+        field("Reply language preference (match_customer, English, Kiswahili)",profile.replyLanguage,{onChange(profile.copy(replyLanguage=it))})
+        field("Extra instructions for the AI receptionist",profile.assistantInstructions,{onChange(profile.copy(assistantInstructions=it))},4)
+        Button(onClick=onSave,enabled=!loading,modifier=Modifier.fillMaxWidth()) {
+            Text(if(loading) "Saving business knowledge…" else "Save business information")
+        }
+    }
+}
+
+@Composable
+private fun ProductsWorkspace(
+    products:List<TwigaProduct>,
+    loading:Boolean,
+    onAdd:()->Unit,
+    onRefresh:()->Unit
+) {
+    Column(Modifier.fillMaxSize()) {
+        Row(verticalAlignment=Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("POS products",fontSize=24.sp,fontWeight=FontWeight.Bold,color=Ink)
+                Text("Products, prices, stock and photos for this business only.",fontSize=12.sp,color=Muted)
+            }
+            TextButton(onClick=onRefresh) { Text("Refresh") }
+            Button(onClick=onAdd) { Icon(Icons.Default.Add,null); Text("Add") }
+        }
+        Spacer(Modifier.height(10.dp))
+        if(loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+        if(products.isEmpty()&&!loading) Text("No products yet. Add the first product to build the business catalogue.",color=Muted,modifier=Modifier.padding(14.dp))
+        LazyColumn {
+            items(products) { product ->
+                Card(Modifier.fillMaxWidth().padding(bottom=9.dp),colors=CardDefaults.cardColors(containerColor=Color.White)) {
+                    Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically) {
+                        if(product.imageUrl.isNotBlank()) {
+                            AsyncImage(model=product.imageUrl,contentDescription=product.name,modifier=Modifier.size(76.dp))
+                        } else {
+                            Box(Modifier.size(76.dp).background(Paper,RoundedCornerShape(12.dp)),contentAlignment=Alignment.Center) {
+                                Icon(Icons.Default.Inventory2,null,tint=Muted,modifier=Modifier.size(30.dp))
+                            }
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(product.name,fontWeight=FontWeight.SemiBold,color=Ink)
+                            if(product.sku.isNotBlank()) Text("SKU: ${product.sku}",fontSize=11.sp,color=Muted)
+                            if(product.category.isNotBlank()) Text(product.category,fontSize=12.sp,color=Muted)
+                            Text("KSh ${"%.2f".format(product.price)} / ${product.unit}",fontWeight=FontWeight.Bold,color=Orange)
+                            Text("Stock: ${product.stock} ${product.unit}",fontSize=12.sp,color=Muted)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProductDialog(
+    name:String,sku:String,category:String,description:String,price:String,stock:String,
+    photoLabel:String,loading:Boolean,
+    onName:(String)->Unit,onSku:(String)->Unit,onCategory:(String)->Unit,onDescription:(String)->Unit,
+    onPrice:(String)->Unit,onStock:(String)->Unit,onPickPhoto:()->Unit,onSave:()->Unit,onDismiss:()->Unit
+) {
+    AlertDialog(
+        onDismissRequest=onDismiss,
+        title={Text("Add POS product")},
+        text={
+            Column(Modifier.fillMaxWidth().heightIn(max=520.dp).verticalScroll(rememberScrollState())) {
+                OutlinedTextField(name,onName,label={Text("Product name *")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                OutlinedTextField(sku,onSku,label={Text("SKU / product code")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                OutlinedTextField(category,onCategory,label={Text("Category")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                OutlinedTextField(price,onPrice,label={Text("Selling price (KSh) *")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                OutlinedTextField(stock,onStock,label={Text("Available stock")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                OutlinedTextField(description,onDescription,label={Text("Product details")},modifier=Modifier.fillMaxWidth(),minLines=2)
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(onClick=onPickPhoto,modifier=Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.AddPhotoAlternate,null); Spacer(Modifier.width(8.dp)); Text("Choose product picture")
+                }
+                if(photoLabel.isNotBlank()) Text(photoLabel,color=Color(0xFF287A46),fontSize=12.sp)
+                Text("Pictures are stored under this business's private Cloudflare R2 folder. Image upload needs the TWIGA Reply service and R2 credentials configured.",fontSize=11.sp,color=Muted)
+            }
+        },
+        confirmButton={TextButton(onClick=onSave,enabled=!loading&&name.isNotBlank()&&price.toDoubleOrNull()!=null){Text(if(loading)"Saving…" else "Save product")}},
+        dismissButton={TextButton(onClick=onDismiss){Text("Cancel")}}
+    )
+}
+
 @Composable
 private fun Brand() {
     Row(verticalAlignment=Alignment.CenterVertically) {
