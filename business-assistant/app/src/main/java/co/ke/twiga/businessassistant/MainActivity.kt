@@ -188,7 +188,7 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
         OutlinedTextField(name,{name=it},label={Text(if(page=="Tasks")"Task title" else "Name / customer")},modifier=Modifier.fillMaxWidth())
         if(page!="Tasks") OutlinedTextField(phone,{phone=it},label={Text(if(page=="Orders")"Amount (KSh)" else "Phone number")},modifier=Modifier.fillMaxWidth())
         OutlinedTextField(notes,{notes=it},label={Text("Notes / details")},modifier=Modifier.fillMaxWidth())
-    }},confirmButton={TextButton(onClick={addRecord},enabled=name.isNotBlank()){Text("Save")}},dismissButton={TextButton(onClick={dialog=false}){Text("Cancel")}})
+    }},confirmButton={TextButton(onClick={ { addRecord() } },enabled=name.isNotBlank()){Text("Save")}},dismissButton={TextButton(onClick={dialog=false}){Text("Cancel")}})
 }
 
 @Composable
