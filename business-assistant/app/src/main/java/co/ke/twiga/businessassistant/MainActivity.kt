@@ -94,6 +94,10 @@ class TwigaApi(private val url:String, private val key:String) {
         data.put("business_id",businessId).put("created_by",s.userId)
         call("/rest/v1/$table",s.token,"POST",data)
     }
+    suspend fun voiceTicket(s:TwigaSession,businessId:String):String {
+        val raw=call("/functions/v1/twiga-vapi-session",s.token,"POST",JSONObject().put("businessId",businessId))
+        return JSONObject(raw).getString("voiceSessionToken")
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -168,7 +172,7 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
                         }
                         if(businessList.size>1) { Text("Switch business",fontWeight=FontWeight.Bold); businessList.forEach { TextButton(onClick={business=it}){Text(it.name)} } }
                     }
-                    "Voice" -> VoiceWorkspace(vapiKey,assistantId,business?.id.orEmpty(),session?.userId.orEmpty(),{voiceStatus=it},{voiceLines=voiceLines+it},voiceStatus,voiceLines,{vapiKey=it;save(url,key,it,assistantId)},{assistantId=it;save(url,key,vapiKey,it)})
+                    "Voice" -> VoiceWorkspace(vapiKey,assistantId,business?.id.orEmpty(),session,api,{voiceStatus=it},{voiceLines=voiceLines+it},voiceStatus,voiceLines,{vapiKey=it;save(url,key,it,assistantId)},{assistantId=it;save(url,key,vapiKey,it)})
                     else -> {
                         Row(verticalAlignment=Alignment.CenterVertically) { Column(Modifier.weight(1f)){Text(page,fontSize=24.sp,fontWeight=FontWeight.Bold);Text("Business records",color=Muted,fontSize=12.sp)}; Button(onClick={dialog=true}){Icon(Icons.Default.Add,null);Text("Add")} }
                         if(loading) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -195,29 +199,65 @@ private fun Brand() {
 }
 
 @Composable
-private fun VoiceWorkspace(key:String,assistant:String,businessId:String,userId:String,setStatus:(String)->Unit,addLine:(String)->Unit,status:String,lines:List<String>,setKey:(String)->Unit,setAssistant:(String)->Unit) {
-    var publicKey by remember(key){mutableStateOf(key)}; var assistantId by remember(assistant){mutableStateOf(assistant)}
+private fun VoiceWorkspace(key:String,assistant:String,businessId:String,session:TwigaSession?,api:TwigaApi,setStatus:(String)->Unit,addLine:(String)->Unit,status:String,lines:List<String>,setKey:(String)->Unit,setAssistant:(String)->Unit) {
+    var publicKey by remember(key){mutableStateOf(key)}
+    var assistantId by remember(assistant){mutableStateOf(assistant)}
     var sdk by remember { mutableStateOf<Vapi?>(null) }
+    var connecting by remember { mutableStateOf(false) }
     val lifecycle=LocalLifecycleOwner.current.lifecycle
     val context=androidx.compose.ui.platform.LocalContext.current
+    val scope= rememberCoroutineScope()
+    LaunchedEffect(sdk) {
+        val active=sdk ?: return@LaunchedEffect
+        active.eventFlow.collect { event ->
+            when(event) {
+                is Vapi.Event.CallDidStart -> setStatus("Connected")
+                is Vapi.Event.CallDidEnd -> { setStatus("Call ended"); sdk=null }
+                is Vapi.Event.Transcript -> addLine(event.text)
+                is Vapi.Event.SpeechUpdate -> setStatus("TWIGA is speaking")
+                is Vapi.Event.Error -> setStatus("Voice error: ${event.error}")
+                else -> Unit
+            }
+        }
+    }
     Column(Modifier.fillMaxSize()) {
-        Text("Talk to TWIGA",fontSize=25.sp,fontWeight=FontWeight.Bold); Text("In-app voice. No phone number required.",color=Muted)
+        Text("Talk to TWIGA",fontSize=25.sp,fontWeight=FontWeight.Bold)
+        Text("In-app voice. No phone number required.",color=Muted)
         OutlinedTextField(publicKey,{publicKey=it;setKey(it)},label={Text("Vapi public key")},modifier=Modifier.fillMaxWidth(),singleLine=true)
         OutlinedTextField(assistantId,{assistantId=it;setAssistant(it)},label={Text("Vapi assistant ID")},modifier=Modifier.fillMaxWidth(),singleLine=true)
         Spacer(Modifier.height(10.dp))
         Card(Modifier.fillMaxWidth().weight(1f),colors=CardDefaults.cardColors(containerColor=Color.White)) {
-            Column(Modifier.padding(14.dp)) { Text(status,fontWeight=FontWeight.Bold,color=Orange); Spacer(Modifier.height(8.dp)); if(lines.isEmpty())Text("Your conversation status will appear here.",color=Muted); LazyColumn { items(lines){Text(it,modifier=Modifier.padding(vertical=4.dp))} } }
+            Column(Modifier.padding(14.dp)) {
+                Text(status,fontWeight=FontWeight.Bold,color=Orange)
+                Spacer(Modifier.height(8.dp))
+                if(lines.isEmpty()) Text("Your conversation transcript will appear here.",color=Muted)
+                LazyColumn { items(lines){Text(it,modifier=Modifier.padding(vertical=4.dp))} }
+            }
         }
         Spacer(Modifier.height(10.dp))
         Button(onClick={
             if(sdk!=null){sdk?.stop();sdk=null;setStatus("Call ended")}
             else if(publicKey.isBlank()||assistantId.isBlank())setStatus("Enter your Vapi public key and assistant ID.")
-            else try {
-                val v=Vapi(context,lifecycle,Vapi.Configuration(publicKey=publicKey)); sdk=v; setStatus("Connecting…")
-                v.start(assistantId=assistantId,metadata=mapOf("businessId" to businessId,"userId" to userId))
-                    .onSuccess{setStatus("Connected");addLine("Vapi voice session connected.")}
-                    .onFailure{setStatus("Connection failed: ${it.message}");sdk=null}
-            } catch(e:Exception){setStatus("Voice error: ${e.message}")}
-        },modifier=Modifier.fillMaxWidth()) { Icon(if(sdk==null)Icons.Default.Mic else Icons.Default.CallEnd,null);Spacer(Modifier.width(8.dp));Text(if(sdk==null)"Start voice assistant" else "End conversation") }
+            else if(session==null||businessId.isBlank())setStatus("Sign in and select a business first.")
+            else {
+                connecting=true;setStatus("Securing voice session…")
+                scope.launch {
+                    try {
+                        val ticket=api.voiceTicket(session,businessId)
+                        val v=Vapi(context,lifecycle,Vapi.Configuration(publicKey=publicKey))
+                        sdk=v
+                        setStatus("Connecting to TWIGA…")
+                        v.start(assistantId=assistantId,metadata=mapOf("businessId" to businessId,"userId" to session.userId,"twigaVoiceSession" to ticket))
+                            .onSuccess{setStatus("Connected");addLine("Secure TWIGA voice session connected.")}
+                            .onFailure{setStatus("Connection failed: ${it.message}");sdk=null}
+                    } catch(e:Exception) { setStatus("Could not start voice: ${e.message}") }
+                    connecting=false
+                }
+            }
+        },enabled=!connecting,modifier=Modifier.fillMaxWidth()) {
+            Icon(if(sdk==null)Icons.Default.Mic else Icons.Default.CallEnd,null)
+            Spacer(Modifier.width(8.dp))
+            Text(if(connecting)"Connecting…" else if(sdk==null)"Start voice assistant" else "End conversation")
+        }
     }
 }
