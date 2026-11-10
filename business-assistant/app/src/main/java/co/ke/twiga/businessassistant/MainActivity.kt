@@ -317,6 +317,7 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
                 whatsStatus=status.optString("status","not_connected")
                 whatsPhone=status.optString("phone","")
                 whatsAiEnabled=status.optBoolean("aiEnabled",false)
+                whatsPrompt=status.optString("systemPrompt","")
                 whatsMessages=api.whatsappMessages(replyApiUrl,activeSession,activeBusiness.id)
                 whatsQr=""
                 if(whatsStatus!="ready" && whatsStatus!="connected" && whatsStatus!="READY" && whatsStatus!="CONNECTED") {
@@ -346,6 +347,7 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
                 whatsStatus=status.optString("status",whatsStatus)
                 whatsPhone=status.optString("phone","")
                 whatsAiEnabled=status.optBoolean("aiEnabled",false)
+                whatsPrompt=status.optString("systemPrompt","")
                 whatsMessages=api.whatsappMessages(replyApiUrl,activeSession,activeBusiness.id)
                 error=""
             } catch(e:Exception) { error=e.message ?: "Could not start WhatsApp connection" }
