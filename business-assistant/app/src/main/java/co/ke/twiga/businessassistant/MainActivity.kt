@@ -114,10 +114,11 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
     var voiceStatus by remember { mutableStateOf("Ready to connect") }; var voiceLines by remember { mutableStateOf(emptyList<String>()) }
     val scope= rememberCoroutineScope(); val api=remember(url,key){TwigaApi(url,key)}
     val table=when(page) { "Customers"->"twiga_customers"; "Orders"->"twiga_orders"; "Appointments"->"twiga_appointments"; else->"twiga_tasks" }
-    fun reload() {
+    fun reload(forPage:String=page) {
         val s=session ?: return; val b=business ?: return
+        val selectedTable=when(forPage) { "Customers"->"twiga_customers"; "Orders"->"twiga_orders"; "Appointments"->"twiga_appointments"; else->"twiga_tasks" }
         loading=true; error=""
-        scope.launch { try { records=api.list(table,s,b.id) } catch(e:Exception) { error=e.message ?: "Could not load records" }; loading=false }
+        scope.launch { try { records=api.list(selectedTable,s,b.id) } catch(e:Exception) { error=e.message ?: "Could not load records" }; loading=false }
     }
     fun login() {
         loading=true; error=""
@@ -152,7 +153,7 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
     } else {
         Scaffold(topBar={TopAppBar(title={Column { Text("TWIGA",fontWeight=FontWeight.Black); Text(business?.name ?: "Business Assistant",fontSize=12.sp,color=Muted) }},actions={TextButton(onClick={session=null;business=null}){Text("Sign out")}})},
             bottomBar={NavigationBar { listOf("Overview","Customers","Orders","Appointments","Tasks","Voice").forEach { item ->
-                NavigationBarItem(selected=page==item,onClick={page=item;if(item!="Overview"&&item!="Voice")reload()},
+                NavigationBarItem(selected=page==item,onClick={page=item;if(item!="Overview"&&item!="Voice")reload(item)},
                     icon={Icon(when(item){"Overview"->Icons.Default.Home;"Customers"->Icons.Default.People;"Orders"->Icons.Default.ReceiptLong;"Appointments"->Icons.Default.CalendarMonth;"Tasks"->Icons.Default.CheckCircle;else->Icons.Default.Mic},null)},
                     label={Text(item,fontSize=9.sp)})
             } }}) { padding ->
@@ -163,7 +164,7 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
                         Text("Good business starts here.",fontSize=24.sp,fontWeight=FontWeight.Bold,color=Ink); Text("Your daily workspace",color=Muted)
                         Spacer(Modifier.height(16.dp))
                         listOf("Customers","Orders","Appointments","Tasks","Voice").forEach { item ->
-                            Card(Modifier.fillMaxWidth().padding(bottom=10.dp).clickable{page=item;if(item!="Voice")reload()},colors=CardDefaults.cardColors(containerColor=Color.White)) {
+                            Card(Modifier.fillMaxWidth().padding(bottom=10.dp).clickable{page=item;if(item!="Voice")reload(item)},colors=CardDefaults.cardColors(containerColor=Color.White)) {
                                 Row(Modifier.padding(18.dp).fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                                     Icon(when(item){"Customers"->Icons.Default.People;"Orders"->Icons.Default.ReceiptLong;"Appointments"->Icons.Default.CalendarMonth;"Tasks"->Icons.Default.CheckCircle;else->Icons.Default.Mic},null,tint=Orange,modifier=Modifier.size(28.dp))
                                     Spacer(Modifier.width(14.dp)); Column(Modifier.weight(1f)){Text(item,fontWeight=FontWeight.SemiBold);Text("Open $item workspace",fontSize=12.sp,color=Muted)}; Icon(Icons.Default.ChevronRight,null)
