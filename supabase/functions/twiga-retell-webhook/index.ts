@@ -57,7 +57,7 @@ Deno.serve(async(req:Request)=>{
       disconnection_reason:call.disconnection_reason || null,
       custom_analysis_data:custom,
       recording_url:recordingUrl || null,
-      recording_url_expires_at:recordingUrl ? new Date(Date.now()+10*60*1000).toISOString() : null,
+      recording_url_expires_at:recordingUrl ? new Date(Date.now()+24*60*60*1000).toISOString() : null,
       recording_stored_in_retell:true,
       recording_copied_to_r2:false
     };
