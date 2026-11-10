@@ -14,8 +14,9 @@ android {
         applicationId = "co.ke.twiga.businessassistant"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        // CI supplies monotonic codes so each published APK can be installed as an in-place update.
+        versionCode = providers.gradleProperty("appVersionCode").orNull?.toIntOrNull() ?: 1
+        versionName = providers.gradleProperty("appVersionName").orNull ?: "1.0.0"
         buildConfigField("String", "SUPABASE_URL", "\"${setting("TWIGA_SUPABASE_URL","TWIGA_SUPABASE_URL").ifBlank { "https://ztyxxikkposfpxsutnfr.supabase.co" }}\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"${setting("TWIGA_SUPABASE_ANON_KEY","TWIGA_SUPABASE_ANON_KEY").ifBlank { "sb_publishable_Zex31DUxW6bX3LP6Wlos2Q_pMiZ_JeT" }}\"")
         buildConfigField("String", "VAPI_PUBLIC_KEY", "\"${setting("TWIGA_VAPI_PUBLIC_KEY","TWIGA_VAPI_PUBLIC_KEY").ifBlank { "2874d463-b31e-4d5a-84d7-e6cbe0a90b15" }}\"")
