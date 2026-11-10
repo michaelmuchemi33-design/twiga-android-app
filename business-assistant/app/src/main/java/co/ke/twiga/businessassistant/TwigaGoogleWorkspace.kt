@@ -144,6 +144,7 @@ internal fun GoogleWorkspaceWorkspace(api: TwigaApi, session: TwigaSession, busi
                 val payload = JSONObject(extra.toString()).put("action", action)
                 val result = api.googleWorkspace(session, businessId, payload)
                 when (action) {
+                    "disconnect" -> { connected = false; email = ""; resultText = "Google access disconnected for this business." }
                     "calendar.list" -> {
                         val rows = result.optJSONArray("items") ?: JSONArray()
                         resultText = "Loaded " + rows.length() + " calendar booking(s)."
