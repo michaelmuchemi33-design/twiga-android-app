@@ -229,7 +229,7 @@ internal fun TwigaRetellWorkspace(
                     enabled = apiKey.isNotBlank() && !loading,
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Validate & securely save key") }
-                Text("Only the business owner or TWIGA platform admin can replace this key. The app never stores the private key locally.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Only the business owner or TWIGA platform admin can replace this key. The app never stores the private key locally. In Retell Settings > API Keys, mark this same key as the Webhook Key so call events can be verified. Restricted keys need Build > Agent > Edit and Deploy > Call > Edit.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
@@ -250,16 +250,13 @@ internal fun TwigaRetellWorkspace(
                         Text("Best current Willa choice for English + Kiswahili.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(selected = voiceId == "retell-Willa", onClick = { voiceId = "retell-Willa"; voiceModel = "s2.1-pro" })
-                    Text("Willa · Retell platform")
-                }
+                Text("Fish Audio Willa uses s2.1-pro; Retell lists this provider/model combination as supporting both English and Swahili.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Divider()
                 Text("Language model", style = MaterialTheme.typography.labelLarge)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(selected = model == "gpt-6-luna", onClick = { model = "gpt-6-luna" })
                     Column {
-                        Text("GPT-6 Luna · 0.0032 USD/min listed")
+                        Text("GPT-6 Luna · $0.0032/min (LLM only)")
                         Text("This is the language-model component, not the full call price. Current listed base components: $0.055/min Retell voice infrastructure + $0.015/min Fish Audio TTS + $0.0032/min GPT-6 Luna = about $0.0732/min before telephony and optional add-ons.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
