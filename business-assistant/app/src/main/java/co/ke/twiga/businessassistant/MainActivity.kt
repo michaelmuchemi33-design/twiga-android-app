@@ -501,6 +501,120 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
 }
 
 
+
+@Composable
+private fun WhatsAppWorkspace(
+    businessName:String,
+    status:String,
+    phone:String,
+    qrDataUrl:String,
+    aiEnabled:Boolean,
+    systemPrompt:String,
+    messages:List<TwigaWhatsAppMessage>,
+    loading:Boolean,
+    replyPhone:String,
+    replyText:String,
+    onConnect:()->Unit,
+    onRefresh:()->Unit,
+    onDisconnect:()->Unit,
+    onAiChange:(Boolean)->Unit,
+    onPromptChange:(String)->Unit,
+    onSaveSettings:()->Unit,
+    onReplyPhoneChange:(String)->Unit,
+    onReplyTextChange:(String)->Unit,
+    onSend:()->Unit
+) {
+    val qrBitmap = remember(qrDataUrl) {
+        runCatching {
+            val raw=qrDataUrl.substringAfter("base64,",qrDataUrl)
+            val bytes=Base64.decode(raw,Base64.DEFAULT)
+            BitmapFactory.decodeByteArray(bytes,0,bytes.size)?.asImageBitmap()
+        }.getOrNull()
+    }
+    val connected=status.equals("ready",true)||status.equals("connected",true)
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom=22.dp)) {
+        Text("WhatsApp",fontSize=25.sp,fontWeight=FontWeight.Bold,color=Ink)
+        Text("Connect the WhatsApp account owned by $businessName. Each business has its own linked account and inbox.",fontSize=13.sp,color=Muted)
+        Spacer(Modifier.height(12.dp))
+        Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=Color.White)) {
+            Column(Modifier.padding(16.dp)) {
+                Row(verticalAlignment=Alignment.CenterVertically) {
+                    Box(Modifier.size(11.dp).background(if(connected)Color(0xFF27965B) else Color(0xFFE5A02B),RoundedCornerShape(50)))
+                    Spacer(Modifier.width(9.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(if(connected)"WhatsApp connected" else "WhatsApp ${status.replace('_',' ')}",fontWeight=FontWeight.Bold,color=Ink)
+                        if(phone.isNotBlank()) Text("Linked number: $phone",fontSize=12.sp,color=Muted)
+                    }
+                    TextButton(onClick=onRefresh,enabled=!loading){Text("Refresh")}
+                }
+                if(!connected) {
+                    Text("Use the WhatsApp app on the business phone: Linked devices → Link a device, then scan this QR code.",fontSize=12.sp,color=Muted)
+                    if(qrBitmap!=null) {
+                        Spacer(Modifier.height(10.dp))
+                        Box(Modifier.fillMaxWidth(),contentAlignment=Alignment.Center) {
+                            Image(bitmap=qrBitmap,contentDescription="WhatsApp link QR code",modifier=Modifier.size(240.dp))
+                        }
+                        Text("QR codes expire. Refresh to request a new one.",fontSize=11.sp,color=Muted)
+                    } else {
+                        Text("A QR code will appear after the connection service is online.",fontSize=12.sp,color=Muted)
+                        Button(onClick=onConnect,enabled=!loading,modifier=Modifier.fillMaxWidth()) {
+                            Text(if(loading)"Starting WhatsApp…" else "Connect this business's WhatsApp")
+                        }
+                    }
+                } else {
+                    Text("This WhatsApp account is linked to this business. Do not share its QR code with anyone.",fontSize=12.sp,color=Muted)
+                    OutlinedButton(onClick=onDisconnect,enabled=!loading,modifier=Modifier.fillMaxWidth()) {
+                        Text("Disconnect WhatsApp")
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=Color.White)) {
+            Column(Modifier.padding(16.dp)) {
+                Row(verticalAlignment=Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("AI receptionist",fontWeight=FontWeight.Bold)
+                        Text("Grok replies using this business profile and its active POS products.",fontSize=12.sp,color=Muted)
+                    }
+                    Switch(checked=aiEnabled,onCheckedChange=onAiChange,enabled=connected&&!loading)
+                }
+                OutlinedTextField(
+                    value=systemPrompt,onValueChange=onPromptChange,label={Text("Extra WhatsApp instructions")},
+                    modifier=Modifier.fillMaxWidth(),minLines=3
+                )
+                Button(onClick=onSaveSettings,enabled=connected&&!loading,modifier=Modifier.fillMaxWidth()) {
+                    Text("Save AI settings")
+                }
+                Text("AI starts disabled. Turn it on only after you have reviewed the replies with a test customer.",fontSize=11.sp,color=Muted)
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Text("Recent messages",fontWeight=FontWeight.Bold,fontSize=18.sp)
+        if(messages.isEmpty()) Text("No WhatsApp messages recorded for this business yet.",fontSize=12.sp,color=Muted,modifier=Modifier.padding(vertical=8.dp))
+        messages.take(30).forEach { message ->
+            Card(Modifier.fillMaxWidth().padding(vertical=4.dp),colors=CardDefaults.cardColors(containerColor=Color.White)) {
+                Column(Modifier.padding(12.dp)) {
+                    Row(verticalAlignment=Alignment.CenterVertically) {
+                        Text(if(message.direction=="outbound")"TWIGA / Staff" else message.senderName,fontWeight=FontWeight.SemiBold,modifier=Modifier.weight(1f))
+                        Text(message.status,fontSize=10.sp,color=Muted)
+                    }
+                    Text(message.body,color=Ink,fontSize=13.sp)
+                    if(message.createdAt.isNotBlank()) Text(message.createdAt,fontSize=10.sp,color=Muted)
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Text("Send a manual reply",fontWeight=FontWeight.Bold,fontSize=18.sp)
+        OutlinedTextField(replyPhone,onReplyPhoneChange,label={Text("Customer phone e.g. 2547XXXXXXXX")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+        OutlinedTextField(replyText,onReplyTextChange,label={Text("Message")},modifier=Modifier.fillMaxWidth(),minLines=2)
+        Button(onClick=onSend,enabled=connected&&!loading&&replyPhone.isNotBlank()&&replyText.isNotBlank(),modifier=Modifier.fillMaxWidth()) {
+            Text(if(loading)"Sending…" else "Send WhatsApp message")
+        }
+        if(loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+    }
+}
+
 @Composable
 private fun BusinessProfileWorkspace(
     profile:TwigaBusinessProfile,
