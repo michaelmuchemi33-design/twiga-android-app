@@ -1,6 +1,7 @@
 package co.ke.twiga.businessassistant
 
 import android.os.Bundle
+import android.content.Intent
 import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.activity.ComponentActivity
@@ -42,6 +43,10 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+import java.util.TimeZone
 
 internal val Orange = Color(0xFFF47721)
 internal val Ink = Color(0xFF171717)
@@ -246,6 +251,19 @@ class TwigaApi(private val url:String, private val key:String) {
         replyCall(replyApiUrl,"/api/whatsapp/send",s,"POST",
             JSONObject().put("businessId",businessId).put("phone",phone).put("message",message))
     }
+    suspend fun googleWorkspace(s:TwigaSession,businessId:String,payload:JSONObject):JSONObject = withContext(Dispatchers.IO) {
+        val body=JSONObject(payload.toString()).put("businessId",businessId)
+        val request=Request.Builder().url(url.trimEnd('/')+"/functions/v1/google-workspace")
+            .header("apikey",key).header("Authorization","Bearer ${s.token}")
+            .header("Content-Type","application/json")
+            .post(body.toString().toRequestBody(jsonType)).build()
+        http.newCall(request).execute().use { response ->
+            val raw=response.body?.string().orEmpty()
+            val parsed=runCatching { JSONObject(raw) }.getOrElse { JSONObject() }
+            if(!response.isSuccessful) throw IllegalStateException(parsed.optString("error").ifBlank { "Google Workspace request failed (${response.code})." })
+            parsed
+        }
+    }
     suspend fun voiceTicket(s:TwigaSession,businessId:String):TwigaVoiceLaunch {
         val result=JSONObject(call("/functions/v1/twiga-vapi-session",s.token,"POST",JSONObject().put("businessId",businessId)))
         val route=result.optJSONObject("vapiAccount") ?: throw IllegalStateException("No Vapi voice route is configured.")
@@ -272,7 +290,7 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
     var platformAdminAvailable by remember { mutableStateOf(false) }
     var records by remember { mutableStateOf(emptyList<TwigaRecord>()) }; var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }; var dialog by remember { mutableStateOf(false) }
-    var name by remember { mutableStateOf("") }; var phone by remember { mutableStateOf("") }; var notes by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf("") }; var phone by remember { mutableStateOf("") }; var notes by remember { mutableStateOf("") }; var appointmentDateTime by remember { mutableStateOf(defaultAppointmentTime()) }
     var voiceStatus by remember { mutableStateOf("Ready to connect") }; var voiceLines by remember { mutableStateOf(emptyList<String>()) }
     var profile by remember { mutableStateOf(TwigaBusinessProfile()) }; var profileLoading by remember { mutableStateOf(false) }
     var products by remember { mutableStateOf(emptyList<TwigaProduct>()) }; var productLoading by remember { mutableStateOf(false) }
@@ -441,10 +459,10 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
         when(page) {
             "Customers" -> data.put("name",name).put("phone",phone).put("notes",notes)
             "Orders" -> data.put("customer_name",name).put("total_amount",phone.toDoubleOrNull() ?: 0.0).put("description",notes).put("status","pending")
-            "Appointments" -> data.put("customer_name",name).put("phone",phone).put("notes",notes).put("status","scheduled")
+            "Appointments" -> data.put("customer_name",name).put("phone",phone).put("notes",notes).put("scheduled_at",appointmentDateTime.trim()).put("status","scheduled")
             else -> data.put("title",name).put("description",notes).put("status","open")
         }
-        loading=true; scope.launch { try { api.add(table,s,b.id,data); dialog=false; name="";phone="";notes="";reload() } catch(e:Exception) { error=e.message ?: "Save failed" }; loading=false }
+        loading=true; scope.launch { try { api.add(table,s,b.id,data); dialog=false; name="";phone="";notes="";appointmentDateTime=defaultAppointmentTime();reload() } catch(e:Exception) { error=e.message ?: "Save failed" }; loading=false }
     }
     if(session==null) {
         Column(Modifier.fillMaxSize().background(Paper).padding(24.dp),verticalArrangement=Arrangement.Center) {
@@ -475,7 +493,7 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
                     "Overview" -> {
                         Text("Good business starts here.",fontSize=24.sp,fontWeight=FontWeight.Bold,color=Ink); Text("Your daily workspace",color=Muted)
                         Spacer(Modifier.height(16.dp))
-                        val homeItems = listOf("Business Profile","POS Products","WhatsApp","Customers","Orders","Appointments","Tasks","Voice","Support") + if(platformAdminAvailable) listOf("Admin & Billing") else emptyList()
+                        val homeItems = listOf("Business Profile","POS Products","Google Workspace","Plan & payments","WhatsApp","Customers","Orders","Appointments","Tasks","Voice","Support") + if(platformAdminAvailable) listOf("Admin & Billing") else emptyList()
                         homeItems.forEach { item ->
                             Card(Modifier.fillMaxWidth().padding(bottom=10.dp).clickable{
                                 page=if(item=="POS Products") "Products" else item
@@ -488,7 +506,7 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
                                 }
                             },colors=CardDefaults.cardColors(containerColor=Color.White)) {
                                 Row(Modifier.padding(18.dp).fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                                    Icon(when(item){"Customers"->Icons.Default.People;"Orders"->Icons.Default.ReceiptLong;"Appointments"->Icons.Default.CalendarMonth;"Tasks"->Icons.Default.CheckCircle;"Support"->Icons.Default.SupportAgent;"Admin & Billing"->Icons.Default.AdminPanelSettings;else->Icons.Default.Mic},null,tint=Orange,modifier=Modifier.size(28.dp))
+                                    Icon(when(item){"Customers"->Icons.Default.People;"Orders"->Icons.Default.ReceiptLong;"Appointments"->Icons.Default.CalendarMonth;"Tasks"->Icons.Default.CheckCircle;"Support"->Icons.Default.SupportAgent;"Admin & Billing"->Icons.Default.AdminPanelSettings;"Google Workspace"->Icons.Default.CalendarMonth;"Plan & payments"->Icons.Default.AccountBalanceWallet;else->Icons.Default.Mic},null,tint=Orange,modifier=Modifier.size(28.dp))
                                     Spacer(Modifier.width(14.dp)); Column(Modifier.weight(1f)){Text(item,fontWeight=FontWeight.SemiBold);Text("Open $item workspace",fontSize=12.sp,color=Muted)}; Icon(Icons.Default.ChevronRight,null)
                                 }
                             }
@@ -510,7 +528,7 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
                     )
                     "Voice" -> VoiceWorkspace(vapiKey,assistantId,business?.id.orEmpty(),session,api,{voiceStatus=it},{voiceLines=voiceLines+it},voiceStatus,voiceLines,{vapiKey=it;save(url,key,it,assistantId,replyApiUrl)},{assistantId=it;save(url,key,vapiKey,it,replyApiUrl)})
                     else -> {
-                        Row(verticalAlignment=Alignment.CenterVertically) { Column(Modifier.weight(1f)){Text(page,fontSize=24.sp,fontWeight=FontWeight.Bold);Text("Business records",color=Muted,fontSize=12.sp)}; Button(onClick={dialog=true}){Icon(Icons.Default.Add,null);Text("Add")} }
+                        Row(verticalAlignment=Alignment.CenterVertically) { Column(Modifier.weight(1f)){Text(page,fontSize=24.sp,fontWeight=FontWeight.Bold);Text("Business records",color=Muted,fontSize=12.sp)}; Button(onClick={dialog=true; if(page=="Appointments") appointmentDateTime=defaultAppointmentTime()}){Icon(Icons.Default.Add,null);Text("Add")} }
                         if(loading) LinearProgressIndicator(Modifier.fillMaxWidth())
                         if(records.isEmpty()&&!loading) Text("Nothing here yet. Tap Add to create the first record.",color=Muted,modifier=Modifier.padding(18.dp))
                         LazyColumn { items(records) { r -> Card(Modifier.fillMaxWidth().padding(bottom=8.dp),colors=CardDefaults.cardColors(containerColor=Color.White)){Column(Modifier.padding(15.dp)){Text(r.name,fontWeight=FontWeight.SemiBold);if(r.detail.isNotBlank())Text(r.detail,color=Muted,fontSize=13.sp);if(r.status.isNotBlank())Text(r.status.uppercase(),color=Orange,fontSize=11.sp)}} } }
@@ -529,7 +547,7 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
     if(dialog) AlertDialog(onDismissRequest={dialog=false},title={Text("Add $page")},text={Column {
         OutlinedTextField(name,{name=it},label={Text(if(page=="Tasks")"Task title" else "Name / customer")},modifier=Modifier.fillMaxWidth())
         if(page!="Tasks") OutlinedTextField(phone,{phone=it},label={Text(if(page=="Orders")"Amount (KSh)" else "Phone number")},modifier=Modifier.fillMaxWidth())
-        OutlinedTextField(notes,{notes=it},label={Text("Notes / details")},modifier=Modifier.fillMaxWidth())
+        if(page=="Appointments") OutlinedTextField(appointmentDateTime,{appointmentDateTime=it},label={Text("Appointment date/time (ISO, +03:00)")},modifier=Modifier.fillMaxWidth(),singleLine=true)\n         OutlinedTextField(notes,{notes=it},label={Text("Notes / details")},modifier=Modifier.fillMaxWidth())
     }},confirmButton={TextButton(onClick={ { addRecord() } },enabled=name.isNotBlank()){Text("Save")}},dismissButton={TextButton(onClick={dialog=false}){Text("Cancel")}})
 }
 
@@ -839,4 +857,12 @@ private fun VoiceWorkspace(key:String,assistant:String,businessId:String,session
             Text(if(connecting)"Connecting…" else if(sdk==null)"Start voice assistant" else "End conversation")
         }
     }
+}
+
+private fun defaultAppointmentTime(): String {
+    val timezone = TimeZone.getTimeZone("Africa/Nairobi")
+    val calendar = Calendar.getInstance(timezone)
+    calendar.add(Calendar.HOUR_OF_DAY, 1)
+    return SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US)
+        .apply { timeZone = timezone }.format(calendar.time)
 }
