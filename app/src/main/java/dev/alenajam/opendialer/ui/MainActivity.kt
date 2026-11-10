@@ -3,6 +3,8 @@ package dev.alenajam.opendialer.ui
 import android.Manifest
 import android.app.NotificationManager
 import android.content.Intent
+import android.app.AlertDialog
+import android.telecom.TelecomManager
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -44,6 +46,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var defaultPhoneManager: DefaultPhoneManager
 
     private var webView: WebView? = null
+    private var pendingDialNumber: String? = null
     private var pendingWebPermission: PermissionRequest? = null
     @Volatile private var googleOAuthInProgress = false
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -92,9 +95,16 @@ class MainActivity : ComponentActivity() {
             results[permission] == true || ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
         }
         webView?.evaluateJavascript("window.twigaNativePermissionsResult && window.twigaNativePermissionsResult($granted)", null)
-        if (granted && RemoteDesk.isPaired(this)) {
-            startRemoteDesk()
-            requestBatteryOptimizationExemption()
+        if (granted) {
+            if (RemoteDesk.isPaired(this)) {
+                startRemoteDesk()
+                requestBatteryOptimizationExemption()
+            }
+            val pending = pendingDialNumber
+            if (!pending.isNullOrBlank()) {
+                pendingDialNumber = null
+                placeSimCall(pending)
+            }
         }
     }
 
@@ -117,6 +127,7 @@ class MainActivity : ComponentActivity() {
         showWorkspace()
         handleOAuthCallback(intent)
         requestDefaultDialerIfNeeded()
+        handleDialIntent(intent)
     }
 
     private fun showWorkspace() {
@@ -326,6 +337,50 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleOAuthCallback(intent)
+        handleDialIntent(intent)
+    }
+
+    /**
+     * This app is registered as the system dialler. ACTION_DIAL must therefore
+     * do something useful instead of merely opening the business WebView.
+     * Confirm the number before placing a normal cellular call on the SIM.
+     */
+    private fun handleDialIntent(source: Intent?) {
+        val action = source?.action ?: return
+        if (action != Intent.ACTION_DIAL && action != Intent.ACTION_VIEW) return
+        val uri = source.data ?: return
+        if (uri.scheme != "tel") return
+        val number = uri.schemeSpecificPart.orEmpty().trim().take(40)
+        if (number.isBlank()) return
+        AlertDialog.Builder(this)
+            .setTitle("Call using your SIM?")
+            .setMessage("Place a normal phone call to $number?")
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Call") { _, _ -> placeSimCall(number) }
+            .show()
+    }
+
+    private fun placeSimCall(number: String) {
+        if (!defaultPhoneManager.isDefaultDialer()) {
+            pendingDialNumber = number
+            requestDefaultDialerManually()
+            return
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
+            pendingDialNumber = number
+            requestPhonePermissions()
+            return
+        }
+        runCatching {
+            getSystemService(TelecomManager::class.java)
+                .placeCall(Uri.fromParts("tel", number, null), Bundle())
+        }.onFailure { error ->
+            AlertDialog.Builder(this)
+                .setTitle("Call could not be started")
+                .setMessage(error.message ?: "Check phone permissions, SIM availability and carrier service.")
+                .setPositiveButton("OK", null)
+                .show()
+        }
     }
 
     private fun requestDefaultDialerIfNeeded() {
