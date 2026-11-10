@@ -134,7 +134,21 @@ Deno.serve(async (req:Request) => {
         updated_at:new Date().toISOString()
       },{onConflict:"business_id"});
       if(recordingSaveError) throw recordingSaveError;
-      return reply({saved:true,config:savedResult.data,recordingEnabled,recordingNotice});
+      let recordingAppliedToAgent=false;
+      if(config.provider==="retell" && savedResult.data?.retell_agent_id) {
+        const {data:retellSecret}=await admin.rpc("twiga_get_provider_secret",{p_business_id:businessId,p_provider:"retell"});
+        if(!retellSecret) return reply({error:"Settings were saved, but the existing Retell agent could not be updated because its business API key is missing."},409);
+        const agentUpdate=await retell(String(retellSecret),"/update-agent/"+encodeURIComponent(String(savedResult.data.retell_agent_id)),"PATCH",{
+          data_storage_setting:recordingEnabled ? "everything" : "basic_attributes_only",
+          opt_in_signed_url:recordingEnabled,
+          signed_url_expiration_ms:86400000
+        });
+        if(!agentUpdate.ok) return reply({error:"Settings were saved, but Retell could not apply the recording preference to the current agent: "+agentUpdate.message},502);
+        const published=await retell(String(retellSecret),"/publish-agent","POST",{agent_id:String(savedResult.data.retell_agent_id)});
+        if(!published.ok) return reply({error:"Recording preference was updated in Retell's draft but could not be published. Re-open AI settings and build the assistant again."},502);
+        recordingAppliedToAgent=true;
+      }
+      return reply({saved:true,config:savedResult.data,recordingEnabled,recordingNotice,recordingAppliedToAgent});
     }
 
     if(action==="provision_agent") {
@@ -181,7 +195,8 @@ Deno.serve(async (req:Request) => {
         enable_backchannel:true,backchannel_frequency:0.45,
         webhook_url:url+"/functions/v1/twiga-retell-webhook",
         webhook_events:["call_started","call_ended","call_analyzed"],webhook_timeout_ms:10000,
-        data_storage_setting:"basic_attributes_only",opt_in_signed_url:true,
+        data_storage_setting:recordingResult.data?.call_recording_enabled===true ? "everything" : "basic_attributes_only",
+        opt_in_signed_url:recordingResult.data?.call_recording_enabled===true,
         signed_url_expiration_ms:86400000,max_call_duration_ms:600000,end_call_after_silence_ms:30000,
         begin_message_delay_ms:350,
         post_call_analysis_data:[
@@ -256,8 +271,6 @@ Deno.serve(async (req:Request) => {
       const webCall=await retell(String(secret),"/v2/create-web-call","POST",{
         agent_id:config.retell_agent_id,
         retell_llm_dynamic_variables:dynamic,
-        data_storage_setting:recordingEnabled ? "everything" : "basic_attributes_only",
-        opt_in_signed_url:recordingEnabled,
         metadata:{twiga_business_id:businessId,twiga_user_id:user.id,source:"twiga_android_app"}
       });
       if(!webCall.ok || !webCall.data.access_token) return reply({error:webCall.message || "Retell could not start the web call."},502);
