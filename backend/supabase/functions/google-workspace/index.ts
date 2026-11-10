@@ -261,7 +261,7 @@ async function businessHasPaidAccess(admin: any, businessId: string): Promise<bo
   if (sub) {
     const status = String(sub.status || "").toLowerCase();
     if (status === "trialing") {
-      if (sub.trial_ends_at) return new Date(sub.trial_ends_at).getTime() > now;
+      if (sub.trial_ends_at) return new Date(sub.trial_ends_at).getTime() + 3 * 86400000 > now;
       const { data: business } = await admin.from("businesses").select("status,paid_through")
         .eq("id", businessId).maybeSingle();
       return !!business && business.status === "TRIAL" &&
