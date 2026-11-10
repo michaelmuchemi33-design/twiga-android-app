@@ -109,9 +109,10 @@ class MainActivity : ComponentActivity() {
             View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
 
         UpdateManager.autoCheck(applicationContext)
-        if (RemoteDesk.isPaired(this) && RemoteDesk.remoteControl(this)) {
-            runCatching { ContextCompat.startForegroundService(this, Intent(this, RemoteDeskService::class.java)) }
-        }
+
+        // Start the paired-phone bridge only after the app has the dialler role
+        // and the runtime phone permissions. Starting it before that can make
+        // remote answer/dial commands fail silently on a fresh install.
 
         showWorkspace()
         handleOAuthCallback(intent)
@@ -328,16 +329,23 @@ class MainActivity : ComponentActivity() {
 
     private fun requestDefaultDialerIfNeeded() {
         val prefs = getSharedPreferences("twiga_setup", MODE_PRIVATE)
-        if (!defaultPhoneManager.isDefaultDialer() &&
-            !prefs.getBoolean("default_phone_prompted", false)
-        ) {
-            prefs.edit().putBoolean("default_phone_prompted", true).apply()
-            defaultPhoneManager.createRequestDefaultDialerIntent()?.let {
-                defaultDialerRequest.launch(it)
+        if (!defaultPhoneManager.isDefaultDialer()) {
+            if (!prefs.getBoolean("default_phone_prompted", false)) {
+                prefs.edit().putBoolean("default_phone_prompted", true).apply()
+                defaultPhoneManager.createRequestDefaultDialerIntent()?.let {
+                    defaultDialerRequest.launch(it)
+                }
+            } else {
+                // The owner can retry from the in-app Phone setup action.
+                requestFullScreenCallAccessIfNeeded()
             }
-        } else {
-            requestFullScreenCallAccessIfNeeded()
+            return
         }
+
+        // A returning user may already have granted the dialler role before
+        // pairing. Always re-check runtime permissions and restart the bridge.
+        if (RemoteDesk.isPaired(this)) requestPhonePermissions()
+        requestFullScreenCallAccessIfNeeded()
     }
 
     private fun requestFullScreenCallAccessIfNeeded() {
