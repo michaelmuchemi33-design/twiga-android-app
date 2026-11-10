@@ -10,6 +10,9 @@ A separate Android app for business operations. It is not a dialer and does not 
 - Supabase email/password sign-in
 - Business selection from the signed-in user's `business_members` relation
 - Customer, order, appointment and task workspaces
+- Per-business knowledge profile (what the business does/sells, services, hours, policies, FAQs, tone, language and AI instructions)
+- Per-business POS product catalogue (name, SKU, category, KSh price, stock, description and product photo)
+- Product photos uploaded directly to private Cloudflare R2 using short-lived upload URLs issued by the TWIGA Reply service
 - Create and list actions against tenant-scoped Supabase tables
 - Official Vapi Android SDK for real-time in-app voice (WebRTC; no phone number)
 - Short-lived voice session ticket issued by an authenticated Supabase Edge Function
@@ -31,6 +34,7 @@ TWIGA_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 TWIGA_SUPABASE_ANON_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
 TWIGA_VAPI_PUBLIC_KEY=YOUR_VAPI_PUBLIC_KEY
 TWIGA_VAPI_ASSISTANT_ID=YOUR_ASSISTANT_ID
+TWIGA_REPLY_API_URL=https://YOUR-RENDER-REPLY-SERVICE
 ```
 
 The app defaults to the existing **TWIGA AI Receptionist** assistant (`ea3ae8f7-fb6f-430e-9c33-96d9a919ade3`). You can override the assistant ID in the Voice tab if you deliberately want another assistant. No phone number or phone pairing is required: this is in-app voice over the internet. Never put a Supabase service-role key or Vapi private API token in the APK.
@@ -77,3 +81,12 @@ The tools endpoint is authorized by the random 256-bit voice-session ticket issu
 - The app currently signs in with email/password; Google sign-in is not wired into this separate APK yet.
 - The first version creates and lists core records. Calendar/Contacts/Sheets/Drive sync and WhatsApp Business messaging are follow-on integrations, not claimed as working in this APK.
 - A GitHub Actions debug build is a test APK, not a permanent signed customer release.
+
+
+## Business profile, POS products and WhatsApp
+
+After sign-in, open **Business Profile** from the Overview screen and describe the selected business. Each selected business has a separate row in `twiga_business_profiles`. Open **POS Products** to add products, prices, SKUs, stock levels and descriptions. The profile and product tables use RLS policies based on `business_members`; records are scoped by `business_id`.
+
+To upload a product picture, configure `TWIGA_REPLY_API_URL` in the local `twiga.properties` file or in the app settings, and deploy the TWIGA Reply service. The Reply service must have Cloudflare R2 configured; images are stored under a path containing the business UUID and are not public bucket objects. Supported image types are JPG, PNG and WebP up to 5 MB.
+
+The WhatsApp AI reads only the selected WhatsApp connection's business profile and active products when answering customer questions. It does not use a global shared product list.
