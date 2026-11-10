@@ -257,6 +257,7 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
     var email by remember { mutableStateOf("") }; var password by remember { mutableStateOf("") }
     var session by remember { mutableStateOf<TwigaSession?>(null) }; var business by remember { mutableStateOf<TwigaRecord?>(null) }
     var businessList by remember { mutableStateOf(emptyList<TwigaRecord>()) }; var page by remember { mutableStateOf("Overview") }
+    var platformAdminAvailable by remember { mutableStateOf(false) }
     var records by remember { mutableStateOf(emptyList<TwigaRecord>()) }; var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }; var dialog by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf("") }; var phone by remember { mutableStateOf("") }; var notes by remember { mutableStateOf("") }
@@ -410,8 +411,17 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
     }
     fun login() {
         loading=true; error=""
-        scope.launch { try { val s=api.login(email.trim(),password); session=s; businessList=api.businesses(s); business=businessList.firstOrNull(); if(business==null) error="No business is linked to this login. Ask the owner to add you in TWIGA."; }
-            catch(e:Exception) { error=e.message ?: "Sign-in failed" }; loading=false }
+        scope.launch {
+            try {
+                val s=api.login(email.trim(),password)
+                session=s
+                businessList=api.businesses(s)
+                business=businessList.firstOrNull()
+                platformAdminAvailable=runCatching { TwigaAdminSupportApi.isPlatformAdmin(url,key,s) }.getOrDefault(false)
+                if(business==null && !platformAdminAvailable) error="No business is linked to this login. Ask the owner to add you in TWIGA."
+            } catch(e:Exception) { error=e.message ?: "Sign-in failed" }
+            loading=false
+        }
     }
     fun addRecord() {
         val s=session ?: return; val b=business ?: return
@@ -441,7 +451,7 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
         }
     } else {
         Scaffold(topBar={TopAppBar(title={Column { Text("TWIGA",fontWeight=FontWeight.Black); Text(business?.name ?: "Business Assistant",fontSize=12.sp,color=Muted) }},actions={if(page!="Overview") TextButton(onClick={page="Overview"}){Text("Home")}
-                TextButton(onClick={session=null;business=null}){Text("Sign out")}})},
+                TextButton(onClick={session=null;business=null;platformAdminAvailable=false;page="Overview"}){Text("Sign out")}})},
             bottomBar={NavigationBar { listOf("Overview","Customers","Orders","Appointments","Tasks","Voice").forEach { item ->
                 NavigationBarItem(selected=page==item,onClick={page=item;if(item!="Overview"&&item!="Voice")reload(item)},
                     icon={Icon(when(item){"Overview"->Icons.Default.Home;"Customers"->Icons.Default.People;"Orders"->Icons.Default.ReceiptLong;"Appointments"->Icons.Default.CalendarMonth;"Tasks"->Icons.Default.CheckCircle;else->Icons.Default.Mic},null)},
@@ -453,13 +463,20 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
                     "Overview" -> {
                         Text("Good business starts here.",fontSize=24.sp,fontWeight=FontWeight.Bold,color=Ink); Text("Your daily workspace",color=Muted)
                         Spacer(Modifier.height(16.dp))
-                        listOf("Business Profile","POS Products","WhatsApp","Customers","Orders","Appointments","Tasks","Voice").forEach { item ->
+                        val homeItems = listOf("Business Profile","POS Products","WhatsApp","Customers","Orders","Appointments","Tasks","Voice","Support") + if(platformAdminAvailable) listOf("Admin & Billing") else emptyList()
+                        homeItems.forEach { item ->
                             Card(Modifier.fillMaxWidth().padding(bottom=10.dp).clickable{
                                 page=if(item=="POS Products") "Products" else item
-                                when(item) { "Business Profile"->loadProfile(); "POS Products"->reloadProducts(); "WhatsApp"->refreshWhatsApp(); else->if(item!="Voice")reload(item) }
+                                when(item) {
+                                    "Business Profile" -> loadProfile()
+                                    "POS Products" -> reloadProducts()
+                                    "WhatsApp" -> refreshWhatsApp()
+                                    "Voice", "Support", "Admin & Billing" -> Unit
+                                    else -> reload(item)
+                                }
                             },colors=CardDefaults.cardColors(containerColor=Color.White)) {
                                 Row(Modifier.padding(18.dp).fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                                    Icon(when(item){"Customers"->Icons.Default.People;"Orders"->Icons.Default.ReceiptLong;"Appointments"->Icons.Default.CalendarMonth;"Tasks"->Icons.Default.CheckCircle;else->Icons.Default.Mic},null,tint=Orange,modifier=Modifier.size(28.dp))
+                                    Icon(when(item){"Customers"->Icons.Default.People;"Orders"->Icons.Default.ReceiptLong;"Appointments"->Icons.Default.CalendarMonth;"Tasks"->Icons.Default.CheckCircle;"Support"->Icons.Default.SupportAgent;"Admin & Billing"->Icons.Default.AdminPanelSettings;else->Icons.Default.Mic},null,tint=Orange,modifier=Modifier.size(28.dp))
                                     Spacer(Modifier.width(14.dp)); Column(Modifier.weight(1f)){Text(item,fontWeight=FontWeight.SemiBold);Text("Open $item workspace",fontSize=12.sp,color=Muted)}; Icon(Icons.Default.ChevronRight,null)
                                 }
                             }
@@ -467,6 +484,8 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
                         if(businessList.size>1) { Text("Switch business",fontWeight=FontWeight.Bold); businessList.forEach { TextButton(onClick={business=it}){Text(it.name)} } }
                     }
                     "Business Profile" -> BusinessProfileWorkspace(profile,profileLoading,{profile=it},{saveProfile()})
+                    "Support" -> TwigaSupportWorkspace(url,key,session,business?.id)
+                    "Admin & Billing" -> if(platformAdminAvailable) TwigaPlatformAdminWorkspace(url,key,session!!) else Text("Platform admin access is not enabled for this account.",color=Muted)
                     "Products" -> ProductsWorkspace(products,productLoading,{productDialog=true;productPhotoKey="";productPhotoLabel=""},{reloadProducts()})
                     "WhatsApp" -> WhatsAppWorkspace(
                         businessName=business?.name ?: "This business",status=whatsStatus,phone=whatsPhone,qrDataUrl=whatsQr,
