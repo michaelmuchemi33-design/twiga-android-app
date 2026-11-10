@@ -17,11 +17,11 @@ Deno.serve(async (req) => {
   if (userError || !user) return json({ error: "Invalid login session" }, 401);
   const { businessId } = await req.json();
   if (typeof businessId !== "string") return json({ error: "businessId is required" }, 400);
-  const { data: membership } = await userClient.from("business_members").select("business_id").eq("business_id", businessId).eq("user_id", user.id).maybeSingle();
+  const admin = createClient(url, serviceKey);
+  const { data: membership } = await admin.from("business_members").select("business_id").eq("business_id", businessId).eq("user_id", user.id).maybeSingle();
   if (!membership) return json({ error: "You are not a member of this business" }, 403);
   const token = crypto.randomUUID() + crypto.randomUUID().replaceAll("-", "");
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
-  const admin = createClient(url, serviceKey);
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
   const { error } = await admin.from("twiga_voice_sessions").insert({ token_hash: hex(digest), business_id: businessId, user_id: user.id, expires_at: expiresAt });
   if (error) return json({ error: "Could not create secure voice session" }, 500);
