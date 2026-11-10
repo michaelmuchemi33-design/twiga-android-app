@@ -809,7 +809,6 @@ private fun VoiceWorkspace(key:String,assistant:String,businessId:String,session
         Spacer(Modifier.height(10.dp))
         Button(onClick={
             if(sdk!=null){sdk?.stop();sdk=null;setStatus("Call ended")}
-            else if(publicKey.isBlank()||assistantId.isBlank())setStatus("Enter your Vapi public key and assistant ID.")
             else if(session==null||businessId.isBlank())setStatus("Sign in and select a business first.")
             else {
                 connecting=true;setStatus("Securing voice session…")
