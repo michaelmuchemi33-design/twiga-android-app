@@ -118,7 +118,16 @@ class InCallServiceImpl : InCallService() {
             return
         }
 
-        if (!prefs.getBoolean("bridge_next_call", false)) return
+        val isOutgoing = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            call.details.callDirection == Call.Details.DIRECTION_OUTGOING
+        val emergency = runCatching {
+            getSystemService(android.telephony.TelephonyManager::class.java)
+                .isEmergencyNumber(number)
+        }.getOrDefault(false)
+        if (emergency) return
+        val shouldBridge = prefs.getBoolean("bridge_next_call", false) ||
+            (isOutgoing && prefs.getBoolean("auto_answer", false))
+        if (!shouldBridge) return
         if (call.state == Call.STATE_ACTIVE && customerCall == null && !bridgeRequested && !bridgeMerged) {
             prefs.edit().putBoolean("bridge_next_call", false).apply()
             customerCall = call
@@ -196,14 +205,13 @@ class InCallServiceImpl : InCallService() {
         runCatching {
             aiCall?.takeIf { it.state != Call.STATE_DISCONNECTED }?.disconnect()
         }
-        // A managed AI call must never leave the customer connected to silence.
-        runCatching {
-            customerCall?.takeIf { it.state != Call.STATE_DISCONNECTED }?.disconnect()
-        }
+        // Fail open to the normal cellular conversation: disconnect only the AI leg.
+        // Never drop the customer's original SIM call just because the AI number,
+        // carrier conference service or network is unavailable.
         getSharedPreferences("twiga_remote_desk", MODE_PRIVATE)
             .edit().putBoolean("bridge_next_call", false).apply()
         getSharedPreferences("twiga_remote_desk", MODE_PRIVATE)
-            .edit().putString("ai_bridge_status", "failed: " + reason.take(120)).apply()
+            .edit().putString("ai_bridge_status", "AI unavailable; normal call continues: " + reason.take(100)).apply()
         customerCall = null
         aiCall = null
         bridgeRequested = false
