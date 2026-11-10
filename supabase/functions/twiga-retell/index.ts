@@ -197,6 +197,7 @@ Deno.serve(async (req:Request) => {
         webhook_events:["call_started","call_ended","call_analyzed"],webhook_timeout_ms:10000,
         data_storage_setting:recordingResult.data?.call_recording_enabled===true ? "everything" : "basic_attributes_only",
         opt_in_signed_url:recordingResult.data?.call_recording_enabled===true,
+        data_storage_retention_days:30,
         signed_url_expiration_ms:86400000,max_call_duration_ms:600000,end_call_after_silence_ms:30000,
         begin_message_delay_ms:350,
         post_call_analysis_data:[
