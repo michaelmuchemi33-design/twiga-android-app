@@ -33,7 +33,7 @@ TWIGA_VAPI_PUBLIC_KEY=YOUR_VAPI_PUBLIC_KEY
 TWIGA_VAPI_ASSISTANT_ID=YOUR_ASSISTANT_ID
 ```
 
-The app also allows the Supabase URL/key to be entered on the sign-in screen and the Vapi public key/assistant ID in the Voice tab. Never put a Supabase service-role key or Vapi private API token in the APK.
+The app defaults to the existing **TWIGA AI Receptionist** assistant (`ea3ae8f7-fb6f-430e-9c33-96d9a919ade3`). You can override the assistant ID in the Voice tab if you deliberately want another assistant. No phone number or phone pairing is required: this is in-app voice over the internet. Never put a Supabase service-role key or Vapi private API token in the APK.
 
 ## Deploy the backend to the existing Supabase project
 
@@ -69,7 +69,7 @@ The tools endpoint is authorized by the random 256-bit voice-session ticket issu
 ]
 ```
 
-**Security:** the Android app first calls `twiga-vapi-session` with the signed-in user's Supabase access token. The function verifies the user and business membership, then returns a random ticket that expires after 10 minutes. Vapi receives that ticket as call metadata. The tools endpoint checks the server secret and ticket, then scopes every database write to the ticket's business and user. Metadata values by themselves are not treated as authorization.
+**Security:** the Android app first calls `twiga-vapi-session` with the signed-in user's Supabase access token. The function verifies the user and business membership, then returns a random ticket that expires after 10 minutes. Vapi receives that ticket as call metadata. The tools endpoint checks the short-lived ticket, then scopes every database write to the ticket's business and user. Metadata values by themselves are not treated as authorization.
 
 ## Current limitations / verification boundary
 
