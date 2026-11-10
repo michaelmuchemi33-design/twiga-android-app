@@ -464,6 +464,7 @@ fun TwigaPlatformAdminWorkspace(url: String, key: String, session: TwigaSession)
             },
             dismissButton = { TextButton(onClick = { showPayment = false }) { Text("Cancel") } }
         )
+    }
     if (showAiSetup && aiSetupClient != null) {
         Dialog(
             onDismissRequest = { showAiSetup = false; aiSetupClient = null },
@@ -489,8 +490,6 @@ fun TwigaPlatformAdminWorkspace(url: String, key: String, session: TwigaSession)
                 }
             }
         }
-    }
-
     }
 }
 
