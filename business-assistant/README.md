@@ -17,7 +17,9 @@ A separate Android app for business operations. It is not a dialer and does not 
 - Official Vapi Android SDK for real-time in-app voice (WebRTC; no phone number)
 - Short-lived voice session ticket issued by an authenticated Supabase Edge Function
 - Vapi tool webhook that checks the ticket before writing business records
-- Build workflow that produces a debug APK artifact
+- In-app Support chat and human support-ticket capture
+- Owner-only in-app Platform Admin with client list, one-off KSh payment ledger, access status and ticket inbox
+- CI debug APK for testing; stable public APK releases are gated on a permanent signing key
 
 ## Build
 
@@ -77,9 +79,9 @@ The tools endpoint is authorized by the random 256-bit voice-session ticket issu
 
 ## Current limitations / verification boundary
 
-- The source and CI workflow are committed, but the Supabase migration/functions still need to be deployed to the live project and the Vapi assistant still needs its credential, Server URL and Function tools configured.
+- The business-assistant database migration and Vapi functions were deployed to the live Supabase project. The platform-admin and Grok-support functions are also deployed; the AI chatbot remains disabled until a new `XAI_API_KEY` is added to Supabase Edge Function Secrets.
 - The app currently signs in with email/password; Google sign-in is not wired into this separate APK yet.
-- The first version creates and lists core records. Calendar/Contacts/Sheets/Drive sync and WhatsApp Business messaging are follow-on integrations, not claimed as working in this APK.
+- Calendar/Contacts/Sheets/Drive sync is not yet wired into this separate APK. The WhatsApp workspace UI exists, but WhatsApp pairing and AI replies require the TWIGA Reply service to be deployed and configured.
 - A GitHub Actions debug build is a test APK, not a permanent signed customer release.
 
 
@@ -97,3 +99,39 @@ The WhatsApp AI reads only the selected WhatsApp connection's business profile a
 The Overview screen includes a WhatsApp workspace for the currently selected business. The screen uses the TWIGA Reply service URL saved on the sign-in screen and the signed-in Supabase access token. It supports creating that business's OpenWA session, displaying its QR code, refreshing link status, showing recent message activity, enabling/disabling AI replies, saving additional business instructions, disconnecting the linked account and sending staff replies.
 
 Before pairing, deploy both Render services and configure the reply service's secrets. The QR must be scanned by the WhatsApp account owned by, or explicitly authorized for, the selected business. AI replies remain off until the business owner turns them on.
+
+
+## In-app platform admin, manual billing and support
+
+The app shows **Admin & Billing** only to users listed in `twiga_platform_admins`. The live migration seeds the sole existing owner account when the project still has only one Auth user and one business owner membership. The Edge Function independently verifies this allowlist on every privileged request; hiding the screen is not the security boundary.
+
+- Client overview: business, owner email, member count, service status and paid-through date.
+- One-off payments: record KSh amount, M-Pesa/bank/cash/card/other method, reference and note. References are unique per method to prevent accidental duplicates.
+- Access: manually mark a client ACTIVE, TRIAL or SUSPENDED. Recording a payment does not silently create or renew a subscription.
+- Support inbox: app/website/WhatsApp tickets can be reviewed and marked in progress/resolved.
+- No automated subscriptions, recurring billing or automatic payment capture is enabled in this phase. `twiga_subscriptions` is retained but is not used as the current payment flow.
+
+The live functions are `twiga-platform-admin` and `twiga-ai-support`. For Grok:
+1. Open Supabase Project Settings > Edge Functions > Secrets.
+2. Add `XAI_API_KEY` using a newly generated xAI API key. Do not put it in Gradle, the APK, GitHub source or website JavaScript.
+3. The support function uses the xAI Responses API and `grok-4.3` with reasoning set to `none` for quick FAQ-style responses. Human tickets still work when the AI key is not set.
+
+Apply the source-controlled migration files under `supabase/migrations` on a fresh environment, then deploy:
+```bash
+supabase functions deploy twiga-platform-admin
+supabase functions deploy twiga-ai-support
+```
+
+## Permanent Android signing and installation upgrades
+
+The current public 1.0.50 APK is debug-signed. GitHub-hosted runners generate different debug signing identities; installing a later APK over an already installed copy can therefore fail with a signature mismatch. The workflow now deliberately keeps the current public APK unchanged until a permanent release key is configured.
+
+Create and back up one Android release keystore, then add these repository Actions secrets:
+- `TWIGA_ANDROID_KEYSTORE_BASE64`
+- `TWIGA_ANDROID_KEYSTORE_PASSWORD`
+- `TWIGA_ANDROID_KEY_ALIAS`
+- `TWIGA_ANDROID_KEY_PASSWORD`
+
+After that, the workflow builds and publishes a permanently signed release APK. Because the already-published 1.0.50 APK was signed with a temporary debug key, users will need to uninstall that one time before installing the first permanently signed build; future releases using the same keystore can update in place. Back up the keystore securely—losing it prevents signed in-place upgrades.
+
+Minimum SDK remains 24 (Android 7.0). A 2019 phone that runs Android 7.0+ should pass the version check, but real install compatibility also depends on CPU ABI and signature state. CI build success is not a substitute for installing on the actual phone.
