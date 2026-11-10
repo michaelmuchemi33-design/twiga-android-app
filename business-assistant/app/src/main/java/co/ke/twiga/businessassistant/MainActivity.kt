@@ -549,7 +549,8 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
     if(dialog) AlertDialog(onDismissRequest={dialog=false},title={Text("Add $page")},text={Column {
         OutlinedTextField(name,{name=it},label={Text(if(page=="Tasks")"Task title" else "Name / customer")},modifier=Modifier.fillMaxWidth())
         if(page!="Tasks") OutlinedTextField(phone,{phone=it},label={Text(if(page=="Orders")"Amount (KSh)" else "Phone number")},modifier=Modifier.fillMaxWidth())
-        if(page=="Appointments") OutlinedTextField(appointmentDateTime,{appointmentDateTime=it},label={Text("Appointment date/time (ISO, +03:00)")},modifier=Modifier.fillMaxWidth(),singleLine=true)\n         OutlinedTextField(notes,{notes=it},label={Text("Notes / details")},modifier=Modifier.fillMaxWidth())
+        if(page=="Appointments") OutlinedTextField(appointmentDateTime,{appointmentDateTime=it},label={Text("Appointment date/time (ISO, +03:00)")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+         OutlinedTextField(notes,{notes=it},label={Text("Notes / details")},modifier=Modifier.fillMaxWidth())
     }},confirmButton={TextButton(onClick={ { addRecord() } },enabled=name.isNotBlank()){Text("Save")}},dismissButton={TextButton(onClick={dialog=false}){Text("Cancel")}})
 }
 
