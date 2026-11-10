@@ -493,7 +493,7 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
                     "Overview" -> {
                         Text("Good business starts here.",fontSize=24.sp,fontWeight=FontWeight.Bold,color=Ink); Text("Your daily workspace",color=Muted)
                         Spacer(Modifier.height(16.dp))
-                        val homeItems = listOf("Business Profile","POS Products","Google Workspace","Plan & payments","WhatsApp","Customers","Orders","Appointments","Tasks","Voice","Support") + if(platformAdminAvailable) listOf("Admin & Billing") else emptyList()
+                        val homeItems = listOf("Business Profile","POS Products","Google Workspace","Plan & payments","WhatsApp","Customers","Orders","Appointments","Tasks","Voice","Voice & AI Settings","Support") + if(platformAdminAvailable) listOf("Admin & Billing") else emptyList()
                         homeItems.forEach { item ->
                             Card(Modifier.fillMaxWidth().padding(bottom=10.dp).clickable{
                                 page=if(item=="POS Products") "Products" else item
@@ -501,7 +501,7 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
                                     "Business Profile" -> loadProfile()
                                     "POS Products" -> reloadProducts()
                                     "WhatsApp" -> refreshWhatsApp()
-                                    "Voice", "Support", "Admin & Billing", "Google Workspace", "Plan & payments" -> Unit
+                                    "Voice", "Voice & AI Settings", "Support", "Admin & Billing", "Google Workspace", "Plan & payments" -> Unit
                                     else -> reload(item)
                                 }
                             },colors=CardDefaults.cardColors(containerColor=Color.White)) {
@@ -528,7 +528,8 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
                         onSaveSettings={updateWhatsAppSettings(whatsAiEnabled,whatsPrompt)},
                         onReplyPhoneChange={whatsReplyPhone=it},onReplyTextChange={whatsReplyText=it},onSend={sendWhatsAppReply()}
                     )
-                    "Voice" -> VoiceWorkspace(vapiKey,assistantId,business?.id.orEmpty(),session,api,{voiceStatus=it},{voiceLines=voiceLines+it},voiceStatus,voiceLines,{vapiKey=it;save(url,key,it,assistantId,replyApiUrl)},{assistantId=it;save(url,key,vapiKey,it,replyApiUrl)})
+                    "Voice" -> if (session != null && business != null) TwigaVoiceRouter(url,key,session!!,business!!.id,business!!.name) { VoiceWorkspace(vapiKey,assistantId,business?.id.orEmpty(),session,api,{voiceStatus=it},{voiceLines=voiceLines+it},voiceStatus,voiceLines,{vapiKey=it;save(url,key,it,assistantId,replyApiUrl)},{assistantId=it;save(url,key,vapiKey,it,replyApiUrl)}) } else Text("Sign in to use voice.")
+                    "Voice & AI Settings" -> if (session != null && business != null) TwigaRetellWorkspace(url,key,session!!,business!!.id,business!!.name) else Text("Select a business to configure voice and AI.")
                     else -> {
                         Row(verticalAlignment=Alignment.CenterVertically) { Column(Modifier.weight(1f)){Text(page,fontSize=24.sp,fontWeight=FontWeight.Bold);Text("Business records",color=Muted,fontSize=12.sp)}; Button(onClick={dialog=true; if(page=="Appointments") appointmentDateTime=defaultAppointmentTime()}){Icon(Icons.Default.Add,null);Text("Add")} }
                         if(loading) LinearProgressIndicator(Modifier.fillMaxWidth())
