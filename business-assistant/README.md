@@ -90,3 +90,10 @@ After sign-in, open **Business Profile** from the Overview screen and describe t
 To upload a product picture, configure `TWIGA_REPLY_API_URL` in the local `twiga.properties` file or in the app settings, and deploy the TWIGA Reply service. The Reply service must have Cloudflare R2 configured; images are stored under a path containing the business UUID and are not public bucket objects. Supported image types are JPG, PNG and WebP up to 5 MB.
 
 The WhatsApp AI reads only the selected WhatsApp connection's business profile and active products when answering customer questions. It does not use a global shared product list.
+
+
+## WhatsApp workspace
+
+The Overview screen includes a WhatsApp workspace for the currently selected business. The screen uses the TWIGA Reply service URL saved on the sign-in screen and the signed-in Supabase access token. It supports creating that business's OpenWA session, displaying its QR code, refreshing link status, showing recent message activity, enabling/disabling AI replies, saving additional business instructions, disconnecting the linked account and sending staff replies.
+
+Before pairing, deploy both Render services and configure the reply service's secrets. The QR must be scanned by the WhatsApp account owned by, or explicitly authorized for, the selected business. AI replies remain off until the business owner turns them on.
