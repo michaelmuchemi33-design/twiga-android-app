@@ -20,6 +20,29 @@ Deno.serve(async (req) => {
   const admin = createClient(url, serviceKey);
   const { data: membership } = await admin.from("business_members").select("business_id").eq("business_id", businessId).eq("user_id", user.id).maybeSingle();
   if (!membership) return json({ error: "You are not a member of this business" }, 403);
+  const { data: subscriptionRows, error: subscriptionError } = await admin.from("twiga_subscriptions")
+    .select("status,trial_ends_at,grace_period_ends_at").eq("business_id", businessId)
+    .order("created_at", { ascending: false }).limit(1);
+  if (subscriptionError) return json({ error: "Could not verify TWIGA payment status." }, 503);
+  const subscription = subscriptionRows?.[0];
+  let paidAccess = false;
+  if (subscription?.status === "trialing") {
+    if (subscription.trial_ends_at) paidAccess = new Date(subscription.trial_ends_at).getTime() + 3 * 86400000 > Date.now();
+    else {
+      const { data: trialBusiness } = await admin.from("businesses").select("status,paid_through").eq("id", businessId).maybeSingle();
+      paidAccess = !!trialBusiness && trialBusiness.status === "TRIAL" &&
+        new Date(String(trialBusiness.paid_through) + "T23:59:59+03:00").getTime() + 3 * 86400000 > Date.now();
+    }
+  } else if (subscription && ["active", "past_due"].includes(String(subscription.status))) {
+    paidAccess = !!subscription.grace_period_ends_at && new Date(subscription.grace_period_ends_at).getTime() > Date.now();
+  } else if (!subscription) {
+    const { data: legacyBusiness } = await admin.from("businesses").select("status,paid_through").eq("id", businessId).maybeSingle();
+    paidAccess = !!legacyBusiness && ["TRIAL", "ACTIVE"].includes(String(legacyBusiness.status)) &&
+      new Date(String(legacyBusiness.paid_through) + "T23:59:59+03:00").getTime() + 3 * 86400000 > Date.now();
+  }
+  if (!paidAccess) return json({
+    error: "TWIGA AI voice is paused because the three-day payment grace period has ended. Pay to restore TWIGA features. Your phone and WhatsApp apps are unaffected."
+  }, 402);
   const { data: accountRows, error: accountError } = await admin.rpc("twiga_next_vapi_account");
   const account = Array.isArray(accountRows) ? accountRows[0] : null;
   if (accountError || !account) return json({ error: "No active TWIGA voice account is available. Ask the platform administrator to enable one." }, 503);
