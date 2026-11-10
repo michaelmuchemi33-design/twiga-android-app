@@ -11,7 +11,7 @@ on:
       - ".github/workflows/twiga-business-assistant.yml"
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-24.04
@@ -29,6 +29,14 @@ jobs:
           SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -1)
           yes | "$SDKMANAGER" --licenses
           "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+      - name: Set unique app version for this build
+        run: |
+          VERSION_CODE=$((400000 + GITHUB_RUN_NUMBER))
+          VERSION_NAME="1.0.$GITHUB_RUN_NUMBER"
+          echo "ORG_GRADLE_PROJECT_appVersionCode=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "ORG_GRADLE_PROJECT_appVersionName=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "TWIGA_APP_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "TWIGA_APP_VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
       - name: Build separate Business Assistant APK
         run: |
           chmod +x ./gradlew
@@ -39,3 +47,38 @@ jobs:
           path: business-assistant/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 30
+      - name: Publish latest TWIGA Business Assistant APK
+        if: github.event_name == 'push' && github.ref == 'refs/heads/feature/twiga-business-assistant-app'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p release-assets
+          APK_SOURCE="business-assistant/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK_SOURCE"
+          cp "$APK_SOURCE" release-assets/twiga-business-assistant.apk
+          APK_SIZE=$(stat -c%s release-assets/twiga-business-assistant.apk)
+          APK_SHA=$(sha256sum release-assets/twiga-business-assistant.apk | cut -d' ' -f1)
+          cat > release-assets/version.json <<EOF
+          {
+            "appId": "co.ke.twiga.businessassistant",
+            "versionName": "$TWIGA_APP_VERSION_NAME",
+            "versionCode": $TWIGA_APP_VERSION_CODE,
+            "sizeBytes": $APK_SIZE,
+            "sha256": "$APK_SHA",
+            "minimumAndroidSdk": 24,
+            "minimumAndroidVersion": "7.0",
+            "sourceBranch": "$GITHUB_REF_NAME",
+            "sourceCommit": "$GITHUB_SHA",
+            "builtAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+          TAG="twiga-business-assistant-latest"
+          TITLE="TWIGA Business Assistant $TWIGA_APP_VERSION_NAME"
+          NOTES="Latest TWIGA Business Assistant Android build.\n\nVersion: $TWIGA_APP_VERSION_NAME ($TWIGA_APP_VERSION_CODE)\nMinimum Android: 7.0 (API 24)\nSHA-256: $APK_SHA\n\nThe TWIGA website reads this release automatically. This is the current CI APK build."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" release-assets/twiga-business-assistant.apk release-assets/version.json --clobber
+            gh release edit "$TAG" --title "$TITLE" --notes "$NOTES"
+          else
+            gh release create "$TAG" release-assets/twiga-business-assistant.apk release-assets/version.json --title "$TITLE" --notes "$NOTES" --target "$GITHUB_SHA"
+          fi
+          echo "Published https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/twiga-business-assistant.apk"
