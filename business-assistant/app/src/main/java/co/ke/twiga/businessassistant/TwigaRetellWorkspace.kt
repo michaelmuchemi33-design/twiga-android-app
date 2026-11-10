@@ -410,3 +410,43 @@ window.endTwigaRetellCall = async () => { try{await client.stopCall();status("Ca
 try{window.TwigaBridge.onReady()}catch(e){}
 </script></body></html>
 """.trimIndent()
+
+
+@Composable
+internal fun TwigaVoiceRouter(
+    url: String,
+    key: String,
+    session: TwigaSession,
+    businessId: String,
+    businessName: String,
+    vapiContent: @Composable () -> Unit
+) {
+    var provider by remember(businessId) { mutableStateOf("vapi") }
+    var loading by remember { mutableStateOf(true) }
+    LaunchedEffect(businessId, session.token) {
+        loading = true
+        provider = runCatching {
+            TwigaRetellApi.getConfig(url, key, session, businessId)
+                .optJSONObject("config")?.optString("provider", "vapi") ?: "vapi"
+        }.getOrDefault("vapi")
+        loading = false
+    }
+    Column(Modifier.fillMaxSize()) {
+        Row(
+            Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            FilterChip(selected = provider == "vapi", onClick = { provider = "vapi" }, label = { Text("Vapi") })
+            FilterChip(selected = provider == "retell", onClick = { provider = "retell" }, label = { Text("Retell · Willa") })
+            if (loading) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+        }
+        Box(Modifier.weight(1f)) {
+            if (provider == "retell") {
+                TwigaRetellWorkspace(url, key, session, businessId, businessName)
+            } else {
+                vapiContent()
+            }
+        }
+    }
+}
