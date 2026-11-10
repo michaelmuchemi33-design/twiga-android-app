@@ -255,7 +255,8 @@ class MainActivity : ComponentActivity() {
                     val js = "window.twigaNativePairResult && window.twigaNativePairResult($ok, ${JSONObject.quote(resultMessage)})"
                     webView?.evaluateJavascript(js, null)
                     if (ok) {
-                        startRemoteDesk()
+                        // requestPhonePermissions starts the remote bridge only
+                        // after the required phone permissions are confirmed.
                         requestPhonePermissions()
                     }
                 }
