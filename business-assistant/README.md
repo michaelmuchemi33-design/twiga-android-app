@@ -42,7 +42,6 @@ Apply the migration and deploy both functions to the TWIGA Supabase project:
 ```bash
 supabase link --project-ref ztyxxikkposfpxsutnfr
 supabase db push
-supabase secrets set VAPI_SERVER_SECRET="a-long-random-secret"
 supabase functions deploy twiga-vapi-session
 supabase functions deploy twiga-vapi-tools
 ```
@@ -52,9 +51,10 @@ The Supabase project must already have the `businesses` and `business_members` t
 ## Connect Vapi so it can perform actions
 
 1. In Vapi, open the TWIGA assistant used by the app (do not attach a phone number).
-2. Create a Bearer Token custom credential configured to send the header `X-Vapi-Secret` **without** a Bearer prefix. Use the same secret value configured as `VAPI_SERVER_SECRET` in Supabase.
-3. Set the assistant Server URL to `https://ztyxxikkposfpxsutnfr.supabase.co/functions/v1/twiga-vapi-tools` and attach that credential.
-4. Add these Function tools to the assistant's model. For each tool, set its server URL to the same Edge Function and attach the same credential to each tool's server configuration.
+2. Set the assistant Server URL to `https://ztyxxikkposfpxsutnfr.supabase.co/functions/v1/twiga-vapi-tools`.
+3. Add these Function tools to the assistant's model. Set each tool's server URL to the same Edge Function.
+
+The tools endpoint is authorized by the random 256-bit voice-session ticket issued only after Supabase verifies the signed-in user and business membership. The ticket expires after 10 minutes. Do not log or expose call metadata.
 
 ### Tool definitions
 
