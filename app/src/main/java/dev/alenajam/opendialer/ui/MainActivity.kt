@@ -287,8 +287,15 @@ class MainActivity : ComponentActivity() {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
         if (missing.isEmpty()) {
-            startRemoteDesk()
-            requestBatteryOptimizationExemption()
+            if (RemoteDesk.isPaired(this)) {
+                startRemoteDesk()
+                requestBatteryOptimizationExemption()
+            }
+            val pending = pendingDialNumber
+            if (!pending.isNullOrBlank()) {
+                pendingDialNumber = null
+                placeSimCall(pending)
+            }
         } else {
             phonePermissions.launch(missing.toTypedArray())
         }
