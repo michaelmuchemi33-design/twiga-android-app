@@ -43,7 +43,7 @@ private data class PlatformTicket(
 )
 private data class SupportLine(val role: String, val content: String)
 
-private object TwigaAdminSupportApi {
+internal object TwigaAdminSupportApi {
     private val client = OkHttpClient.Builder().callTimeout(35, TimeUnit.SECONDS).build()
     private val json = "application/json".toMediaType()
 
