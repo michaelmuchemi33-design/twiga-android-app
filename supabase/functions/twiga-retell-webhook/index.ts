@@ -86,26 +86,50 @@ Deno.serve(async(req:Request)=>{
       const order=String(custom.order_request || "").trim();
       const action=String(custom.follow_up_action || "").trim();
       const followTime=String(custom.follow_up_time || "").trim();
+      const enquiryType=String(custom.enquiry_type || "").trim();
       const caller=String(custom.customer_name || call.from_number || "Caller").trim();
+      const phone=String(custom.customer_phone || call.from_number || "").trim();
+      const {data:biz}=await admin.from("businesses").select("created_by").eq("id",config.business_id).maybeSingle();
+
+      if(biz?.created_by && custom.customer_name && phone) {
+        const {data:existingCustomer}=await admin.from("twiga_customers")
+          .select("id").eq("business_id",config.business_id).eq("phone",phone).limit(1).maybeSingle();
+        if(!existingCustomer) {
+          const {error:customerError}=await admin.from("twiga_customers").insert({
+            business_id:config.business_id,created_by:biz.created_by,
+            name:String(custom.customer_name).slice(0,160),phone:phone.slice(0,60),
+            notes:"Captured from Retell conversation. Call ID: "+callId
+          });
+          if(customerError) console.error("Retell customer capture failed",customerError.message);
+        }
+      }
+
       const tasks:string[]=[];
+      if(enquiryType && !["other","general","none",""].includes(enquiryType.toLowerCase()) && (summary || transcript)) {
+        tasks.push("New enquiry: "+enquiryType+" — "+caller);
+      }
       if(needsFollowup || action) tasks.push(action || "Follow up with "+caller+" after the phone enquiry");
       if(appointment) tasks.push("Confirm appointment request: "+appointment);
       if(order) tasks.push("Review order request: "+order);
-      if(tasks.length) {
-        const {data:biz}=await admin.from("businesses").select("created_by").eq("id",config.business_id).maybeSingle();
-        for(const task of Array.from(new Set(tasks)).slice(0,3)) {
+      if(tasks.length && biz?.created_by) {
+        for(const task of Array.from(new Set(tasks)).slice(0,4)) {
           const marker="Retell call ID: "+callId;
           const desc=[
             "Automatically created from a completed Retell call.",
             "Customer: "+caller,
-            "Callback number: "+String(custom.customer_phone || call.from_number || "Not supplied"),
+            "Callback number: "+(phone || "Not supplied"),
+            "Enquiry type: "+(enquiryType || "Not classified"),
             "Requested follow-up time: "+(followTime || "Not specified"),
             "Details: "+task,
             "Call summary: "+(summary || "See call transcript in TWIGA call history."),
             marker
           ].join("\n");
-          const {data:existing}=await admin.from("twiga_tasks").select("id").eq("business_id",config.business_id).ilike("description","%"+marker+"%").ilike("title","%"+task.slice(0,40)+"%").limit(1).maybeSingle();
-          if(!existing && biz?.created_by) {
+          const {data:existing}=await admin.from("twiga_tasks").select("id")
+            .eq("business_id",config.business_id)
+            .ilike("description","%"+marker+"%")
+            .ilike("title","%"+task.slice(0,40)+"%")
+            .limit(1).maybeSingle();
+          if(!existing) {
             const {error:taskError}=await admin.from("twiga_tasks").insert({
               business_id:config.business_id,created_by:biz.created_by,
               title:task.slice(0,180),description:desc,status:"open"
