@@ -3,6 +3,8 @@ package dev.alenajam.opendialer.ui
 import android.Manifest
 import android.app.NotificationManager
 import android.content.Intent
+import android.app.AlertDialog
+import android.telecom.TelecomManager
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -44,6 +46,8 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var defaultPhoneManager: DefaultPhoneManager
 
     private var webView: WebView? = null
+    private var pendingDialNumber: String? = null
+    private var phonePermissionRequestInFlight = false
     private var pendingWebPermission: PermissionRequest? = null
     @Volatile private var googleOAuthInProgress = false
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -82,6 +86,7 @@ class MainActivity : ComponentActivity() {
     private val phonePermissions = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { results ->
+        phonePermissionRequestInFlight = false
         val required = listOf(
             Manifest.permission.CALL_PHONE,
             Manifest.permission.READ_PHONE_STATE,
@@ -92,9 +97,16 @@ class MainActivity : ComponentActivity() {
             results[permission] == true || ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
         }
         webView?.evaluateJavascript("window.twigaNativePermissionsResult && window.twigaNativePermissionsResult($granted)", null)
-        if (granted && RemoteDesk.isPaired(this)) {
-            startRemoteDesk()
-            requestBatteryOptimizationExemption()
+        if (granted) {
+            if (RemoteDesk.isPaired(this)) {
+                startRemoteDesk()
+                requestBatteryOptimizationExemption()
+            }
+            val pending = pendingDialNumber
+            if (!pending.isNullOrBlank()) {
+                pendingDialNumber = null
+                placeSimCall(pending)
+            }
         }
     }
 
@@ -109,13 +121,15 @@ class MainActivity : ComponentActivity() {
             View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
 
         UpdateManager.autoCheck(applicationContext)
-        if (RemoteDesk.isPaired(this) && RemoteDesk.remoteControl(this)) {
-            runCatching { ContextCompat.startForegroundService(this, Intent(this, RemoteDeskService::class.java)) }
-        }
+
+        // Start the paired-phone bridge only after the app has the dialler role
+        // and the runtime phone permissions. Starting it before that can make
+        // remote answer/dial commands fail silently on a fresh install.
 
         showWorkspace()
         handleOAuthCallback(intent)
         requestDefaultDialerIfNeeded()
+        handleDialIntent(intent)
     }
 
     private fun showWorkspace() {
@@ -254,7 +268,8 @@ class MainActivity : ComponentActivity() {
                     val js = "window.twigaNativePairResult && window.twigaNativePairResult($ok, ${JSONObject.quote(resultMessage)})"
                     webView?.evaluateJavascript(js, null)
                     if (ok) {
-                        startRemoteDesk()
+                        // requestPhonePermissions starts the remote bridge only
+                        // after the required phone permissions are confirmed.
                         requestPhonePermissions()
                     }
                 }
@@ -274,9 +289,17 @@ class MainActivity : ComponentActivity() {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
         if (missing.isEmpty()) {
-            startRemoteDesk()
-            requestBatteryOptimizationExemption()
-        } else {
+            if (RemoteDesk.isPaired(this)) {
+                startRemoteDesk()
+                requestBatteryOptimizationExemption()
+            }
+            val pending = pendingDialNumber
+            if (!pending.isNullOrBlank()) {
+                pendingDialNumber = null
+                placeSimCall(pending)
+            }
+        } else if (!phonePermissionRequestInFlight) {
+            phonePermissionRequestInFlight = true
             phonePermissions.launch(missing.toTypedArray())
         }
     }
@@ -324,20 +347,71 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleOAuthCallback(intent)
+        handleDialIntent(intent)
+    }
+
+    /**
+     * This app is registered as the system dialler. ACTION_DIAL must therefore
+     * do something useful instead of merely opening the business WebView.
+     * Confirm the number before placing a normal cellular call on the SIM.
+     */
+    private fun handleDialIntent(source: Intent?) {
+        val action = source?.action ?: return
+        if (action != Intent.ACTION_DIAL && action != Intent.ACTION_VIEW) return
+        val uri = source.data ?: return
+        if (uri.scheme != "tel") return
+        val number = uri.schemeSpecificPart.orEmpty().trim().take(40)
+        if (number.isBlank()) return
+        AlertDialog.Builder(this)
+            .setTitle("Call using your SIM?")
+            .setMessage("Place a normal phone call to $number?")
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Call") { _, _ -> placeSimCall(number) }
+            .show()
+    }
+
+    private fun placeSimCall(number: String) {
+        if (!defaultPhoneManager.isDefaultDialer()) {
+            pendingDialNumber = number
+            requestDefaultDialerManually()
+            return
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
+            pendingDialNumber = number
+            requestPhonePermissions()
+            return
+        }
+        runCatching {
+            getSystemService(TelecomManager::class.java)
+                .placeCall(Uri.fromParts("tel", number, null), Bundle())
+        }.onFailure { error ->
+            AlertDialog.Builder(this)
+                .setTitle("Call could not be started")
+                .setMessage(error.message ?: "Check phone permissions, SIM availability and carrier service.")
+                .setPositiveButton("OK", null)
+                .show()
+        }
     }
 
     private fun requestDefaultDialerIfNeeded() {
         val prefs = getSharedPreferences("twiga_setup", MODE_PRIVATE)
-        if (!defaultPhoneManager.isDefaultDialer() &&
-            !prefs.getBoolean("default_phone_prompted", false)
-        ) {
-            prefs.edit().putBoolean("default_phone_prompted", true).apply()
-            defaultPhoneManager.createRequestDefaultDialerIntent()?.let {
-                defaultDialerRequest.launch(it)
+        if (!defaultPhoneManager.isDefaultDialer()) {
+            if (!prefs.getBoolean("default_phone_prompted", false)) {
+                prefs.edit().putBoolean("default_phone_prompted", true).apply()
+                defaultPhoneManager.createRequestDefaultDialerIntent()?.let {
+                    defaultDialerRequest.launch(it)
+                }
+            } else {
+                // The owner can retry from the in-app Phone setup action.
+                requestFullScreenCallAccessIfNeeded()
             }
-        } else {
-            requestFullScreenCallAccessIfNeeded()
+            return
         }
+
+        // A returning user may already have granted the dialler role before
+        // pairing. Always re-check runtime permissions and restart the bridge.
+        if (RemoteDesk.isPaired(this)) requestPhonePermissions()
+        requestFullScreenCallAccessIfNeeded()
     }
 
     private fun requestFullScreenCallAccessIfNeeded() {
