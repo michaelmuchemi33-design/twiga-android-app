@@ -2,6 +2,11 @@ create schema if not exists private;
 grant usage on schema private to authenticated;
 
 alter table public.twiga_subscriptions
+  drop constraint if exists twiga_subscriptions_billing_interval_check;
+alter table public.twiga_subscriptions
+  add constraint twiga_subscriptions_billing_interval_check
+  check (billing_interval in ('weekly','monthly','annual'));
+alter table public.twiga_subscriptions
   alter column billing_interval set default 'weekly',
   alter column amount set default 375;
 alter table public.twiga_subscriptions
