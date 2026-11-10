@@ -95,16 +95,22 @@ Deno.serve(async (req) => {
       const { data: business, error: businessError } = await admin.from("businesses")
         .select("id").eq("id", businessId).maybeSingle();
       if (businessError || !business) return reply({ error: "Client not found." }, 404);
-      const { data, error } = await admin.from("twiga_platform_payments").insert({
-        business_id: businessId, amount, currency: "KES", method,
-        provider_reference: reference || null, notes: notes || null,
-        period_start: periodStart, period_end: periodEnd, recorded_by: user.id,
-      }).select("id,business_id,amount,currency,method,provider_reference,paid_at").single();
+      const { data, error } = await admin.rpc("twiga_record_platform_payment", {
+        p_business_id: businessId,
+        p_amount: amount,
+        p_method: method,
+        p_reference: reference || null,
+        p_notes: notes || null,
+        p_period_start: periodStart,
+        p_period_end: periodEnd,
+        p_recorded_by: user.id,
+      });
       if (error) {
         if (error.code === "23505") return reply({ error: "That payment reference has already been recorded." }, 409);
+        if (error.code === "P0002") return reply({ error: "Client not found." }, 404);
         throw error;
       }
-      return reply({ saved: true, payment: data });
+      return reply({ saved: true, payment: data, clientAccessUpdated: Boolean(periodEnd) });
     }
 
     if (action === "set_access") {
