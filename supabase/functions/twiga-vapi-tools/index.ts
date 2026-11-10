@@ -7,7 +7,7 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "POST only" });
   const expected = Deno.env.get("VAPI_SERVER_SECRET");
   const received = req.headers.get("X-Vapi-Secret") || "";
-  if (!expected || received !== expected) return json({ results: [] });
+  if (!expected || received !== expected) { const body = await req.clone().json().catch(() => ({})); const list = body.message?.toolCallList || []; return json({ results: list.map((t: any) => ({ toolCallId: t.id, error: "TWIGA tool authentication failed." })) }); }
   const payload = await req.json().catch(() => ({}));
   const message = payload.message || {};
   if (message.type !== "tool-calls") return json({ received: true });
@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
           if (error) throw error; result = data; break;
         }
         case "list_appointments": {
-          const { data, error } = await admin.from("twiga_appointments").select("id,customer_name,scheduled_at,status").eq("business_id",session.business_id).order("scheduled_at",{ascending:true}).limit(10);
+          const { data, error } = await admin.from("twiga_appointments").select("id,customer_name,scheduled_at,status").eq("business_id",session.business_id).gte("scheduled_at",new Date().toISOString()).order("scheduled_at",{ascending:true}).limit(10);
           if (error) throw error; result = data; break;
         }
         default: throw new Error("This TWIGA action is not enabled: " + String(name));
