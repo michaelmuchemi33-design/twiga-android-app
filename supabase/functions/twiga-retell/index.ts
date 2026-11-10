@@ -107,16 +107,23 @@ Deno.serve(async (req:Request) => {
       if(!["gpt-6-luna","gpt-5.6-luna"].includes(model)) return reply({error:"Unsupported Retell model."},400);
       const ambient=Math.min(0.3,Math.max(0,Number(body.ambientVolume ?? 0.12)));
       const config={
-        business_id:businessId,provider:body.provider==="retell"?"retell":"vapi",
+        provider:body.provider==="retell"?"retell":"vapi",
         retell_voice_id:voiceId,retell_voice_model:voiceModel,retell_model:model,
         retell_language_codes:["en-GB","sw-KE"],retell_ambient_sound:"call-center",
         retell_ambient_sound_volume:ambient,inbound_prompt:String(body.inboundPrompt || "").slice(0,12000),
         outbound_prompt:String(body.outboundPrompt || "").slice(0,12000),
         updated_by:user.id,updated_at:new Date().toISOString()
       };
-      const {data,error}=await admin.from("twiga_business_voice_configs").upsert(config,{onConflict:"business_id"}).select("business_id,provider,retell_agent_id,retell_llm_id,retell_voice_id,retell_voice_model,retell_model,retell_language_codes,retell_ambient_sound,retell_ambient_sound_volume,inbound_prompt,outbound_prompt,last_provisioned_at,updated_at").single();
-      if(error) throw error;
-      return reply({saved:true,config:data});
+      const {data:existing,error:existingError}=await admin.from("twiga_business_voice_configs")
+        .select("business_id").eq("business_id",businessId).maybeSingle();
+      if(existingError) throw existingError;
+      const savedResult=existing
+        ? await admin.from("twiga_business_voice_configs").update(config).eq("business_id",businessId)
+            .select("business_id,provider,retell_agent_id,retell_llm_id,retell_voice_id,retell_voice_model,retell_model,retell_language_codes,retell_ambient_sound,retell_ambient_sound_volume,inbound_prompt,outbound_prompt,last_provisioned_at,updated_at").single()
+        : await admin.from("twiga_business_voice_configs").insert({...config,business_id:businessId})
+            .select("business_id,provider,retell_agent_id,retell_llm_id,retell_voice_id,retell_voice_model,retell_model,retell_language_codes,retell_ambient_sound,retell_ambient_sound_volume,inbound_prompt,outbound_prompt,last_provisioned_at,updated_at").single();
+      if(savedResult.error) throw savedResult.error;
+      return reply({saved:true,config:savedResult.data});
     }
 
     if(action==="provision_agent") {
@@ -130,22 +137,36 @@ Deno.serve(async (req:Request) => {
       ]);
       const biz=bizResult.data,config=configResult.data;
       if(bizResult.error || !biz) return reply({error:"Business not found."},404);
+      if(productsResult.error) return reply({error:"Could not load this business's product catalogue."},500);
       if(!config) return reply({error:"Save the voice settings before provisioning."},400);
       const check=await retell(String(secret),"/get-concurrency");
       if(!check.ok) return reply({error:"Retell key no longer works. Replace it in AI settings."},400);
       const prompt=buildPrompt(biz,profileResult.data,productsResult.data || [],config.inbound_prompt || "",config.outbound_prompt || "");
       const requested=String(config.retell_model || "gpt-6-luna");
-      const llmBody={model:requested,start_speaker:"agent",begin_message:"Hello, thank you for contacting "+biz.name+". How may I help you today?",general_prompt:prompt,model_temperature:0.1,begin_after_user_silence_ms:1200};
-      let llm=await retell(String(secret),"/create-retell-llm","POST",llmBody);
+      const llmBody={
+        model:requested,start_speaker:"agent",
+        begin_message:"Hello, thank you for contacting "+biz.name+". How may I help you today?",
+        general_prompt:prompt,model_temperature:0.1,begin_after_user_silence_ms:1200
+      };
       let actual=requested;
+      const existingLlmId=String(config.retell_llm_id || "");
+      let llm=existingLlmId
+        ? await retell(String(secret),"/update-retell-llm/"+encodeURIComponent(existingLlmId),"PATCH",llmBody)
+        : await retell(String(secret),"/create-retell-llm","POST",llmBody);
       if(!llm.ok && requested==="gpt-6-luna" && llm.status===400) {
         actual="gpt-5.6-luna";
-        llm=await retell(String(secret),"/create-retell-llm","POST",{...llmBody,model:actual});
+        const fallbackBody={...llmBody,model:actual};
+        llm=existingLlmId
+          ? await retell(String(secret),"/update-retell-llm/"+encodeURIComponent(existingLlmId),"PATCH",fallbackBody)
+          : await retell(String(secret),"/create-retell-llm","POST",fallbackBody);
       }
-      if(!llm.ok || !llm.data.llm_id) return reply({error:"Retell could not create the language model: "+(llm.message || "No LLM id returned")},502);
+      const llmId=existingLlmId || String(llm.data.llm_id || "");
+      if(!llm.ok || !llmId) {
+        return reply({error:"Retell could not save the language model: "+(llm.message || "No LLM id returned")},502);
+      }
       const agentBody={
         agent_name:("TWIGA - "+biz.name).slice(0,120),
-        response_engine:{type:"retell-llm",llm_id:llm.data.llm_id},
+        response_engine:{type:"retell-llm",llm_id:llmId},
         voice_id:config.retell_voice_id || "fish_audio-Willa",
         voice_model:config.retell_voice_model || "s2.1-pro",
         language:["en-GB","sw-KE"],voice_emotion:"calm",
@@ -154,7 +175,7 @@ Deno.serve(async (req:Request) => {
         enable_backchannel:true,backchannel_frequency:0.45,
         webhook_url:url+"/functions/v1/twiga-retell-webhook",
         webhook_events:["call_started","call_ended","call_analyzed"],webhook_timeout_ms:10000,
-        data_storage_setting:"everything",data_storage_retention_days:30,opt_in_signed_url:true,
+        data_storage_setting:"everything",opt_in_signed_url:true,
         signed_url_expiration_ms:86400000,max_call_duration_ms:600000,end_call_after_silence_ms:30000,
         begin_message_delay_ms:350,
         post_call_analysis_data:[
@@ -168,16 +189,27 @@ Deno.serve(async (req:Request) => {
           {type:"string",name:"order_request",description:"Products, quantities and preferences; this is not a confirmed order."}
         ]
       };
-      const agent=await retell(String(secret),"/create-agent","POST",agentBody);
-      if(!agent.ok || !agent.data.agent_id) return reply({error:"Retell could not create the voice agent: "+(agent.message || "No agent id returned")},502);
-      const published=await retell(String(secret),"/publish-agent","POST",{agent_id:agent.data.agent_id});
-      if(!published.ok) return reply({error:"Agent draft created but Retell did not publish it. Review it in Retell before trying again.",agentCreated:true},502);
+      const existingAgentId=String(config.retell_agent_id || "");
+      const agent=existingAgentId
+        ? await retell(String(secret),"/update-agent/"+encodeURIComponent(existingAgentId),"PATCH",agentBody)
+        : await retell(String(secret),"/create-agent","POST",agentBody);
+      const agentId=existingAgentId || String(agent.data.agent_id || "");
+      if(!agent.ok || !agentId) return reply({error:"Retell could not save the voice agent: "+(agent.message || "No agent id returned")},502);
+      const published=await retell(String(secret),"/publish-agent","POST",{agent_id:agentId});
+      if(!published.ok) return reply({error:"Agent draft was saved but Retell did not publish it. Review the draft in Retell before retrying.",agentCreated:!existingAgentId,agentId},502);
       const {data:saved,error:saveError}=await admin.from("twiga_business_voice_configs").update({
-        provider:"retell",retell_agent_id:agent.data.agent_id,retell_llm_id:llm.data.llm_id,
+        provider:"retell",retell_agent_id:agentId,retell_llm_id:llmId,
         retell_model:actual,last_provisioned_at:new Date().toISOString(),updated_at:new Date().toISOString()
-      }).eq("business_id",businessId).select("business_id,provider,retell_agent_id,retell_llm_id,retell_voice_id,retell_voice_model,retell_model,retell_language_codes,retell_ambient_sound,retell_ambient_sound_volume,last_provisioned_at").single();
+      }).eq("business_id",businessId)
+        .select("business_id,provider,retell_agent_id,retell_llm_id,retell_voice_id,retell_voice_model,retell_model,retell_language_codes,retell_ambient_sound,retell_ambient_sound_volume,last_provisioned_at").single();
       if(saveError) throw saveError;
-      return reply({provisioned:true,published:true,config:saved,modelNotice:actual===requested?"Retell accepted the requested model.":"The live pricing page lists GPT-6 Luna, but the create API rejected it; GPT-5.6 Luna was used as the documented fallback.",message:"The business-specific Retell receptionist is published. Vapi remains available and has not been removed."});
+      return reply({
+        provisioned:true,published:true,updated:!!existingAgentId,config:saved,
+        modelNotice:actual===requested?"Retell accepted the requested model.":"Retell rejected GPT-6 Luna; the documented GPT-5.6 Luna fallback was used.",
+        message:existingAgentId
+          ?"The existing business-specific Retell receptionist was updated and published. Vapi remains available."
+          :"The business-specific Retell receptionist was created and published. Vapi remains available."
+      });
     }
 
     if(action==="create_web_call") {
