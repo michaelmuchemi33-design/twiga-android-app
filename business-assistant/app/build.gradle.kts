@@ -20,6 +20,7 @@ android {
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"${setting("TWIGA_SUPABASE_ANON_KEY","TWIGA_SUPABASE_ANON_KEY").ifBlank { "sb_publishable_Zex31DUxW6bX3LP6Wlos2Q_pMiZ_JeT" }}\"")
         buildConfigField("String", "VAPI_PUBLIC_KEY", "\"${setting("TWIGA_VAPI_PUBLIC_KEY","TWIGA_VAPI_PUBLIC_KEY").ifBlank { "2874d463-b31e-4d5a-84d7-e6cbe0a90b15" }}\"")
         buildConfigField("String", "VAPI_ASSISTANT_ID", "\"${setting("TWIGA_VAPI_ASSISTANT_ID","TWIGA_VAPI_ASSISTANT_ID").ifBlank { "ea3ae8f7-fb6f-430e-9c33-96d9a919ade3" }}\"")
+        buildConfigField("String", "TWIGA_REPLY_API_URL", "\"${setting("TWIGA_REPLY_API_URL","TWIGA_REPLY_API_URL")}\"")
     }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
@@ -38,6 +39,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.json:json:20240303")
+    implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("ai.vapi.android:vapi:1.0.7")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
