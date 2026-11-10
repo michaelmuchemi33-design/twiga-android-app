@@ -65,8 +65,14 @@ Deno.serve(async (req) => {
         .order("created_at", { ascending: false }).limit(100);
       if (ticketError) throw ticketError;
 
+      const { data: vapiAccounts, error: vapiError } = await admin
+        .from("twiga_vapi_accounts")
+        .select("id,name,vapi_public_key,assistant_id,voice_label,voice_model,priority,enabled,last_used_at,created_at")
+        .order("priority", { ascending: true }).order("created_at", { ascending: true });
+      if (vapiError) throw vapiError;
+
       const paidTotal = (payments || []).reduce((n: number, p: any) => n + Number(p.amount || 0), 0);
-      return reply({ isAdmin: true, clients, payments: payments || [], tickets: tickets || [],
+      return reply({ isAdmin: true, clients, payments: payments || [], tickets: tickets || [], vapiAccounts: vapiAccounts || [],
         metrics: { clientCount: clients.length, paymentCount: (payments || []).length,
           paidTotalKes: Number(paidTotal.toFixed(2)),
           openTickets: (tickets || []).filter((t: any) => t.status !== "resolved").length } });
@@ -115,6 +121,36 @@ Deno.serve(async (req) => {
         .eq("id", businessId).select("id,name,status,paid_through").single();
       if (error) throw error;
       return reply({ saved: true, client: data });
+    }
+
+    if (action === "save_vapi_account") {
+      const name = String(payload.name || "").trim().slice(0, 80);
+      const publicKey = String(payload.publicKey || "").trim().slice(0, 255);
+      const assistantId = String(payload.assistantId || "").trim().slice(0, 255);
+      const voiceLabel = String(payload.voiceLabel || "").trim().slice(0, 120);
+      const voiceModel = String(payload.voiceModel || "").trim().slice(0, 120);
+      const priority = Number.isInteger(Number(payload.priority)) ? Math.max(1, Math.min(10000, Number(payload.priority))) : 100;
+      const enabled = payload.enabled !== false;
+      if (name.length < 2 || publicKey.length < 8 || assistantId.length < 8)
+        return reply({ error: "Enter a name, Vapi public SDK key and assistant ID." }, 400);
+      const { data, error } = await admin.from("twiga_vapi_accounts").upsert({
+        name, vapi_public_key: publicKey, assistant_id: assistantId,
+        voice_label: voiceLabel, voice_model: voiceModel, priority, enabled, updated_at: new Date().toISOString()
+      }, { onConflict: "vapi_public_key,assistant_id" })
+        .select("id,name,vapi_public_key,assistant_id,voice_label,voice_model,priority,enabled,last_used_at").single();
+      if (error) throw error;
+      return reply({ saved: true, vapiAccount: data });
+    }
+
+    if (action === "set_vapi_account_enabled") {
+      const accountId = String(payload.accountId || "");
+      const enabled = payload.enabled === true;
+      if (!accountId) return reply({ error: "Choose a Vapi account." }, 400);
+      const { data, error } = await admin.from("twiga_vapi_accounts")
+        .update({ enabled, updated_at: new Date().toISOString() }).eq("id", accountId)
+        .select("id,name,enabled").single();
+      if (error) throw error;
+      return reply({ saved: true, vapiAccount: data });
     }
 
     if (action === "update_ticket") {
