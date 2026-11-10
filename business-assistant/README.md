@@ -135,3 +135,17 @@ Create and back up one Android release keystore, then add these repository Actio
 After that, the workflow builds and publishes a permanently signed release APK. Because the already-published 1.0.50 APK was signed with a temporary debug key, users will need to uninstall that one time before installing the first permanently signed build; future releases using the same keystore can update in place. Back up the keystore securely—losing it prevents signed in-place upgrades.
 
 Minimum SDK remains 24 (Android 7.0). A 2019 phone that runs Android 7.0+ should pass the version check, but real install compatibility also depends on CPU ABI and signature state. CI build success is not a substitute for installing on the actual phone.
+
+
+## Rotating Vapi voice accounts
+
+The Android app requests a voice profile from `twiga-vapi-session` for each new voice session. The service calls the service-only `twiga_next_vapi_account()` allocator, which picks the least-recently-used enabled account and updates its use time. The owner can manage profiles in **Admin & Billing → Rotating Vapi accounts**.
+
+Each profile stores only:
+- Vapi **public SDK key** (the key the Android Vapi SDK uses)
+- Assistant ID belonging to that Vapi workspace
+- Display name, voice label/model label and rotation priority
+
+Do not paste a Vapi private API key into this screen. Keep private workspace API keys in Composio. A Composio connection being active does not itself provide the public SDK key needed by the Android SDK; retrieve the public SDK key and the assistant ID from that same Vapi workspace. The assistant must already be configured in Vapi with the voice/model you want. The current TWIGA route is Sarah on ElevenLabs `eleven_v3`; changing the voice model is a Vapi assistant configuration change, not just an app label.
+
+For low latency, benchmark ElevenLabs `eleven_flash_v2_5` (about 100 ms median TTS latency in ElevenLabs' published measurements) or Vapi's supported Cartesia `sonic-3.6` against the existing voice before switching the production assistant. Published server-side TTS latency does not include network and app processing time.
