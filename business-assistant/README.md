@@ -1,5 +1,7 @@
 # TWIGA Business Assistant (Android)
 
+Build validation is run by the repository's dedicated GitHub Actions workflow.
+
 A separate Android app for business operations. It is not a dialer and does not create, buy, or attach a virtual phone number. The existing TWIGA Phone Bridge remains a separate app for supported SIM/Telecom features.
 
 ## What is implemented
