@@ -432,10 +432,14 @@ Deno.serve(async (req: Request) => {
       for (const appointment of appointments || []) {
         const start = new Date(appointment.scheduled_at);
         if (!Number.isFinite(start.getTime())) continue;
-        const end = new Date(start.getTime() + 30 * 60000);
+        const durationMatch = String(appointment.notes || "").match(/Requested duration minutes:\s*(\d+)/i);
+        const durationMinutes = Math.min(180, Math.max(15, Number(durationMatch?.[1] || 30)));
+        const end = new Date(start.getTime() + durationMinutes * 60000);
+        const pendingRequest = String(appointment.status || "").toLowerCase() === "requested";
         const event = {
-          summary: (business?.name ? String(business.name) + " — " : "") + String(appointment.customer_name || "TWIGA booking"),
+          summary: (pendingRequest ? "REQUEST — CONFIRM: " : "") + (business?.name ? String(business.name) + " — " : "") + String(appointment.customer_name || "TWIGA booking"),
           description: [
+            pendingRequest ? "STATUS: Pending request — contact customer to confirm before treating this as booked." : "STATUS: " + String(appointment.status || "scheduled"),
             appointment.phone ? "Phone: " + appointment.phone : "",
             appointment.notes || "",
             "TWIGA appointment " + appointment.id,
