@@ -16,9 +16,9 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
-        buildConfigField("String", "SUPABASE_URL", "\"${setting("TWIGA_SUPABASE_URL","TWIGA_SUPABASE_URL")}\"")
-        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${setting("TWIGA_SUPABASE_ANON_KEY","TWIGA_SUPABASE_ANON_KEY")}\"")
-        buildConfigField("String", "VAPI_PUBLIC_KEY", "\"${setting("TWIGA_VAPI_PUBLIC_KEY","TWIGA_VAPI_PUBLIC_KEY")}\"")
+        buildConfigField("String", "SUPABASE_URL", "\"${setting("TWIGA_SUPABASE_URL","TWIGA_SUPABASE_URL").ifBlank { "https://ztyxxikkposfpxsutnfr.supabase.co" }}\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${setting("TWIGA_SUPABASE_ANON_KEY","TWIGA_SUPABASE_ANON_KEY").ifBlank { "sb_publishable_Zex31DUxW6bX3LP6Wlos2Q_pMiZ_JeT" }}\"")
+        buildConfigField("String", "VAPI_PUBLIC_KEY", "\"${setting("TWIGA_VAPI_PUBLIC_KEY","TWIGA_VAPI_PUBLIC_KEY").ifBlank { "2874d463-b31e-4d5a-84d7-e6cbe0a90b15" }}\"")
         buildConfigField("String", "VAPI_ASSISTANT_ID", "\"${setting("TWIGA_VAPI_ASSISTANT_ID","TWIGA_VAPI_ASSISTANT_ID")}\"")
     }
     buildFeatures { compose = true; buildConfig = true }
