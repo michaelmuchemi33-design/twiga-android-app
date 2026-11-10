@@ -66,7 +66,7 @@ jobs:
         if: github.event_name != 'pull_request' && steps.signing.outputs.configured == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: unity-ai-receptionist-release-apk
+          name: twiga-business-assistant-release-apk
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 30
@@ -79,10 +79,10 @@ jobs:
           cp app/build/outputs/apk/release/app-release.apk twiga-business-assistant.apk
           CODE=$((400000 + GITHUB_RUN_NUMBER))
           SIZE=$(stat -c%s twiga-business-assistant.apk)
-          printf '{"build": %s, "size": %s, "apk": "https://github.com/%s/releases/download/latest-apk/unity-ai-receptionist.apk"}' "$CODE" "$SIZE" "$GITHUB_REPOSITORY" > version.json
+          printf '{"build": %s, "size": %s, "apk": "https://github.com/%s/releases/download/latest-apk/twiga-business-assistant.apk"}' "$CODE" "$SIZE" "$GITHUB_REPOSITORY" > version.json
           if gh release view latest-apk >/dev/null 2>&1; then
-            gh release upload latest-apk unity-ai-receptionist.apk version.json --clobber
+            gh release upload latest-apk twiga-business-assistant.apk version.json --clobber
             gh release edit latest-apk --title "TWIGA Business Assistant - Latest Optimized APK" --notes "Optimized TWIGA release build. build: $CODE. Signed with the permanent TWIGA release key."
           else
-            gh release create latest-apk unity-ai-receptionist.apk version.json --title "Unity AI Receptionist - Latest Optimized APK" --notes "Optimized release build. build: $CODE. Signed with the permanent TWIGA release key." --prerelease
+            gh release create latest-apk twiga-business-assistant.apk version.json --title "TWIGA Business Assistant - Latest Optimized APK" --notes "Optimized release build. build: $CODE. Signed with the permanent TWIGA release key." --prerelease
           fi
