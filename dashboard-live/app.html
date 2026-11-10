@@ -501,7 +501,7 @@ async function intLoad(){try{
   gr=await fetch(K.supabaseUrl+"/functions/v1/google-workspace",{method:"POST",headers:gh,body:JSON.stringify({action:"status",businessId:BIZ.id})});
   google=await gr.json();if(!gr.ok)google.error=google.error||"Google connection could not be verified";
   var cr=await fetch(K.supabaseUrl+"/functions/v1/google-workspace",{method:"POST",headers:gh,body:JSON.stringify({action:"oauth.config",businessId:BIZ.id})});
-  googleCfg=await cr.json();if(!cr.ok)googleCfg={clientId:"",scopes:[]};
+  googleCfg=await cr.json();if(!cr.ok||!googleCfg.clientId)googleCfg=window.TWIGA_GOOGLE_OAUTH||{clientId:"",scopes:[]};
  }catch(ge){google.error=ge.message}}
  window.TWIGA_GOOGLE_OAUTH=googleCfg;
  if(!window.google||!window.google.accounts){if(!window._twigaGsiLoading){window._twigaGsiLoading=new Promise(function(resolve,reject){var sc=document.createElement("script");sc.src="https://accounts.google.com/gsi/client";sc.async=true;sc.defer=true;sc.onload=resolve;sc.onerror=function(){reject(new Error("Google sign-in script could not load"))};document.head.appendChild(sc)})}}
