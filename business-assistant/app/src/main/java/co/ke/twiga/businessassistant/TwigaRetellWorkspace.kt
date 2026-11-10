@@ -67,11 +67,13 @@ internal object TwigaRetellApi {
     suspend fun saveSettings(
         url: String, key: String, session: TwigaSession, businessId: String,
         provider: String, voiceId: String, voiceModel: String, model: String,
-        ambientVolume: Double, inboundPrompt: String, outboundPrompt: String
+        ambientVolume: Double, inboundPrompt: String, outboundPrompt: String,
+        recordingEnabled: Boolean, recordingNotice: String
     ) = post(url, key, session, "save_settings", businessId, JSONObject()
         .put("provider", provider).put("voiceId", voiceId).put("voiceModel", voiceModel)
         .put("model", model).put("ambientVolume", ambientVolume)
-        .put("inboundPrompt", inboundPrompt).put("outboundPrompt", outboundPrompt))
+        .put("inboundPrompt", inboundPrompt).put("outboundPrompt", outboundPrompt)
+        .put("recordingEnabled", recordingEnabled).put("recordingNotice", recordingNotice))
 
     suspend fun provision(url: String, key: String, session: TwigaSession, businessId: String) =
         post(url, key, session, "provision_agent", businessId)
@@ -97,6 +99,8 @@ internal fun TwigaRetellWorkspace(
     var keyConfigured by remember { mutableStateOf(false) }
     var keyLast4 by remember { mutableStateOf("") }
     var apiKey by remember { mutableStateOf("") }
+    var recordingEnabled by remember { mutableStateOf(false) }
+    var recordingNotice by remember { mutableStateOf("This call may be recorded to help us serve you.") }
     var provider by remember { mutableStateOf("vapi") }
     var voiceId by remember { mutableStateOf("fish_audio-Willa") }
     var voiceModel by remember { mutableStateOf("s2.1-pro") }
@@ -154,6 +158,8 @@ internal fun TwigaRetellWorkspace(
             provider = config.optString("provider", "vapi")
             keyConfigured = result.optBoolean("keyConfigured", false)
             keyLast4 = result.optString("keyLast4", "")
+            recordingEnabled = result.optBoolean("recordingEnabled", false)
+            recordingNotice = result.optString("recordingNotice", "This call may be recorded to help us serve you.")
             voiceId = config.optString("retell_voice_id", "fish_audio-Willa")
             voiceModel = config.optString("retell_voice_model", "s2.1-pro")
             model = config.optString("retell_model", "gpt-6-luna")
@@ -274,6 +280,20 @@ internal fun TwigaRetellWorkspace(
 
         Card {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Call recording & privacy", fontWeight = FontWeight.SemiBold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = recordingEnabled, onCheckedChange = { recordingEnabled = it })
+                    Column(Modifier.weight(1f)) {
+                        Text("Allow call recordings and transcript storage")
+                        Text(if (recordingEnabled) "Recording is enabled for this business. Make sure your recording notice and consent process are in place." else "Off by default. TWIGA stores call activity metadata only; it does not retain audio or full transcripts.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                OutlinedTextField(recordingNotice, { recordingNotice = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Customer recording notice") }, minLines = 2, enabled = recordingEnabled)
+            }
+        }
+
+        Card {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Business knowledge & call behaviour", fontWeight = FontWeight.SemiBold)
                 Text("The Retell agent is built from this business's profile, product names/prices/stock, services, FAQs, opening hours, policies and instructions. No other business's records are included.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 OutlinedTextField(inboundPrompt, { inboundPrompt = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Incoming call instructions") }, minLines = 3)
@@ -283,7 +303,7 @@ internal fun TwigaRetellWorkspace(
                         loading = true; error = ""; message = ""
                         scope.launch {
                             try {
-                                TwigaRetellApi.saveSettings(url, key, session, businessId, provider, voiceId, voiceModel, model, ambient.toDouble(), inboundPrompt, outboundPrompt)
+                                TwigaRetellApi.saveSettings(url, key, session, businessId, provider, voiceId, voiceModel, model, ambient.toDouble(), inboundPrompt, outboundPrompt, recordingEnabled, recordingNotice)
                                 message = "Voice settings saved for " + businessName + "."
                             } catch (e: Exception) { error = e.message ?: "Could not save settings." }
                             finally { loading = false }
@@ -297,7 +317,7 @@ internal fun TwigaRetellWorkspace(
                         loading = true; error = ""; message = ""
                         scope.launch {
                             try {
-                                TwigaRetellApi.saveSettings(url, key, session, businessId, "retell", voiceId, voiceModel, model, ambient.toDouble(), inboundPrompt, outboundPrompt)
+                                TwigaRetellApi.saveSettings(url, key, session, businessId, "retell", voiceId, voiceModel, model, ambient.toDouble(), inboundPrompt, outboundPrompt, recordingEnabled, recordingNotice)
                                 val result = TwigaRetellApi.provision(url, key, session, businessId)
                                 val saved = result.optJSONObject("config")
                                 provider = "retell"
