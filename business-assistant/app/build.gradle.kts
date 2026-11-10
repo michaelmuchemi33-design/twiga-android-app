@@ -19,7 +19,7 @@ android {
         buildConfigField("String", "SUPABASE_URL", "\"${setting("TWIGA_SUPABASE_URL","TWIGA_SUPABASE_URL").ifBlank { "https://ztyxxikkposfpxsutnfr.supabase.co" }}\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"${setting("TWIGA_SUPABASE_ANON_KEY","TWIGA_SUPABASE_ANON_KEY").ifBlank { "sb_publishable_Zex31DUxW6bX3LP6Wlos2Q_pMiZ_JeT" }}\"")
         buildConfigField("String", "VAPI_PUBLIC_KEY", "\"${setting("TWIGA_VAPI_PUBLIC_KEY","TWIGA_VAPI_PUBLIC_KEY").ifBlank { "2874d463-b31e-4d5a-84d7-e6cbe0a90b15" }}\"")
-        buildConfigField("String", "VAPI_ASSISTANT_ID", "\"${setting("TWIGA_VAPI_ASSISTANT_ID","TWIGA_VAPI_ASSISTANT_ID")}\"")
+        buildConfigField("String", "VAPI_ASSISTANT_ID", "\"${setting("TWIGA_VAPI_ASSISTANT_ID","TWIGA_VAPI_ASSISTANT_ID").ifBlank { "ea3ae8f7-fb6f-430e-9c33-96d9a919ade3" }}\"")
     }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
