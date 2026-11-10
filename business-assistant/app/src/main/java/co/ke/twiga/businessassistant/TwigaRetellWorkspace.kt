@@ -173,7 +173,7 @@ internal fun TwigaRetellWorkspace(
     LaunchedEffect(accessToken, webReady) {
         if (accessToken.isNotBlank() && webReady) {
             val token = JSONObject.quote(accessToken)
-            webView?.evaluateJavascript("window.startTwigaRetellCall && window.startTwigaRetellCall(" + token + ")", null)
+            webView?.evaluateJavascript("window.setTwigaRetellToken && window.setTwigaRetellToken(" + token + ")", null)
         }
     }
 
@@ -260,12 +260,12 @@ internal fun TwigaRetellWorkspace(
                     RadioButton(selected = model == "gpt-6-luna", onClick = { model = "gpt-6-luna" })
                     Column {
                         Text("GPT-6 Luna · 0.0032 USD/min listed")
-                        Text("TWIGA tries this first. If the create API rejects it, it falls back to the documented GPT-5.6 Luna.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("This is the language-model component, not the full call price. Current listed base components: $0.055/min Retell voice infrastructure + $0.015/min Fish Audio TTS + $0.0032/min GPT-6 Luna = about $0.0732/min before telephony and optional add-ons.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(selected = model == "gpt-5.6-luna", onClick = { model = "gpt-5.6-luna" })
-                    Text("GPT-5.6 Luna · documented fallback")
+                    Text("GPT-5.6 Luna · higher LLM cost")
                 }
                 Divider()
                 Text("Background ambience · subtle office/call-centre", style = MaterialTheme.typography.labelLarge)
@@ -391,21 +391,33 @@ internal fun TwigaRetellWorkspace(
 private val RETELL_WEB_CLIENT_HTML = """
 <!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>
 body{font-family:system-ui,sans-serif;background:#f4f4f1;color:#171717;margin:0;padding:12px}
-#status{font-size:14px;color:#555}
+#status{font-size:14px;color:#555;margin-bottom:10px}
+button{border:0;border-radius:10px;background:#f47721;color:#171717;font-weight:700;padding:12px 18px;margin:4px 6px 4px 0}
+#controls{display:none}
 </style></head><body><div id="status">Preparing secure voice session…</div>
+<div id="controls"><button id="start" type="button">Start Willa call</button><button id="stop" type="button" style="display:none;background:#b3261e;color:white">End call</button></div>
 <script type="module">
 import { RetellWebClient } from "https://esm.sh/retell-client-js-sdk";
 const client = new RetellWebClient();
+let pendingToken = "";
 const status = (s) => { document.getElementById("status").textContent=s; try{window.TwigaBridge.onStatus(s)}catch(e){} };
-client.on("call_started",()=>status("Connected · Willa is listening"));
-client.on("call_ended",()=>status("Call ended"));
+const startButton=document.getElementById("start"),stopButton=document.getElementById("stop");
+client.on("call_started",()=>{status("Connected · Willa is listening");startButton.style.display="none";stopButton.style.display="inline-block"});
+client.on("call_ended",()=>{status("Call ended");startButton.style.display="inline-block";stopButton.style.display="none";pendingToken=""});
 client.on("agent_start_talking",()=>status("Willa is speaking"));
 client.on("agent_stop_talking",()=>status("Listening"));
 client.on("error",(e)=>{ const m=String(e?.message||e||"Voice error"); status("Call error: "+m); try{window.TwigaBridge.onError(m)}catch(x){} });
-window.startTwigaRetellCall = async (accessToken) => {
-  try { status("Connecting…"); await client.startCall({accessToken}); }
-  catch(e) { const m=String(e?.message||e||"Unable to connect"); status("Call error: "+m); try{window.TwigaBridge.onError(m)}catch(x){} }
+window.setTwigaRetellToken = (token) => {
+  pendingToken=token || "";
+  document.getElementById("controls").style.display=pendingToken?"block":"none";
+  status(pendingToken?"Ready · tap Start Willa call to connect your microphone":"Waiting for secure voice token");
 };
+startButton.addEventListener("click",async()=>{
+  if(!pendingToken){status("The secure call token is missing. Start the test again.");return}
+  try{status("Connecting…");await client.startCall({accessToken:pendingToken})}
+  catch(e){const m=String(e?.message||e||"Unable to connect");status("Call error: "+m);try{window.TwigaBridge.onError(m)}catch(x){}}
+});
+stopButton.addEventListener("click",async()=>{try{await client.stopCall()}catch(e){status("Could not end call")}});
 window.endTwigaRetellCall = async () => { try{await client.stopCall();status("Call ended")}catch(e){status("Could not end call")} };
 try{window.TwigaBridge.onReady()}catch(e){}
 </script></body></html>
