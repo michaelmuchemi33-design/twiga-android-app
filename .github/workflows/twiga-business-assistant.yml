@@ -47,13 +47,40 @@ jobs:
           path: business-assistant/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 30
+      - name: Prepare permanent Android release signing
+        if: ${{ secrets.TWIGA_ANDROID_KEYSTORE_BASE64 != '' }}
+        env:
+          TWIGA_ANDROID_KEYSTORE_BASE64: ${{ secrets.TWIGA_ANDROID_KEYSTORE_BASE64 }}
+          TWIGA_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.TWIGA_ANDROID_KEYSTORE_PASSWORD }}
+          TWIGA_ANDROID_KEY_ALIAS: ${{ secrets.TWIGA_ANDROID_KEY_ALIAS }}
+          TWIGA_ANDROID_KEY_PASSWORD: ${{ secrets.TWIGA_ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$TWIGA_ANDROID_KEYSTORE_PASSWORD"
+          test -n "$TWIGA_ANDROID_KEY_ALIAS"
+          test -n "$TWIGA_ANDROID_KEY_PASSWORD"
+          echo "$TWIGA_ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/twiga-release.jks"
+          test -s "$RUNNER_TEMP/twiga-release.jks"
+          echo "TWIGA_ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/twiga-release.jks" >> "$GITHUB_ENV"
+      - name: Build signed release APK
+        if: ${{ secrets.TWIGA_ANDROID_KEYSTORE_BASE64 != '' }}
+        run: ./gradlew --no-daemon -p business-assistant :app:assembleRelease
+      - uses: actions/upload-artifact@v4
+        if: ${{ secrets.TWIGA_ANDROID_KEYSTORE_BASE64 != '' }}
+        with:
+          name: twiga-business-assistant-signed-release-apk
+          path: business-assistant/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 30
+      - name: Keep the previous public APK until permanent signing is configured
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/feature/twiga-business-assistant-app' && secrets.TWIGA_ANDROID_KEYSTORE_BASE64 == '' }}
+        run: echo "No permanent signing key configured. Skipping public release replacement to avoid publishing a debug-signed update."
       - name: Publish latest TWIGA Business Assistant APK
-        if: github.event_name == 'push' && github.ref == 'refs/heads/feature/twiga-business-assistant-app'
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/feature/twiga-business-assistant-app' && secrets.TWIGA_ANDROID_KEYSTORE_BASE64 != '' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p release-assets
-          APK_SOURCE="business-assistant/app/build/outputs/apk/debug/app-debug.apk"
+          APK_SOURCE="business-assistant/app/build/outputs/apk/release/app-release.apk"
           test -s "$APK_SOURCE"
           cp "$APK_SOURCE" release-assets/twiga-business-assistant.apk
           APK_SIZE=$(stat -c%s release-assets/twiga-business-assistant.apk)
@@ -74,7 +101,7 @@ jobs:
           EOF
           TAG="twiga-business-assistant-latest"
           TITLE="TWIGA Business Assistant $TWIGA_APP_VERSION_NAME"
-          NOTES="Latest TWIGA Business Assistant Android build.\n\nVersion: $TWIGA_APP_VERSION_NAME ($TWIGA_APP_VERSION_CODE)\nMinimum Android: 7.0 (API 24)\nSHA-256: $APK_SHA\n\nThe TWIGA website reads this release automatically. This is the current CI APK build."
+          NOTES="Latest TWIGA Business Assistant Android build.\n\nVersion: $TWIGA_APP_VERSION_NAME ($TWIGA_APP_VERSION_CODE)\nMinimum Android: 7.0 (API 24)\nSHA-256: $APK_SHA\n\nThe TWIGA website reads this release automatically. This APK is signed with the permanent TWIGA release key."
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" release-assets/twiga-business-assistant.apk release-assets/version.json --clobber
             gh release edit "$TAG" --title "$TITLE" --notes "$NOTES"
