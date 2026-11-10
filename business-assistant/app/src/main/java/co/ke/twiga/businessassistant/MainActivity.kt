@@ -1,11 +1,14 @@
 package co.ke.twiga.businessassistant
 
 import android.os.Bundle
+import android.graphics.BitmapFactory
+import android.util.Base64
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.net.Uri
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -21,6 +24,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -102,6 +106,7 @@ data class TwigaProduct(
     val price:Double, val currency:String, val unit:String, val stock:Double, val imageKey:String,
     val imageUrl:String
 )
+data class TwigaWhatsAppMessage(val senderName:String,val body:String,val direction:String,val status:String,val createdAt:String)
 class TwigaApi(private val url:String, private val key:String) {
     private suspend fun call(path:String, token:String, method:String="GET", body:JSONObject?=null):String = withContext(Dispatchers.IO) {
         val b=Request.Builder().url(url.trimEnd('/')+path).header("apikey",key).header("Authorization","Bearer $token").header("Content-Type","application/json").header("Prefer","return=representation")
@@ -196,6 +201,47 @@ class TwigaApi(private val url:String, private val key:String) {
             JSONObject(raw).optString("imageUrl","")
         }
     }
+    private suspend fun replyCall(replyApiUrl:String,path:String,s:TwigaSession,method:String="GET",body:JSONObject?=null):String = withContext(Dispatchers.IO) {
+        if(replyApiUrl.isBlank()) throw IllegalStateException("TWIGA Reply service URL has not been configured.")
+        val b=Request.Builder().url(replyApiUrl.trimEnd('/')+path)
+            .header("Authorization","Bearer ${s.token}").header("Content-Type","application/json")
+        when(method) {
+            "POST" -> b.post((body ?: JSONObject()).toString().toRequestBody(jsonType))
+            "PATCH" -> b.patch((body ?: JSONObject()).toString().toRequestBody(jsonType))
+            else -> b.get()
+        }
+        http.newCall(b.build()).execute().use { r ->
+            val raw=r.body?.string().orEmpty()
+            if(!r.isSuccessful) throw IllegalStateException("TWIGA WhatsApp service ${r.code}: ${raw.take(200)}")
+            raw
+        }
+    }
+    suspend fun connectWhatsApp(replyApiUrl:String,s:TwigaSession,businessId:String):JSONObject =
+        JSONObject(replyCall(replyApiUrl,"/api/whatsapp/connect",s,"POST",JSONObject().put("businessId",businessId)))
+    suspend fun whatsappStatus(replyApiUrl:String,s:TwigaSession,businessId:String):JSONObject =
+        JSONObject(replyCall(replyApiUrl,"/api/whatsapp/status?businessId="+Uri.encode(businessId),s))
+    suspend fun whatsappQr(replyApiUrl:String,s:TwigaSession,businessId:String):JSONObject =
+        JSONObject(replyCall(replyApiUrl,"/api/whatsapp/qr?businessId="+Uri.encode(businessId),s))
+    suspend fun whatsappMessages(replyApiUrl:String,s:TwigaSession,businessId:String):List<TwigaWhatsAppMessage> {
+        val root=JSONObject(replyCall(replyApiUrl,"/api/whatsapp/messages?businessId="+Uri.encode(businessId),s))
+        val rows=root.optJSONArray("messages") ?: JSONArray()
+        return (0 until rows.length()).map { i ->
+            val j=rows.getJSONObject(i)
+            TwigaWhatsAppMessage(j.optString("sender_name","Customer"),j.optString("body",""),
+                j.optString("direction","inbound"),j.optString("status",""),j.optString("created_at",""))
+        }
+    }
+    suspend fun saveWhatsAppSettings(replyApiUrl:String,s:TwigaSession,businessId:String,enabled:Boolean,prompt:String) {
+        replyCall(replyApiUrl,"/api/whatsapp/settings",s,"PATCH",
+            JSONObject().put("businessId",businessId).put("aiEnabled",enabled).put("systemPrompt",prompt))
+    }
+    suspend fun disconnectWhatsApp(replyApiUrl:String,s:TwigaSession,businessId:String) {
+        replyCall(replyApiUrl,"/api/whatsapp/disconnect",s,"POST",JSONObject().put("businessId",businessId))
+    }
+    suspend fun sendWhatsApp(replyApiUrl:String,s:TwigaSession,businessId:String,phone:String,message:String) {
+        replyCall(replyApiUrl,"/api/whatsapp/send",s,"POST",
+            JSONObject().put("businessId",businessId).put("phone",phone).put("message",message))
+    }
     suspend fun voiceTicket(s:TwigaSession,businessId:String):String {
         val raw=call("/functions/v1/twiga-vapi-session",s.token,"POST",JSONObject().put("businessId",businessId))
         return JSONObject(raw).getString("voiceSessionToken")
@@ -222,6 +268,11 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
     var productName by remember { mutableStateOf("") }; var productSku by remember { mutableStateOf("") }
     var productCategory by remember { mutableStateOf("") }; var productDescription by remember { mutableStateOf("") }
     var productPrice by remember { mutableStateOf("") }; var productStock by remember { mutableStateOf("0") }
+    var whatsStatus by remember { mutableStateOf("not_connected") }; var whatsPhone by remember { mutableStateOf("") }
+    var whatsQr by remember { mutableStateOf("") }; var whatsAiEnabled by remember { mutableStateOf(false) }
+    var whatsPrompt by remember { mutableStateOf("") }; var whatsMessages by remember { mutableStateOf(emptyList<TwigaWhatsAppMessage>()) }
+    var whatsLoading by remember { mutableStateOf(false) }; var whatsReplyPhone by remember { mutableStateOf("") }
+    var whatsReplyText by remember { mutableStateOf("") }
     val scope= rememberCoroutineScope(); val api=remember(url,key){TwigaApi(url,key)}
     val context=androidx.compose.ui.platform.LocalContext.current
     val imagePicker=rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri:Uri? ->
@@ -255,6 +306,87 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
         val activeSession=session ?: return; val activeBusiness=business ?: return
         productLoading=true
         scope.launch { try { products=api.listProducts(activeSession,activeBusiness.id,replyApiUrl); error="" } catch(e:Exception) { error=e.message ?: "Could not load products" }; productLoading=false }
+    }
+    fun refreshWhatsApp() {
+        val activeSession=session ?: return; val activeBusiness=business ?: return
+        if(replyApiUrl.isBlank()) { error="Set the TWIGA Reply service URL in sign-in settings, then reopen WhatsApp."; return }
+        whatsLoading=true
+        scope.launch {
+            try {
+                val status=api.whatsappStatus(replyApiUrl,activeSession,activeBusiness.id)
+                whatsStatus=status.optString("status","not_connected")
+                whatsPhone=status.optString("phone","")
+                whatsAiEnabled=status.optBoolean("aiEnabled",false)
+                whatsMessages=api.whatsappMessages(replyApiUrl,activeSession,activeBusiness.id)
+                whatsQr=""
+                if(whatsStatus!="ready" && whatsStatus!="connected" && whatsStatus!="READY" && whatsStatus!="CONNECTED") {
+                    runCatching { api.whatsappQr(replyApiUrl,activeSession,activeBusiness.id) }
+                        .onSuccess { q -> whatsQr=q.optString("qrCode",q.optString("qr","")) }
+                }
+                error=""
+            } catch(e:Exception) { error=e.message ?: "Could not load WhatsApp status" }
+            whatsLoading=false
+        }
+    }
+    fun connectWhatsApp() {
+        val activeSession=session ?: return; val activeBusiness=business ?: return
+        if(replyApiUrl.isBlank()) { error="Set the TWIGA Reply service URL in sign-in settings first."; return }
+        whatsLoading=true
+        scope.launch {
+            try {
+                val result=api.connectWhatsApp(replyApiUrl,activeSession,activeBusiness.id)
+                whatsStatus=result.optString("status","connecting")
+                val qr=result.optJSONObject("qr")
+                whatsQr=qr?.optString("qrCode",qr.optString("qr","")).orEmpty()
+                if(whatsQr.isBlank()) {
+                    runCatching { api.whatsappQr(replyApiUrl,activeSession,activeBusiness.id) }
+                        .onSuccess { q -> whatsQr=q.optString("qrCode",q.optString("qr","")) }
+                }
+                val status=api.whatsappStatus(replyApiUrl,activeSession,activeBusiness.id)
+                whatsStatus=status.optString("status",whatsStatus)
+                whatsPhone=status.optString("phone","")
+                whatsAiEnabled=status.optBoolean("aiEnabled",false)
+                whatsMessages=api.whatsappMessages(replyApiUrl,activeSession,activeBusiness.id)
+                error=""
+            } catch(e:Exception) { error=e.message ?: "Could not start WhatsApp connection" }
+            whatsLoading=false
+        }
+    }
+    fun updateWhatsAppSettings(enabled:Boolean,prompt:String) {
+        val activeSession=session ?: return; val activeBusiness=business ?: return
+        whatsLoading=true
+        scope.launch {
+            try {
+                api.saveWhatsAppSettings(replyApiUrl,activeSession,activeBusiness.id,enabled,prompt)
+                whatsAiEnabled=enabled; whatsPrompt=prompt; error=""
+            } catch(e:Exception) { error=e.message ?: "Could not save WhatsApp settings" }
+            whatsLoading=false
+        }
+    }
+    fun disconnectWhatsApp() {
+        val activeSession=session ?: return; val activeBusiness=business ?: return
+        whatsLoading=true
+        scope.launch {
+            try {
+                api.disconnectWhatsApp(replyApiUrl,activeSession,activeBusiness.id)
+                whatsStatus="disconnected"; whatsPhone=""; whatsQr=""; whatsAiEnabled=false; error=""
+            } catch(e:Exception) { error=e.message ?: "Could not disconnect WhatsApp" }
+            whatsLoading=false
+        }
+    }
+    fun sendWhatsAppReply() {
+        val activeSession=session ?: return; val activeBusiness=business ?: return
+        if(whatsReplyPhone.isBlank()||whatsReplyText.isBlank()) { error="Enter the customer's phone number and reply."; return }
+        whatsLoading=true
+        scope.launch {
+            try {
+                api.sendWhatsApp(replyApiUrl,activeSession,activeBusiness.id,whatsReplyPhone,whatsReplyText)
+                whatsReplyText=""
+                whatsMessages=api.whatsappMessages(replyApiUrl,activeSession,activeBusiness.id)
+                error=""
+            } catch(e:Exception) { error=e.message ?: "Could not send WhatsApp message" }
+            whatsLoading=false
+        }
     }
     fun saveProduct() {
         val activeSession=session ?: return; val activeBusiness=business ?: return
@@ -319,10 +451,10 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
                     "Overview" -> {
                         Text("Good business starts here.",fontSize=24.sp,fontWeight=FontWeight.Bold,color=Ink); Text("Your daily workspace",color=Muted)
                         Spacer(Modifier.height(16.dp))
-                        listOf("Business Profile","POS Products","Customers","Orders","Appointments","Tasks","Voice").forEach { item ->
+                        listOf("Business Profile","POS Products","WhatsApp","Customers","Orders","Appointments","Tasks","Voice").forEach { item ->
                             Card(Modifier.fillMaxWidth().padding(bottom=10.dp).clickable{
                                 page=if(item=="POS Products") "Products" else item
-                                when(item) { "Business Profile"->loadProfile(); "POS Products"->reloadProducts(); else->if(item!="Voice")reload(item) }
+                                when(item) { "Business Profile"->loadProfile(); "POS Products"->reloadProducts(); "WhatsApp"->refreshWhatsApp(); else->if(item!="Voice")reload(item) }
                             },colors=CardDefaults.cardColors(containerColor=Color.White)) {
                                 Row(Modifier.padding(18.dp).fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                                     Icon(when(item){"Customers"->Icons.Default.People;"Orders"->Icons.Default.ReceiptLong;"Appointments"->Icons.Default.CalendarMonth;"Tasks"->Icons.Default.CheckCircle;else->Icons.Default.Mic},null,tint=Orange,modifier=Modifier.size(28.dp))
@@ -334,6 +466,15 @@ private fun BusinessApp(initialUrl:String,initialKey:String,initialVapi:String,i
                     }
                     "Business Profile" -> BusinessProfileWorkspace(profile,profileLoading,{profile=it},{saveProfile()})
                     "Products" -> ProductsWorkspace(products,productLoading,{productDialog=true;productPhotoKey="";productPhotoLabel=""},{reloadProducts()})
+                    "WhatsApp" -> WhatsAppWorkspace(
+                        businessName=business?.name ?: "This business",status=whatsStatus,phone=whatsPhone,qrDataUrl=whatsQr,
+                        aiEnabled=whatsAiEnabled,systemPrompt=whatsPrompt,messages=whatsMessages,loading=whatsLoading,
+                        replyPhone=whatsReplyPhone,replyText=whatsReplyText,
+                        onConnect={connectWhatsApp()},onRefresh={refreshWhatsApp()},onDisconnect={disconnectWhatsApp()},
+                        onAiChange={updateWhatsAppSettings(it,whatsPrompt)},onPromptChange={whatsPrompt=it},
+                        onSaveSettings={updateWhatsAppSettings(whatsAiEnabled,whatsPrompt)},
+                        onReplyPhoneChange={whatsReplyPhone=it},onReplyTextChange={whatsReplyText=it},onSend={sendWhatsAppReply()}
+                    )
                     "Voice" -> VoiceWorkspace(vapiKey,assistantId,business?.id.orEmpty(),session,api,{voiceStatus=it},{voiceLines=voiceLines+it},voiceStatus,voiceLines,{vapiKey=it;save(url,key,it,assistantId,replyApiUrl)},{assistantId=it;save(url,key,vapiKey,it,replyApiUrl)})
                     else -> {
                         Row(verticalAlignment=Alignment.CenterVertically) { Column(Modifier.weight(1f)){Text(page,fontSize=24.sp,fontWeight=FontWeight.Bold);Text("Business records",color=Muted,fontSize=12.sp)}; Button(onClick={dialog=true}){Icon(Icons.Default.Add,null);Text("Add")} }
