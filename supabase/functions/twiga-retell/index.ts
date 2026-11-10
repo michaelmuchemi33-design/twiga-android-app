@@ -30,7 +30,7 @@ function buildPrompt(b:Row,p:Row|null,items:Row[],inbound:string,outbound:string
     "LANGUAGES: Always support British English (en-GB) and Kiswahili (sw-KE). Detect the language used and reply in that language. Natural English/Kiswahili code-switching is welcome. Calm, warm, middle-aged British-English voice, with natural Kiswahili pronunciation where supported. Keep replies concise.",
     "ROLE: Handle enquiries, explain real products/services and prices, collect customer details when appropriate, capture order and appointment requests, answer FAQs, and prepare clear follow-up actions.",
     "ACCURACY: Use only supplied facts. Never invent prices, stock, opening hours, discounts, booking availability, delivery terms, payment status, order status or policies. Say you will ask the team when information is missing.",
-    "ACTION SAFETY: Never claim an appointment, order, payment, customer or task has been saved unless a TWIGA tool confirms it. In this release, collect and summarise booking/order requests and tell the caller that the business team will confirm them. Do not claim to have changed Google Calendar or POS during a call.",
+    "ACTION SAFETY: Never claim an appointment, order or payment is confirmed. For a clear appointment request, repeat the date, time, service and customer details, then capture them as a pending TWIGA appointment request. Explain that the business will confirm it. TWIGA saves it in this business's appointments and the owner can sync it to Google Calendar. Do not tell the caller that a calendar event or final booking is confirmed.",
     "FOLLOW-UP: Identify whether human follow-up is needed, collect a callback number if volunteered, ask for a suitable time, and summarize the exact requested action. Respect requests not to be contacted again.",
     "INBOUND RULES: "+(inbound || "Greet the customer, ask how to help, and guide the conversation toward a clear enquiry, appointment request, order request or message."),
     "OUTBOUND RULES: "+(outbound || "For an authorised outgoing call, identify yourself and the business, explain the reason, ask whether this is a convenient time, and stop politely if the person declines."),
@@ -178,7 +178,10 @@ Deno.serve(async (req:Request) => {
           {type:"boolean",name:"follow_up_required",description:"Whether a human follow-up is needed."},
           {type:"string",name:"follow_up_action",description:"Specific next action requested by the caller."},
           {type:"string",name:"follow_up_time",description:"Requested callback/follow-up time, if supplied."},
-          {type:"string",name:"appointment_request",description:"Requested time and service; this is a request, not a confirmed booking."},
+          {type:"string",name:"appointment_request",description:"Full requested appointment summary: service, date and time; pending confirmation, not confirmed."},
+          {type:"string",name:"appointment_start_iso",description:"If the caller clearly agrees on an exact date and time, provide ISO 8601 with Africa/Nairobi offset +03:00, such as 2026-11-24T14:00:00+03:00. Leave empty if unclear or incomplete; never guess."},
+          {type:"number",name:"appointment_duration_minutes",description:"Requested appointment length in minutes if the caller or business profile specifies it; otherwise leave empty."},
+          {type:"string",name:"appointment_service",description:"Specific service or appointment reason requested."},
           {type:"string",name:"order_request",description:"Products, quantities and preferences; this is not a confirmed order."}
         ]
       };
