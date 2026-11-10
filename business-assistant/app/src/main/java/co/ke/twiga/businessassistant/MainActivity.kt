@@ -43,10 +43,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
-private val Orange = Color(0xFFF47721)
-private val Ink = Color(0xFF171717)
+internal val Orange = Color(0xFFF47721)
+internal val Ink = Color(0xFF171717)
 private val Paper = Color(0xFFF7F7F5)
-private val Muted = Color(0xFF77736E)
+internal val Muted = Color(0xFF77736E)
 private val http = OkHttpClient.Builder().callTimeout(25, TimeUnit.SECONDS).build()
 private val jsonType = "application/json".toMediaType()
 
