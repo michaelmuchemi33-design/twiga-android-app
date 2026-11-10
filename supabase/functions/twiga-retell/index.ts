@@ -148,21 +148,14 @@ Deno.serve(async (req:Request) => {
         begin_message:"Hello, thank you for contacting "+biz.name+". How may I help you today?",
         general_prompt:prompt,model_temperature:0.1,begin_after_user_silence_ms:1200
       };
-      let actual=requested;
+      const actual=requested;
       const existingLlmId=String(config.retell_llm_id || "");
-      let llm=existingLlmId
+      const llm=existingLlmId
         ? await retell(String(secret),"/update-retell-llm/"+encodeURIComponent(existingLlmId),"PATCH",llmBody)
         : await retell(String(secret),"/create-retell-llm","POST",llmBody);
-      if(!llm.ok && requested==="gpt-6-luna" && llm.status===400) {
-        actual="gpt-5.6-luna";
-        const fallbackBody={...llmBody,model:actual};
-        llm=existingLlmId
-          ? await retell(String(secret),"/update-retell-llm/"+encodeURIComponent(existingLlmId),"PATCH",fallbackBody)
-          : await retell(String(secret),"/create-retell-llm","POST",fallbackBody);
-      }
       const llmId=existingLlmId || String(llm.data.llm_id || "");
       if(!llm.ok || !llmId) {
-        return reply({error:"Retell could not save the language model: "+(llm.message || "No LLM id returned")},502);
+        return reply({error:"Retell could not save the selected language model ("+requested+"): "+(llm.message || "No LLM id returned")+". Choose another model only if you approve its different price."},502);
       }
       const agentBody={
         agent_name:("TWIGA - "+biz.name).slice(0,120),
@@ -171,7 +164,7 @@ Deno.serve(async (req:Request) => {
         voice_model:config.retell_voice_model || "s2.1-pro",
         language:["en-GB","sw-KE"],voice_emotion:"calm",
         ambient_sound:"call-center",ambient_sound_volume:Number(config.retell_ambient_sound_volume ?? 0.12),
-        denoising_mode:"noise-cancellation",responsiveness:0.92,interruption_sensitivity:0.8,
+        responsiveness:0.92,interruption_sensitivity:0.8,
         enable_backchannel:true,backchannel_frequency:0.45,
         webhook_url:url+"/functions/v1/twiga-retell-webhook",
         webhook_events:["call_started","call_ended","call_analyzed"],webhook_timeout_ms:10000,
@@ -205,7 +198,7 @@ Deno.serve(async (req:Request) => {
       if(saveError) throw saveError;
       return reply({
         provisioned:true,published:true,updated:!!existingAgentId,config:saved,
-        modelNotice:actual===requested?"Retell accepted the requested model.":"Retell rejected GPT-6 Luna; the documented GPT-5.6 Luna fallback was used.",
+        modelNotice:"Retell was configured with the exact model you selected; TWIGA does not silently switch to a different price tier.",
         message:existingAgentId
           ?"The existing business-specific Retell receptionist was updated and published. Vapi remains available."
           :"The business-specific Retell receptionist was created and published. Vapi remains available."
