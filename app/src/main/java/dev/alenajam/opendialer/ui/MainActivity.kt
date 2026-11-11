@@ -123,9 +123,8 @@ class MainActivity : ComponentActivity() {
 
         UpdateManager.autoCheck(applicationContext)
 
-        // Start the paired-phone bridge only after the app has the dialler role
-        // and the runtime phone permissions. Starting it before that can make
-        // remote answer/dial commands fail silently on a fresh install.
+        // The signed-in workspace auto-registers this handset. Start remote
+        // commands only after registration, the dialler role, and phone permissions.
 
         showWorkspace()
         handleOAuthCallback(intent)
