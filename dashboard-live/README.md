@@ -4,7 +4,7 @@ Deployed at https://app.twiga.co.ke (Vercel project `twiga-live`).
 
 The Android app opens this same production workspace at `https://app.twiga.co.ke/` from its normal entry route. The website remains the single source of truth for the business interface: logo, colours, navigation, responsive layout, POS/orders, customers, AI settings, and account settings. Android adds native phone and Telecom capabilities behind that interface rather than presenting a second dashboard.
 
-The web phone page handles dashboard pairing, dial commands, device status and recent call activity. The Android app provides the native Telecom layer and securely claims the web-generated six-digit pairing code through its WebView bridge.
+The Android app opens this workspace and signs in using the same TWIGA business account. Once the authenticated business membership is loaded, the Android bridge automatically registers that handset with Supabase and stores its private device token. There is no six-digit pairing code. The dashboard then shows device status, call activity and remote SIM-call controls. Android still requires the user to approve the default phone role and phone permissions.
 
 ## SIM AI call path
 
