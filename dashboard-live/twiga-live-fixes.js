@@ -724,4 +724,5 @@
   });
   window.render();
   window.route(1);
+  window.TWIGA_LIVE_UI_READY = true;
 })();
