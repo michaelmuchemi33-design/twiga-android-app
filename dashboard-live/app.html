@@ -396,6 +396,11 @@ async function L(a,d){var s=(await sb.auth.getSession()).data.session;if(!s)thro
  var r=await fetch(K.ledgerUrl,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:a,token:s.access_token,business_id:BIZ.id,data:d||{},txn:(d&&d.txn)||""})});
  var j=await r.json();if(!j.ok)throw new Error(String(j.error||"Request failed").replace(/^INACTIVE\|/,""));return j}
 window.TWIGA_LEDGER = L;
+window.TWIGA_DB = {
+  client: sb,
+  businessId: function(){ return BIZ && BIZ.id ? BIZ.id : null; },
+  userId: function(){ return SESS && SESS.user ? SESS.user.id : null; }
+};
 async function overviewLoad(){
  try{
   var now=new Date(),day=new Date(now);day.setHours(0,0,0,0);
