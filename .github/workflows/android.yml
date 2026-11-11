@@ -127,5 +127,5 @@ jobs:
             gh release upload latest-apk twiga.apk version.json --clobber
             gh release edit latest-apk --title "TWIGA - Latest Android APK" --notes "TWIGA Android release. Build: $CODE. Signed with the permanent TWIGA release key."
           else
-            gh release create latest-apk twiga.apk version.json --title "TWIGA - Latest Android APK" --notes "TWIGA Android release. Build: $CODE. Signed with the permanent TWIGA release key." --prerelease --prerelease
+            gh release create latest-apk twiga.apk version.json --title "TWIGA - Latest Android APK" --notes "TWIGA Android release. Build: $CODE. Signed with the permanent TWIGA release key." --prerelease
           fi
