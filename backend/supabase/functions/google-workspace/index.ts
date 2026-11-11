@@ -245,9 +245,9 @@ async function ensureSheet(admin: any, connection: Conn, token: string) {
     if (!id) throw new HttpError(502, "Google did not return a spreadsheet ID.");
     url = "https://docs.google.com/spreadsheets/d/" + id + "/edit";
     await googleJson(token, "https://sheets.googleapis.com/v4/spreadsheets/" + encodeURIComponent(id) +
-      "/values/Sheet1!A1:H1?valueInputOption=RAW", {
+      "/values/Sheet1!A1:J1?valueInputOption=RAW", {
       method: "PUT",
-      body: JSON.stringify({ values: [["Exported at", "Order ID", "Customer", "Phone", "Type", "Total (KSh)", "Paid (KSh)", "Status"]] }),
+      body: JSON.stringify({ values: [["Exported at", "Order ID", "Customer", "Phone", "Items / service", "Total (KSh)", "Paid (KSh)", "Payment method", "Status", "Created at"]] }),
     });
   }
   await admin.from("twiga_google_connections").update({
@@ -356,6 +356,60 @@ Deno.serve(async (req: Request) => {
       });
       return reply(req, { deleted: true, eventId });
     }
+    if (action === "appointments.sync") {
+      const { data: business, error: businessError } = await admin.from("businesses")
+        .select("name").eq("id", businessId).maybeSingle();
+      if (businessError) throw new HttpError(500, "Could not read the TWIGA business name.");
+      const { data: appointments, error: appointmentError } = await admin.from("twiga_appointments")
+        .select("id,customer_name,phone,scheduled_at,notes,status,google_event_id")
+        .eq("business_id", businessId).is("google_event_id", null)
+        .order("scheduled_at", { ascending: true }).limit(100);
+      if (appointmentError) throw new HttpError(500, "Could not load TWIGA appointments to sync.");
+      let synced = 0;
+      for (const appointment of appointments || []) {
+        const start = new Date(appointment.scheduled_at);
+        if (!Number.isFinite(start.getTime())) continue;
+        const durationMatch = String(appointment.notes || "").match(/Requested duration minutes:\\s*(\\d+)/i);
+        const durationMinutes = Math.min(180, Math.max(15, Number(durationMatch?.[1] || 30)));
+        const end = new Date(start.getTime() + durationMinutes * 60000);
+        const pendingRequest = String(appointment.status || "").toLowerCase() === "requested";
+        const eventId = "twiga" + String(appointment.id).replace(/-/g, "").toLowerCase();
+        const event = {
+          id: eventId,
+          summary: (pendingRequest ? "REQUEST — CONFIRM: " : "") +
+            (business?.name ? String(business.name) + " — " : "") +
+            String(appointment.customer_name || "TWIGA appointment"),
+          description: [
+            pendingRequest ? "STATUS: Pending request — contact customer to confirm before treating this as booked." :
+              "STATUS: " + String(appointment.status || "scheduled"),
+            appointment.phone ? "Phone: " + appointment.phone : "",
+            appointment.notes || "",
+            "TWIGA appointment " + appointment.id,
+          ].filter(Boolean).join("\\n"),
+          start: { dateTime: start.toISOString(), timeZone: "Africa/Nairobi" },
+          end: { dateTime: end.toISOString(), timeZone: "Africa/Nairobi" },
+        };
+        const url = "https://www.googleapis.com/calendar/v3/calendars/primary/events";
+        let created: any;
+        try {
+          created = await googleJson(token, url, { method: "POST", body: JSON.stringify(event) });
+        } catch (error) {
+          if (error instanceof HttpError && error.status === 409) {
+            created = await googleJson(token, url + "/" + encodeURIComponent(eventId));
+          } else {
+            throw error;
+          }
+        }
+        const { error: saveError } = await admin.from("twiga_appointments").update({
+          google_event_id: created.id || eventId,
+          google_event_url: created.htmlLink || null,
+          google_synced_at: new Date().toISOString(),
+        }).eq("id", appointment.id).eq("business_id", businessId);
+        if (saveError) throw new HttpError(500, "A Google Calendar event was created but TWIGA could not save its sync reference. Retry to reconcile it.");
+        synced += 1;
+      }
+      return reply(req, { synced, remaining: Math.max(0, (appointments || []).length - synced) });
+    }
     if (action === "contacts.list") {
       const q = new URLSearchParams({ pageSize: String(Math.min(100, Math.max(1, Number(body.pageSize || 100)))), personFields: "names,emailAddresses,phoneNumbers" });
       if (body.pageToken) q.set("pageToken", String(body.pageToken));
@@ -367,27 +421,85 @@ Deno.serve(async (req: Request) => {
       return reply(req, { ...sheet, ready: true });
     }
     if (action === "sheets.export-orders") {
-      const orders = Array.isArray(body.orders) ? body.orders.slice(0, 1000) : [];
+      const { data: orders, error: orderError } = await admin.from("twiga_orders")
+        .select("id,order_number,customer_name,customer_phone,total_amount,description,status,payment_status,payment_method,created_at,items")
+        .eq("business_id", businessId).order("created_at", { ascending: false }).limit(1000);
+      if (orderError) throw new HttpError(500, "Could not load TWIGA orders for Google Sheets export.");
       const sheet = await ensureSheet(admin, connection, token);
-      const values: unknown[][] = [["Exported at", "Order ID", "Customer", "Phone", "Type", "Total (KSh)", "Paid (KSh)", "Status"]];
-      for (const o of orders) values.push([
-        new Date().toISOString(),
-        String(o.OrderId || o.orderId || "").slice(0, 80),
-        String(o.Customer || o.customer || "").slice(0, 120),
-        String(o.Phone || o.phone || "").slice(0, 40),
-        String(o.Type || o.type || "").slice(0, 50),
-        Number(o.Total ?? o.total ?? 0),
-        Number(o.Paid ?? o.paid ?? 0),
-        String(o.Status || o.status || "").slice(0, 40),
-      ]);
+      const values: unknown[][] = [["Exported at", "Order ID", "Customer", "Phone", "Items / service", "Total (KSh)", "Paid (KSh)", "Payment method", "Status", "Created at"]];
+      for (const o of orders || []) {
+        const lines = Array.isArray(o.items)
+          ? o.items.map((item: any) => [String(item.name || item.product_name || "Item"), String(item.quantity ?? 1)].join(" x")).join(", ")
+          : "";
+        values.push([
+          new Date().toISOString(),
+          String(o.order_number || o.id || "").slice(0, 80),
+          String(o.customer_name || "").slice(0, 120),
+          String(o.customer_phone || "").slice(0, 40),
+          String(lines || o.description || "").slice(0, 500),
+          Number(o.total_amount || 0),
+          String(o.payment_status || "").toLowerCase() === "paid" ? Number(o.total_amount || 0) : 0,
+          String(o.payment_method || "").slice(0, 40),
+          String(o.status || "").slice(0, 40),
+          String(o.created_at || ""),
+        ]);
+      }
       await googleJson(token, "https://sheets.googleapis.com/v4/spreadsheets/" + encodeURIComponent(sheet.spreadsheetId) +
-        "/values:batchClear", { method: "POST", body: JSON.stringify({ ranges: ["Sheet1!A1:H1001"] }) });
+        "/values:batchClear", { method: "POST", body: JSON.stringify({ ranges: ["Sheet1!A1:J1001"] }) });
       await googleJson(token, "https://sheets.googleapis.com/v4/spreadsheets/" + encodeURIComponent(sheet.spreadsheetId) +
-        "/values/Sheet1!A1:H" + values.length + "?valueInputOption=RAW", {
+        "/values/Sheet1!A1:J" + values.length + "?valueInputOption=RAW", {
         method: "PUT", body: JSON.stringify({ values }),
       });
-      await admin.from("twiga_google_connections").update({ last_sync_at: new Date().toISOString() }).eq("business_id", businessId);
-      return reply(req, { exported: orders.length, spreadsheetUrl: sheet.spreadsheetUrl });
+      const { error: syncError } = await admin.from("twiga_google_connections")
+        .update({ last_sync_at: new Date().toISOString() }).eq("business_id", businessId);
+      if (syncError) throw new HttpError(500, "The sheet was exported but the sync timestamp could not be saved.");
+      return reply(req, { exported: (orders || []).length, spreadsheetUrl: sheet.spreadsheetUrl });
+    }
+    if (action === "drive.export-calls") {
+      const { data: settings, error: settingsError } = await admin.from("twiga_business_settings")
+        .select("call_recording_enabled").eq("business_id", businessId).maybeSingle();
+      if (settingsError) throw new HttpError(500, "Could not read the business call-recording setting.");
+      const includeTranscript = settings?.call_recording_enabled === true;
+      const { data: calls, error: callsError } = await admin.from("twiga_call_records")
+        .select("id,channel,direction,from_number,to_number,status,started_at,ended_at,duration_seconds,summary,transcript")
+        .eq("business_id", businessId).order("created_at", { ascending: false }).limit(500);
+      if (callsError) throw new HttpError(500, "Could not load TWIGA call records for Drive export.");
+      const csvCell = (value: unknown) => '"' + String(value ?? "").replace(/"/g, '""') + '"';
+      const headers = [
+        "Call ID", "Channel", "Direction", "From", "To", "Status", "Started", "Ended", "Duration seconds", "Summary",
+        ...(includeTranscript ? ["Transcript"] : []),
+      ];
+      const rows: unknown[][] = [headers];
+      for (const call of calls || []) {
+        rows.push([
+          call.id, call.channel, call.direction, call.from_number, call.to_number, call.status,
+          call.started_at, call.ended_at, call.duration_seconds, call.summary,
+          ...(includeTranscript ? [call.transcript] : []),
+        ]);
+      }
+      const csv = rows.map(row => row.map(csvCell).join(",")).join("\\r\\n");
+      const boundary = "twiga_" + crypto.randomUUID().replace(/-/g, "");
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const metadata = { name: "TWIGA-call-records-" + stamp + ".csv", mimeType: "text/csv" };
+      const body = new Blob([
+        "--" + boundary + "\\r\\nContent-Type: application/json; charset=UTF-8\\r\\n\\r\\n",
+        JSON.stringify(metadata),
+        "\\r\\n--" + boundary + "\\r\\nContent-Type: text/csv; charset=UTF-8\\r\\n\\r\\n",
+        csv,
+        "\\r\\n--" + boundary + "--",
+      ]);
+      const uploaded = await readJson(await fetch(
+        "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,webViewLink",
+        { method: "POST", headers: { authorization: "Bearer " + token, "content-type": "multipart/related; boundary=" + boundary }, body },
+      ));
+      const { error: syncError } = await admin.from("twiga_google_connections")
+        .update({ last_sync_at: new Date().toISOString() }).eq("business_id", businessId);
+      if (syncError) throw new HttpError(500, "The call export was uploaded but TWIGA could not save the sync timestamp.");
+      return reply(req, {
+        exported: calls?.length || 0, file: uploaded, transcriptIncluded: includeTranscript,
+        note: includeTranscript ? "Transcript export was included because call-recording is enabled." :
+          "Only call metadata and summaries were exported because call transcript export is disabled in business privacy settings.",
+      });
     }
     if (action === "drive.status") {
       const sheet = await ensureSheet(admin, connection, token);
