@@ -534,7 +534,7 @@
 
   // Structured business setup, real overview, reports and follow-ups.
   var PROFILE_FIELDS=[
-    ["business_summary","Business summary","What should a new customer know about the business?"],
+    ["business_summary","Describe your business","Start here: what is your business, where is it, and what should customers know?"],
     ["what_they_sell","What you sell","Products, packages, brands and price ranges."],
     ["what_they_do","What you do","Services, appointments, repairs, deliveries or other work."],
     ["products_and_services","Products and services","List names, sizes, variations and typical durations. Keep exact prices in the catalogue."],
@@ -588,6 +588,7 @@
     try{
       var row={business_id:twigaBusinessId(),updated_by:twigaUserId(),updated_at:new Date().toISOString()};
       PROFILE_FIELDS.forEach(function(f){row[f[0]]=$("twigaProfile_"+f[0]).value.trim()});
+      if(!row.business_summary)throw new Error("Start by describing your business. Include what you do and where customers can find you.");
       row.brand_voice=$("twigaProfile_brand_voice").value.trim();
       row.reply_language=$("twigaProfile_reply_language").value;
       var saved=await twigaDb().from("twiga_business_profiles").upsert(row,{onConflict:"business_id"});
@@ -601,7 +602,8 @@
       var profileLines=PROFILE_FIELDS.map(function(f){return f[1]+": "+row[f[0]]}).filter(function(x){return x.split(": ").slice(1).join(": ").trim()!==""});
       profileLines.push("Brand voice: "+row.brand_voice,"Reply language: "+row.reply_language);
       var prompt=(base?base+"\n\n":"")+"[TWIGA STRUCTURED BUSINESS PROFILE]\n"+profileLines.join("\n");
-      var faq=[old.faq||"",row.frequently_asked_questions||""].filter(Boolean).join("\n\n");
+      var baseFaq=String(old.faq||"").split("\n\n[TWIGA STRUCTURED BUSINESS PROFILE FAQ]\n")[0].trim();
+      var faq=baseFaq+(row.frequently_asked_questions?"\n\n[TWIGA STRUCTURED BUSINESS PROFILE FAQ]\n"+row.frequently_asked_questions:"");
       var ai=await twigaDb().rpc("save_business_ai",{
         p_business:twigaBusinessId(),
         p_prompt:prompt,
@@ -611,7 +613,7 @@
         p_rules:old.rules||""
       });
       if(ai.error)throw ai.error;
-      if(msg)msg.textContent="Saved. Your structured business profile and the AI receptionist prompt are now in sync.";
+      if(msg)msg.textContent="Saved. Your website and Android app now use this same business description.";
     }catch(err){if(msg)msg.textContent="Could not save business profile: "+err.message}
     finally{b.disabled=false}
   });
