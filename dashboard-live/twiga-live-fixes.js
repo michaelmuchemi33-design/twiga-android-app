@@ -55,7 +55,7 @@
     try{
       var results=await Promise.all([
         sb.from("twiga_customers").select("name,phone,notes,created_at").eq("business_id",BIZ.id).order("created_at",{ascending:false}).limit(200),
-        L("listContacts",{limit:200}).catch(function(e){return {contacts:[],ledgerError:e.message};}),
+        window.TWIGA_LEDGER("listContacts",{limit:200}).catch(function(e){return {contacts:[],ledgerError:e.message};}),
         googleRequest("status").catch(function(e){return {connected:false,error:e.message};})
       ]);
       var db=results[0], ledger=results[1], google=results[2];
@@ -123,7 +123,7 @@
     try{
       var results=await Promise.all([
         sb.from("twiga_appointments").select("customer_name,phone,scheduled_at,notes,status,google_event_url").eq("business_id",BIZ.id).order("scheduled_at",{ascending:true}).limit(200),
-        L("listOrders",{limit:200}).catch(function(){return {orders:[]};})
+        window.TWIGA_LEDGER("listOrders",{limit:200}).catch(function(){return {orders:[]};})
       ]);
       if(results[0].error)throw results[0].error;
       var rows=(results[0].data||[]).map(function(x){return[dateText(x.scheduled_at),esc(x.customer_name||"—"),esc(x.phone||""),esc(x.notes||""),G(esc(x.status||"scheduled"),String(x.status).toLowerCase()==="confirmed"?"ok":"or"),x.google_event_url?'<a href="'+esc(x.google_event_url)+'" target="_blank" rel="noopener">Google event</a>':"—"]});
@@ -142,7 +142,7 @@
     var target=$("twigaCalendar");if(!target)return;
     try{
       var results=await Promise.all([
-        L("listEvents",{from:new Date().toISOString()}).catch(function(e){return {events:[],ledgerError:e.message};}),
+        window.TWIGA_LEDGER("listEvents",{from:new Date().toISOString()}).catch(function(e){return {events:[],ledgerError:e.message};}),
         sb.from("twiga_appointments").select("customer_name,scheduled_at,notes,status").eq("business_id",BIZ.id).gte("scheduled_at",new Date().toISOString()).order("scheduled_at",{ascending:true}).limit(100),
         googleRequest("status").catch(function(e){return {connected:false,error:e.message};})
       ]);
