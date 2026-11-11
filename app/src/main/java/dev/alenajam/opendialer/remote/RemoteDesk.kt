@@ -10,8 +10,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Talks to the TWIGA dashboard backend. Only the public Supabase address and its
- * browser-safe publishable key live here. The phone proves who it is with a private
- * device token that is created when the owner pairs it with a 6-digit code.
+ * browser-safe publishable key live here. After the owner signs in inside the
+ * Android workspace, an authenticated registration RPC creates a private device token.
  */
 object RemoteDesk {
     private const val BASE = "https://ztyxxikkposfpxsutnfr.supabase.co"
