@@ -153,15 +153,6 @@ class CallsHandler @Inject constructor(
 
         newOngoingCall?.let { ongoingCall ->
             resolveContact(ongoingCall)
-            if (CallActionPolicy.shouldAutoAnswer(ongoingCall.state, context.getSharedPreferences("twiga_remote_desk", android.content.Context.MODE_PRIVATE).getBoolean("auto_answer", false))) {
-                // Opt-in only; Android binds this service for calls. No permanent polling service.
-                scope.launch {
-                    kotlinx.coroutines.delay(1200)
-                    if (CallActionPolicy.shouldAutoAnswer(ongoingCall.state, context.getSharedPreferences("twiga_remote_desk", android.content.Context.MODE_PRIVATE).getBoolean("auto_answer", false))) {
-                        ongoingCall.answer()
-                    }
-                }
-            }
         }
         reconcileCallsFromTelecom()
     }

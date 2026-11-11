@@ -11,8 +11,18 @@ import androidx.annotation.RequiresApi
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
+/**
+ * Native Telecom entry point for the handset's own SIM calls.
+ *
+ * TWIGA reports native call state and provides the system call UI. It does not
+ * answer calls automatically, dial a second provider number, or conference a
+ * second call into the user's SIM call. Vapi/Retell cellular audio integration
+ * is not available in this build.
+ */
 @AndroidEntryPoint
 class InCallServiceImpl : InCallService() {
+    private val callerIdCallbacks = mutableMapOf<Call, Call.Callback>()
+
     @Inject
     lateinit var callHandler: CallsHandler
 
@@ -27,11 +37,28 @@ class InCallServiceImpl : InCallService() {
 
     override fun onCallAdded(call: Call) {
         super.onCallAdded(call)
+        reportCallerId(call.details.handle?.schemeSpecificPart.orEmpty())
+        val callback = object : Call.Callback() {
+            override fun onDetailsChanged(call: Call, details: Call.Details) {
+                reportCallerId(details.handle?.schemeSpecificPart.orEmpty())
+            }
+        }
+        callerIdCallbacks[call] = callback
+        call.registerCallback(callback)
         callHandler.addCall(call, this)
+    }
+
+    private fun reportCallerId(number: String) {
+        if (number.isBlank()) return
+        sendBroadcast(Intent("dev.alenajam.opendialer.TELECOM_CALL_DETAILS").apply {
+            setClassName(packageName, "dev.alenajam.opendialer.remote.TelecomCallDetailsReceiver")
+            putExtra("number", number)
+        })
     }
 
     override fun onCallRemoved(call: Call) {
         super.onCallRemoved(call)
+        callerIdCallbacks.remove(call)?.let(call::unregisterCallback)
         callHandler.removeCall(call)
     }
 
@@ -82,10 +109,7 @@ class InCallServiceImpl : InCallService() {
     }
 
     override fun onBind(intent: Intent): IBinder? {
-        callHandler.setup(
-            this,
-            applicationContext
-        )
+        callHandler.setup(this, applicationContext)
         telecomAdapter.attach(this)
         notificationManager.attach(this)
         hardwareManager.attach()

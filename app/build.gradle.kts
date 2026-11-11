@@ -30,7 +30,8 @@ android {
 
     defaultConfig {
         applicationId = "com.unity.receptionist"
-        minSdk = 29
+        // Keep the dialer available on Android 7.0+ (API 24); newer Telecom features are guarded at runtime.
+        minSdk = 24
         targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersionName
