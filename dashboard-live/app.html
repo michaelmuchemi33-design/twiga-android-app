@@ -792,7 +792,7 @@ async function buildRetellAgent(){
 }
 async function loadAi(){
  var r=await sb.from("business_ai").select("prompt,greeting,auto_reply,faq,rules").eq("business_id",BIZ.id).maybeSingle(),d=r.data||{};
- if($("aip")){$("aip").value=d.prompt||"";$("aig").value=d.greeting||"";$("aim").value=d.auto_reply||"";if($("aif"))$("aif").value=d.faq||"";if($("air"))$("air").value=d.rules||"";$("aic").textContent=$("aip").value.length+" / 20000";var ln=await sb.from("ai_lines").select("number").eq("business_id",BIZ.id).maybeSingle();if($("ail"))$("ail").value=(ln.data&&ln.data.number)||""}
+ if($("aip")){$("aip").value=d.prompt||"";$("aig").value=d.greeting||"";$("aim").value=d.auto_reply||"";if($("aif"))$("aif").value=d.faq||"";if($("air"))$("air").value=d.rules||"";$("aic").textContent=$("aip").value.length+" / 20000";}
  await loadVoiceConfig();
 }
 document.addEventListener("click",async function(e){
