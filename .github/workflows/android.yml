@@ -120,9 +120,15 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cp app/build/outputs/apk/release/app-release.apk twiga.apk
-          CODE=$((400000 + GITHUB_RUN_NUMBER))
+          BUILD=$((400000 + GITHUB_RUN_NUMBER))
+          VERSION_NAME=$(sed -n 's/^appVersionName=//p' gradle.properties | head -1)
+          VERSION_CODE=$(sed -n 's/^appVersionCode=//p' gradle.properties | head -1)
+          APP_ID=$(grep -oE 'applicationId[[:space:]]*=[[:space:]]*"[^"]+"' app/build.gradle.kts | head -1 | cut -d'"' -f2)
           SIZE=$(stat -c%s twiga.apk)
-          printf '{"build": %s, "size": %s, "apk": "https://github.com/%s/releases/download/latest-apk/twiga.apk"}' "$CODE" "$SIZE" "$GITHUB_REPOSITORY" > version.json
+          SHA256=$(sha256sum twiga.apk | cut -d' ' -f1)
+          BUILT_AT=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          test -n "$VERSION_NAME" && test -n "$VERSION_CODE" && test -n "$APP_ID"
+          printf '{"build": %s, "versionName": "%s", "versionCode": %s, "appId": "%s", "sizeBytes": %s, "sha256": "%s", "minimumAndroidVersion": "7.0", "builtAt": "%s", "apk": "https://github.com/%s/releases/download/latest-apk/twiga.apk"}' "$BUILD" "$VERSION_NAME" "$VERSION_CODE" "$APP_ID" "$SIZE" "$SHA256" "$BUILT_AT" "$GITHUB_REPOSITORY" > version.json
           if gh release view latest-apk >/dev/null 2>&1; then
             gh release delete-asset latest-apk unity-ai-receptionist.apk --yes || true
             gh release upload latest-apk twiga.apk version.json --clobber
