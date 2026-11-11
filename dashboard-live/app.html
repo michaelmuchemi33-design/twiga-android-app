@@ -483,6 +483,7 @@ R.integrations=function(){setTimeout(intLoad,0);return["Connect your Google acco
 document.addEventListener("click",function(e){
  var b=e.target.closest('[data-act="googleConnect"]');if(!b)return;
  var cfg=window.TWIGA_GOOGLE_OAUTH||{},msg=$("googleMsg");
+ if(cfg.serverConfigured!==true){if(msg)msg.textContent="Google Workspace server setup is incomplete. In Supabase > Edge Functions > Secrets, set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and GOOGLE_TOKEN_ENCRYPTION_KEY (base64-encoded 32 random bytes). Google consent alone cannot save the connection until these are configured.";return}
  if(!cfg.clientId){if(msg)msg.textContent="Google OAuth client ID is not configured in Supabase secrets.";return}
  if(!window.google||!window.google.accounts||!window.google.accounts.oauth2){if(msg)msg.textContent="Google sign-in is still loading. Please tap Connect again in a moment.";return}
  try{
@@ -573,13 +574,13 @@ async function intLoad(){try{
  var d=await sb.from("devices").select("id,name,last_seen,ai_enabled").eq("business_id",BIZ.id).order("created_at",{ascending:false}).limit(1),
  a=await sb.from("business_ai").select("prompt").eq("business_id",BIZ.id).maybeSingle(),
  dev=d.data&&d.data[0],session=(await sb.auth.getSession()).data.session,
- google={connected:false,scopes:[],googleEmail:"",error:"Google status not checked"},googleCfg={clientId:"",scopes:[]};
+ google={connected:false,scopes:[],googleEmail:"",error:"Google status not checked"},googleCfg={clientId:"",scopes:[],serverConfigured:false};
  if(session){try{
   var gh={apikey:K.supabaseKey,Authorization:"Bearer "+session.access_token,"Content-Type":"application/json"},
   gr=await fetch(K.supabaseUrl+"/functions/v1/google-workspace",{method:"POST",headers:gh,body:JSON.stringify({action:"status",businessId:BIZ.id})});
   google=await gr.json();if(!gr.ok)google.error=google.error||"Google connection could not be verified";
   var cr=await fetch(K.supabaseUrl+"/functions/v1/google-workspace",{method:"POST",headers:gh,body:JSON.stringify({action:"oauth.config",businessId:BIZ.id})});
-  googleCfg=await cr.json();if(!cr.ok||!googleCfg.clientId)googleCfg=window.TWIGA_GOOGLE_OAUTH||{clientId:"",scopes:[]};
+  googleCfg=await cr.json();var serverConfigured=!!googleCfg.serverConfigured;if(!cr.ok||!googleCfg.clientId)googleCfg=window.TWIGA_GOOGLE_OAUTH||{clientId:"",scopes:[]};googleCfg.serverConfigured=serverConfigured;
  }catch(ge){google.error=ge.message}}
  window.TWIGA_GOOGLE_OAUTH=googleCfg;
  if(!window.google||!window.google.accounts){if(!window._twigaGsiLoading){window._twigaGsiLoading=new Promise(function(resolve,reject){var sc=document.createElement("script");sc.src="https://accounts.google.com/gsi/client";sc.async=true;sc.defer=true;sc.onload=resolve;sc.onerror=function(){reject(new Error("Google sign-in script could not load"))};document.head.appendChild(sc)})}}
@@ -589,6 +590,7 @@ async function intLoad(){try{
  if($("intRows"))$("intRows").innerHTML=T(["Service","Status","Details"],[
  ["Android app (same TWIGA account)",dev?G("Signed in","ok"):G("Not signed in","or"),dev?esc(dev.name)+" · last seen "+ago(dev.last_seen):"Sign in to TWIGA Android with this same account; no separate pairing is required"],
  ["AI receptionist",a.data&&a.data.prompt?G("Configured","ok"):G("Needs setup","or"),a.data&&a.data.prompt?"Business instructions saved":"Describe the business on the AI Receptionist page"],
+ ["Google OAuth server",googleCfg.serverConfigured?G("Ready","ok"):G("Setup required","bad"),googleCfg.serverConfigured?"OAuth exchange and encrypted token storage are configured":"Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and GOOGLE_TOKEN_ENCRYPTION_KEY in Supabase Function secrets"],
  ["Google Calendar",gstatus("https://www.googleapis.com/auth/calendar.events.owned"),gdetail("https://www.googleapis.com/auth/calendar.events.owned")],
  ["Google Contacts",gstatus("https://www.googleapis.com/auth/contacts.readonly"),gdetail("https://www.googleapis.com/auth/contacts.readonly")],
  ["Google Sheets",gstatus("https://www.googleapis.com/auth/spreadsheets"),gdetail("https://www.googleapis.com/auth/spreadsheets")],
