@@ -68,7 +68,16 @@ object RemoteDesk {
 
     /** Calls a database function and returns its JSON text. Throws IOException on any failure. */
     @Throws(IOException::class)
-    fun rpc(name: String, body: JSONObject): String {
+    fun rpc(name: String, body: JSONObject): String = rpcInternal(name, body, null)
+
+    /** Calls an authenticated RPC using the current TWIGA WebView session. */
+    @Throws(IOException::class)
+    fun rpcAuthenticated(name: String, body: JSONObject, accessToken: String): String {
+        require(accessToken.isNotBlank()) { "Sign in to TWIGA before connecting this phone." }
+        return rpcInternal(name, body, accessToken)
+    }
+
+    private fun rpcInternal(name: String, body: JSONObject, accessToken: String?): String {
         val conn = URL("$BASE/rest/v1/rpc/$name").openConnection() as HttpURLConnection
         try {
             conn.requestMethod = "POST"
@@ -76,6 +85,7 @@ object RemoteDesk {
             conn.readTimeout = 10000
             conn.doOutput = true
             conn.setRequestProperty("apikey", KEY)
+            if (!accessToken.isNullOrBlank()) conn.setRequestProperty("Authorization", "Bearer $accessToken")
             conn.setRequestProperty("Content-Type", "application/json")
             conn.outputStream.use { it.write(body.toString().toByteArray()) }
             val code = conn.responseCode
