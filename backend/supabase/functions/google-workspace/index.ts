@@ -106,18 +106,23 @@ async function authenticate(req: Request, businessId: string) {
   if (!authorization.startsWith("Bearer ")) throw new HttpError(401, "Sign in to TWIGA again.");
   const anon = env("SUPABASE_ANON_KEY") || env("SUPABASE_PUBLISHABLE_KEY");
   if (!anon) throw new HttpError(500, "Supabase publishable key is not configured for this function.");
-  const userClient = createClient(env("SUPABASE_URL"), anon, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { authorization } },
-  });
   const accessToken = authorization.slice("Bearer ".length).trim();
-  const { data, error } = await userClient.auth.getUser(accessToken);
+  if (!accessToken) throw new HttpError(401, "Sign in to TWIGA again.");
+  const admin = getAdmin();
+  // Validate the user's session with Supabase Auth. The user JWT is supplied
+  // explicitly; the service-role client is used only after this validation.
+  const { data, error } = await admin.auth.getUser(accessToken);
   if (error || !data.user) throw new HttpError(401, "Your TWIGA session has expired. Sign in again.");
-  // This query runs with the caller's JWT and existing business_members RLS policy.
-  const { data: member, error: memberError } = await userClient
-    .from("business_members").select("business_id,role").eq("business_id", businessId).maybeSingle();
+  // The privileged lookup is constrained to both the authenticated user ID and
+  // requested business ID, so another business cannot be accessed by guessing an ID.
+  const { data: member, error: memberError } = await admin
+    .from("business_members")
+    .select("business_id,role")
+    .eq("business_id", businessId)
+    .eq("user_id", data.user.id)
+    .maybeSingle();
   if (memberError || !member) throw new HttpError(403, "You do not have access to this TWIGA business.");
-  return { user: data.user, role: String(member.role || "member").toLowerCase(), admin: getAdmin() };
+  return { user: data.user, role: String(member.role || "member").toLowerCase(), admin };
 }
 async function getConnection(admin: any, businessId: string): Promise<Conn | null> {
   const { data, error } = await admin.from("twiga_google_connections").select("*")
