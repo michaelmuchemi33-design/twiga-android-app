@@ -379,6 +379,9 @@ async function load(){
  var r=await sb.auth.getSession();SESS=r.data.session;BIZ=null;
  if(SESS){var q=await sb.from("business_members").select("role,businesses(id,name,business_type,status,paid_through)").limit(1),w=q.data&&q.data[0];if(w&&w.businesses){BIZ=w.businesses;BIZ.role=w.role}}
  READY=true;paint();route();pre();
+ if(SESS&&BIZ&&window.TwigaAndroid&&typeof window.TwigaAndroid.registerDevice==="function"&&typeof window.TwigaAndroid.isPaired==="function"&&!window.TwigaAndroid.isPaired()){
+  window.TwigaAndroid.registerDevice(SESS.access_token,BIZ.id);
+ }
 }
 window.gate_=function(k){
  if(!READY)return true;
@@ -388,7 +391,7 @@ window.gate_=function(k){
   document.body.classList.add("auth");$("v-live").hidden=true;$("v-other").hidden=false;$("v-other").innerHTML=SETUP;return true}
  if(k==="setup"){location.hash="#overview";return true}
  return false};
-sb.auth.onAuthStateChange(function(e){if(e==="SIGNED_OUT")setTimeout(load,0)});
+sb.auth.onAuthStateChange(function(e){if(e==="SIGNED_OUT"){if(window.TwigaAndroid&&typeof window.TwigaAndroid.clearDeviceRegistration==="function")window.TwigaAndroid.clearDeviceRegistration();setTimeout(load,0)}});
 async function L(a,d){var s=(await sb.auth.getSession()).data.session;if(!s)throw new Error("Please sign in again.");
  var r=await fetch(K.ledgerUrl,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:a,token:s.access_token,business_id:BIZ.id,data:d||{},txn:(d&&d.txn)||""})});
  var j=await r.json();if(!j.ok)throw new Error(String(j.error||"Request failed").replace(/^INACTIVE\|/,""));return j}
@@ -510,7 +513,7 @@ async function intLoad(){try{
  gstatus=function(x){return !google.connected?G("Not connected","or"):!google.refreshReady?G("Reconnect","bad"):scope(x)?G("Connected","ok"):G("Permission missing","or")},
  gdetail=function(x){return !google.connected?"Connect Google Workspace":!google.refreshReady?"Reconnect Google to refresh access":scope(x)?"Granted to "+esc(google.googleEmail||"Google account"):"Reconnect and grant the required permission"};
  if($("intRows"))$("intRows").innerHTML=T(["Service","Status","Details"],[
- ["TWIGA SIM phone",dev?G("Paired","ok"):G("Not paired","or"),dev?esc(dev.name)+" · last seen "+ago(dev.last_seen):"Pair the Android phone"],
+ ["TWIGA Android gateway",dev?G("Connected","ok"):G("Waiting for sign-in","or"),dev?esc(dev.name)+" · last seen "+ago(dev.last_seen):"Sign in to TWIGA on the Android app with this business account"],
  ["AI business prompt",a.data&&a.data.prompt?G("Configured","ok"):G("Not configured","or"),a.data&&a.data.prompt?"Business instructions saved":"Describe the business on the AI page"],
  ["AI provider line",hasLine?G("Configured","ok"):G("Missing","or"),hasLine?"A Retell/Vapi number is saved for the AI bridge":"Save the phone number assigned to your selected AI provider"],
  ["Google Calendar",gstatus("https://www.googleapis.com/auth/calendar.events.owned"),gdetail("https://www.googleapis.com/auth/calendar.events.owned")],
@@ -592,26 +595,26 @@ function draw(){
  var on=online(),live=on&&EV.filter(function(e){return(e.state==="ringing"||e.state==="active")&&Date.now()-new Date(e.updated_at)<6*36e5})[0];
  var side='<div class="card pg"><h2>'+(DEV?esc(DEV.name):"Phone")+' '+(DEV?G(on?"Online":"Offline, seen "+ago(DEV.last_seen),on?"ok":"bad"):G("Not paired","gr"))+'</h2><div class="pb" style="margin-top:10px">';
  if(live){side+='<div class="cb" style="padding:14px"><div class="sub">'+(live.direction==="in"?"Incoming call":"Outgoing call")+'</div><b style="font-size:20px">'+esc(live.number||"Unknown number")+'</b><div class="tm" style="margin:4px 0"><span id="tmr" data-t="'+live.updated_at+'">0:00</span> '+G(ST[live.state][0],ST[live.state][1])+'</div><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">'+(live.state==="ringing"&&live.direction==="in"?'<button class="btn pri" data-act="cmd" data-a="answer">Answer</button><button class="btn" data-act="cmd" data-a="decline">Decline</button>':'<button class="btn pri" data-act="cmd" data-a="hangup">Hang up</button>')+'</div></div>'}
- else side+='<div class="sub">'+(on?"No active call.":DEV?"Open the TWIGA app on the phone and keep it connected.":"Pair your phone to start.")+'</div>';
+ else side+='<div class="sub">'+(on?"No active call.":DEV?"Open the TWIGA app on the phone and keep it connected.":"Sign in to TWIGA on your Android phone using this same business account. The phone connects automatically.")+'</div>';
  if(CMD&&Date.now()-new Date(CMD.created_at)<30000)side+='<div class="sub">'+(CMD.status==="failed"?"Failed: "+esc(CMD.message||""):CMD.status==="done"?"Sent to phone.":"Sending to phone...")+'</div>';
  if(DEV)side+='<div class="opt" style="padding:8px 0"><div><b>AI receptionist</b><span>When on, TWIGA answers incoming SIM calls, dials your saved Vapi AI number as a second call and asks Android Telecom to merge both calls. Outgoing calls started from the TWIGA dashboard are also joined to the AI; normal personal calls made directly in the phone dialer stay personal calls. This requires carrier conference calling and may use extra airtime. If the carrier cannot merge the calls, TWIGA ends the AI-managed call rather than leaving the customer connected to silence; the customer may need to call back.</span></div><label class="sw"><input type="checkbox" id="aisw" aria-label="AI receptionist"'+(DEV.ai_enabled?" checked":"")+'><s></s></label></div>';
- if(window.TwigaAndroid&&typeof window.TwigaAndroid.requestPhoneSetup==="function")side+='<div style="margin:10px 0"><button class="btn sm" data-act="nativeSetup">Enable phone and background access</button><div class="sub">Set TWIGA as your default phone app and allow background operation for reliable call events and remote commands.</div></div>';
- side+='<div><button class="btn sm" data-act="pair">'+(DEV?"Pair another phone":"Pair phone")+'</button> '+(PAIR?'<b style="font-size:20px;letter-spacing:3px">'+esc(PAIR)+'</b> <span class="sub">Type this in the phone app. Valid for 10 minutes.</span>':"")+'</div><a class="lk" href="https://github.com/michaelmuchemi33-design/unity-ai-receptionist-app/releases/download/latest-apk/unity-ai-receptionist.apk">Download the phone app</a></div></div>';
+ if(window.TwigaAndroid&&typeof window.TwigaAndroid.requestPhoneSetup==="function")side+='<div style="margin:10px 0"><button class="btn sm" data-act="nativeSetup">Enable phone permissions</button><div class="sub">TWIGA connects this handset automatically when you sign in with the same business account. Android will still ask you to approve phone and background permissions.</div></div>';
+ side+='<div class="sub" style="margin-top:10px"><a class="lk" href="https://github.com/michaelmuchemi33-design/twiga-android-app/releases/download/latest-apk/twiga.apk">Download TWIGA Android app</a></div></div></div>';
  var keep=Date.now()-AIT<4000&&$("aisw")?$("aisw").checked:null;
  $("dside").innerHTML=side;if(keep!==null&&$("aisw"))$("aisw").checked=keep;
  $("dhist").innerHTML=C("Recent calls",EV.length?T(["Time","Call","Number","Status","Length",""],EV.map(function(e){return[new Date(e.updated_at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),(e.direction==="in"?"In":"Out")+(e.ai_on?" "+G("AI on","or"):""),esc(e.number||"Unknown"),G(ST[e.state][0],ST[e.state][1]),dur(e.duration_s),e.number?'<button class="btn sm" data-act="redial" data-n="'+esc(e.number)+'">Call back</button>':""]})):'<div class="pb sub">No calls yet. Calls made or received on the paired phone appear here.</div>');
  if(window.lucide)lucide.createIcons()}
 setInterval(function(){var t=$("tmr");if(t)t.textContent=dur((Date.now()-new Date(t.dataset.t))/1000)},1000);
 function dmsg(t){var m=$("dmsg");if(m)m.textContent=t}
-window.twigaNativePairResult=function(ok,message){
- dmsg(message|| (ok?"Phone connected.":"Pairing failed."));
- if(ok){PAIR="";pull()}
+window.twigaNativeDeviceResult=function(ok,message){
+ dmsg(message||(ok?"Phone connected.":"Automatic phone connection failed."));
+ if(ok)pull();
 };
 window.twigaNativePermissionsResult=function(ok){
  dmsg(ok?"Phone permissions enabled. TWIGA can now report calls and receive dashboard commands.":"Some phone permissions are missing. Allow Phone, Call logs and Answer calls in Android settings, then try again.");
 };
 async function send(a,n){
- if(!DEV){dmsg("Pair a phone first.");return}
+ if(!DEV){dmsg("Open TWIGA on your Android phone and sign in with the same business account.");return}
  if(!online()){dmsg("Phone is offline. Open the TWIGA app on it.");return}
  var r=await sb.from("call_commands").insert({business_id:BIZ.id,device_id:DEV.id,action:a,number:n||null});
  if(r.error)dmsg(r.error.message);else{dmsg(a==="dial"?"Calling "+n+"...":"Sent.");pull()}}
@@ -623,7 +626,6 @@ document.addEventListener("click",async function(e){
  else if(a==="bk"){NUM=NUM.slice(0,-1);$("dn").value=NUM}
  else if(a==="dial"||a==="redial"){var n=(a==="redial"?b.dataset.n:NUM).replace(/[\s()-]/g,"");if(!/^[0-9+*#]{3,20}$/.test(n)){dmsg("Enter a valid number.");return}send("dial",n)}
  else if(a==="cmd")send(b.dataset.a);
- else if(a==="pair"){var r=await sb.rpc("create_pairing",{p_business:BIZ.id});if(r.error)dmsg(r.error.message);else{PAIR=r.data;draw();if(window.TwigaAndroid&&typeof window.TwigaAndroid.isPaired==="function"&&!window.TwigaAndroid.isPaired()&&typeof window.TwigaAndroid.claimPairingCode==="function"){dmsg("Connecting this Android phone…");window.TwigaAndroid.claimPairingCode(PAIR)}}}
  else if(a==="nativeSetup"&&window.TwigaAndroid&&typeof window.TwigaAndroid.requestPhoneSetup==="function"){window.TwigaAndroid.requestPhoneSetup()}
 });
 var AI0=R.ai;
@@ -793,7 +795,7 @@ V={overview:"Overview",pos:"POS",phone:"Dialer",history:"Call History",ai:"AI Re
   try{var u=await L("usage");o.push(chk(true,"Cloud storage",(u.used/1048576).toFixed(1)+" MB of 500 MB used"))}catch(x){o.push(chk(false,"Cloud storage",x.message))}
   try{var hr=await fetch("https://twiga-api.twiga-ke.workers.dev/"),hj=await hr.json();o.push(chk(!!(hr.ok&&hj.ok),"TWIGA API",hj.app+" · "+(hj.features||[]).join(", ")))}catch(x){o.push(chk(false,"TWIGA API",x.message))}
   var dv=await sb.from("devices").select("name,last_seen,ai_enabled").eq("business_id",BIZ.id).order("created_at",{ascending:false}).limit(1),dev=dv.data&&dv.data[0];
-  o.push(chk(!!dev,"Phone paired",dev?dev.name:"No phone yet. Open the Dialer page and tap Pair phone."));
+  o.push(chk(!!dev,"Android gateway",dev?dev.name:"No phone yet. Sign in to TWIGA on the Android app with this business account."));
   var up=dev&&dev.last_seen&&Date.now()-new Date(dev.last_seen)<60000;
   o.push(chk(!!up,"Phone online",dev?(up?"Checked in "+ago(dev.last_seen):"Last seen "+ago(dev.last_seen)+". Open the TWIGA app."):"-"));
   var ev=await sb.from("call_events").select("direction,number,state,updated_at").eq("business_id",BIZ.id).order("updated_at",{ascending:false}).limit(1),e=ev.data&&ev.data[0];
@@ -812,7 +814,7 @@ V={overview:"Overview",pos:"POS",phone:"Dialer",history:"Call History",ai:"AI Re
    else if(a==="tcheck"){b.disabled=true;await runChecks();b.disabled=false}
    else if(a==="tdial"){var n=($("tnum").value||"").replace(/[\s()-]/g,"");if(!/^[0-9+*#]{3,20}$/.test(n)){$("tmsg").textContent="Enter a valid number.";return}
     var d=await sb.from("devices").select("id,last_seen,ai_enabled").eq("business_id",BIZ.id).order("last_seen",{ascending:false}).limit(1),dev=d.data&&d.data[0];
-    if(!dev){$("tmsg").textContent="Pair a phone first on the Dialer page.";return}
+    if(!dev){$("tmsg").textContent="Sign in to TWIGA on the Android app with this same business account; the phone will connect automatically.";return}
     if(!dev.last_seen||Date.now()-new Date(dev.last_seen).getTime()>=60000){$("tmsg").textContent="Your paired phone is offline. Open TWIGA on the phone and wait until it shows Connected.";return}
     var r=await sb.from("call_commands").insert({business_id:BIZ.id,device_id:dev.id,action:"dial",number:n});$("tmsg").textContent=r.error?r.error.message:(dev.ai_enabled?"Call queued. The AI should join the SIM call if the AI line and carrier conference are ready.":"Call queued. Enable AI Receptionist if you want the AI to join.");}
    else if(a==="svsave"){var nm=$("sn").value.trim();if(!nm){$("smsg").textContent="Enter a name.";return}var kind=$("sk").value;
