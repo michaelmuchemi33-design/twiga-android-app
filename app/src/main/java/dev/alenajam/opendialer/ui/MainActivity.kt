@@ -174,6 +174,12 @@ class MainActivity : ComponentActivity() {
                     true
                 }.getOrDefault(true)
             }
+
+            override fun onPageFinished(view: WebView?, url: String?) {
+                super.onPageFinished(view, url)
+                val host = runCatching { Uri.parse(url).host }.getOrNull()
+                if (host == WORKSPACE_HOST) attemptAutomaticDeviceRegistration()
+            }
         }
 
         view.addJavascriptInterface(TwigaAndroidBridge(), "TwigaAndroid")
@@ -219,6 +225,51 @@ class MainActivity : ComponentActivity() {
                 if (current != null && current.canGoBack()) current.goBack() else finish()
             }
         })
+    }
+
+    /**
+     * The installed production dashboard may be older than the auto-registering
+     * branch. Read the signed-in session from its same-origin WebView, register
+     * once, and observe sign-out so the device token is cleared with the account.
+     */
+    private fun attemptAutomaticDeviceRegistration() {
+        if (RemoteDesk.isPaired(this)) return
+        val script = """
+            (function() {
+              if (!window.TwigaAndroid) return false;
+              if (!window.__twigaNativeAuthObserverInstalled &&
+                  window.sb && window.sb.auth && window.sb.auth.onAuthStateChange) {
+                window.__twigaNativeAuthObserverInstalled = true;
+                window.sb.auth.onAuthStateChange(function(event, session) {
+                  if (event === "SIGNED_OUT") {
+                    window.TwigaAndroid.clearDeviceRegistration();
+                  } else if (event === "SIGNED_IN" && session) {
+                    var tries = 0;
+                    var connect = function() {
+                      var business = window.BIZ;
+                      if (business && business.id) {
+                        window.TwigaAndroid.registerDevice(session.access_token, business.id);
+                      } else if (tries++ < 20) {
+                        window.setTimeout(connect, 500);
+                      }
+                    };
+                    connect();
+                  }
+                });
+              }
+              if (window.TwigaAndroid.isPaired()) return true;
+              var session = window.SESS;
+              var business = window.BIZ;
+              if (!session || !session.access_token || !business || !business.id) return false;
+              window.TwigaAndroid.registerDevice(session.access_token, business.id);
+              return true;
+            })()
+        """.trimIndent()
+        webView?.evaluateJavascript(script) { result ->
+            if (result != "true" && !RemoteDesk.isPaired(this)) {
+                mainHandler.postDelayed({ attemptAutomaticDeviceRegistration() }, 700L)
+            }
+        }
     }
 
     private inner class TwigaAndroidBridge {
