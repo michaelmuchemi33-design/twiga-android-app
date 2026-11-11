@@ -22,7 +22,7 @@ document.documentElement.classList.add("pre");
       if(document.getElementById("twiga-live-load-error"))return;
       var box=document.createElement("div");box.id="twiga-live-load-error";
       box.setAttribute("role","alert");
-      box.style.cssText="position:fixed;z-index:99999;left:16px;right:16px;top:12px;padding:14px 16px;border:1px solid #f47721;border-radius:12px;background:#fff;color:#171717;box-shadow:0 8px 30px rgba(0,0,0,.15);font:14px/1.5 system-ui";
+      box.style.cssText="position:fixed;z-index:99999;left:16px;right:16px;top:12px;padding:14px 16px;border:1px solid #DE752E;border-radius:12px;background:#fff;color:#171717;box-shadow:0 8px 30px rgba(0,0,0,.15);font:14px/1.5 system-ui";
       box.textContent="TWIGA live workspace features failed to load. Do not rely on any demo-looking screens or submit transactions while this warning is visible. Refresh the page; if it continues, contact support@twiga.co.ke.";
       document.body.appendChild(box);
     }
