@@ -14,9 +14,21 @@ document.documentElement.classList.add("pre");
   var add=function(){
     if(document.getElementById("twiga-polish"))return;
     var link=document.createElement("link");
-    link.id="twiga-polish";link.rel="stylesheet";link.href="/twiga-polish.css?v=1";
+    link.id="twiga-polish";link.rel="stylesheet";link.href="/twiga-polish.css?v=2";
     document.head.appendChild(link);
-    var script=document.createElement("script");script.src="/twiga-live-fixes.js?v=1";script.async=false;document.body.appendChild(script);
+    var script=document.createElement("script");
+    script.src="/twiga-live-fixes.js?v=2";script.async=false;
+    function showLoadError(){
+      if(document.getElementById("twiga-live-load-error"))return;
+      var box=document.createElement("div");box.id="twiga-live-load-error";
+      box.setAttribute("role","alert");
+      box.style.cssText="position:fixed;z-index:99999;left:16px;right:16px;top:12px;padding:14px 16px;border:1px solid #f47721;border-radius:12px;background:#fff;color:#171717;box-shadow:0 8px 30px rgba(0,0,0,.15);font:14px/1.5 system-ui";
+      box.textContent="TWIGA could not load the live workspace features. Refresh the page. If this continues, contact support@twiga.co.ke. The demo fallback is disabled.";
+      document.body.appendChild(box);
+    }
+    script.onerror=showLoadError;
+    script.onload=function(){if(!window.TWIGA_LIVE_UI_READY)showLoadError()};
+    document.body.appendChild(script);
   };
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",add,{once:true});else add();
 })();
