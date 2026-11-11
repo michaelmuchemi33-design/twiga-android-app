@@ -114,6 +114,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Clear any legacy conference-bridge flags from previous app versions.
+        getSharedPreferences("twiga_remote_desk", MODE_PRIVATE).edit()
+            .putBoolean("auto_answer", false)
+            .remove("ai_line")
+            .remove("bridge_next_call")
+            .apply()
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.statusBarColor = android.graphics.Color.TRANSPARENT
         window.navigationBarColor = android.graphics.Color.TRANSPARENT

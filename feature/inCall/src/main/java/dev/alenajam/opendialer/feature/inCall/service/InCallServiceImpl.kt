@@ -1,41 +1,26 @@
 package dev.alenajam.opendialer.feature.inCall.service
 
-import android.annotation.SuppressLint
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
-import android.os.Bundle
-import android.os.Handler
-import android.os.IBinder
-import android.os.Looper
 import android.telecom.Call
 import android.telecom.CallAudioState
-import android.telecom.VideoProfile
 import android.telecom.CallEndpoint
 import android.telecom.InCallService
-import android.telecom.TelecomManager
 import androidx.annotation.RequiresApi
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
 /**
- * Native Telecom entry point. When the owner has enabled AI and configured a Vapi
- * phone number, TWIGA can attempt to add that AI number as a second cellular call
- * and merge both legs using the carrier's conference-call service.
+ * Native Telecom entry point for the handset's own SIM calls.
  *
- * This does not capture protected SIM audio. It relies on carrier conference support.
+ * TWIGA reports native call state and provides the system call UI. It does not
+ * answer calls automatically, dial a second provider number, or conference a
+ * second call into the user's SIM call. Vapi/Retell cellular audio integration
+ * is not available in this build.
  */
 @AndroidEntryPoint
 class InCallServiceImpl : InCallService() {
     private val callerIdCallbacks = mutableMapOf<Call, Call.Callback>()
-    private val bridgeHandler = Handler(Looper.getMainLooper())
-    private var customerCall: Call? = null
-    private var aiCall: Call? = null
-    private var bridgeRequested = false
-    private var bridgeMergeInFlight = false
-    private val autoAnswerRequested = mutableSetOf<Call>()
-    private var bridgeMerged = false
-    private var bridgeTimeout: Runnable? = null
 
     @Inject
     lateinit var callHandler: CallsHandler
@@ -55,23 +40,11 @@ class InCallServiceImpl : InCallService() {
         val callback = object : Call.Callback() {
             override fun onDetailsChanged(call: Call, details: Call.Details) {
                 reportCallerId(details.handle?.schemeSpecificPart.orEmpty())
-                observeAiLeg(call)
-            }
-
-            override fun onStateChanged(call: Call, state: Int) {
-                maybeAutoAnswer(call)
-                observeAiLeg(call)
-            }
-
-            override fun onConferenceableCallsChanged(call: Call, conferenceableCalls: List<Call>) {
-                tryMergeAiLeg()
             }
         }
         callerIdCallbacks[call] = callback
         call.registerCallback(callback)
         callHandler.addCall(call, this)
-        maybeAutoAnswer(call)
-        observeAiLeg(call)
     }
 
     private fun reportCallerId(number: String) {
@@ -82,160 +55,10 @@ class InCallServiceImpl : InCallService() {
         })
     }
 
-    /** Auto-answer incoming SIM calls only when the owner has enabled the AI receptionist. */
-    private fun maybeAutoAnswer(call: Call) {
-        if (call.state != Call.STATE_RINGING) return
-        val prefs = getSharedPreferences("twiga_remote_desk", MODE_PRIVATE)
-        if (!prefs.getBoolean("auto_answer", false)) return
-        val aiNumber = prefs.getString("ai_line", "").orEmpty().trim()
-        val caller = call.details.handle?.schemeSpecificPart.orEmpty()
-        if (aiNumber.isNotBlank() && samePhoneNumber(caller, aiNumber)) return
-        if (!autoAnswerRequested.add(call)) return
-        try {
-            prefs.edit().putBoolean("bridge_next_call", true).putString("ai_bridge_status", "answering_customer").apply()
-            call.answer(VideoProfile.STATE_AUDIO_ONLY)
-        } catch (error: Exception) {
-            autoAnswerRequested.remove(call)
-            prefs.edit().putBoolean("bridge_next_call", false).putString("ai_bridge_status", "auto_answer_failed").apply()
-        }
-    }
-
-    /**
-     * If this is the configured AI number, remember it as the AI leg. Otherwise,
-     * when a customer call becomes active, dial the configured AI number once.
-     */
-    @SuppressLint("MissingPermission")
-    private fun observeAiLeg(call: Call) {
-        val prefs = getSharedPreferences("twiga_remote_desk", MODE_PRIVATE)
-        if (!prefs.getBoolean("ai", false)) return
-        val aiNumber = prefs.getString("ai_line", "").orEmpty().trim()
-        if (aiNumber.isBlank()) return
-
-        val number = call.details.handle?.schemeSpecificPart.orEmpty()
-        if (samePhoneNumber(number, aiNumber)) {
-            aiCall = call
-            tryMergeAiLeg()
-            return
-        }
-
-        if (!prefs.getBoolean("bridge_next_call", false)) return
-        if (call.state == Call.STATE_ACTIVE && customerCall == null && !bridgeRequested && !bridgeMerged) {
-            prefs.edit().putBoolean("bridge_next_call", false).apply()
-            customerCall = call
-            bridgeRequested = true
-            prefs.edit().putString("ai_bridge_status", "calling_ai").apply()
-            try {
-                val telecom = getSystemService(TelecomManager::class.java)
-                // Use the same SIM/account as the customer leg; conference merging across
-                // different SIM subscriptions is not supported by most carrier stacks.
-                val extras = Bundle()
-                customerCall?.details?.accountHandle?.let { account ->
-                    extras.putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, account)
-                }
-                telecom.placeCall(Uri.fromParts("tel", aiNumber, null), extras)
-                scheduleBridgeFallback()
-            } catch (error: Exception) {
-                prefs.edit().putString("ai_bridge_status", "failed_to_call_ai").apply()
-                bridgeRequested = false
-                customerCall = null
-            }
-        }
-    }
-
-    private fun tryMergeAiLeg() {
-        val customer = customerCall ?: return
-        val ai = aiCall ?: return
-        val customerReady = customer.state == Call.STATE_ACTIVE || customer.state == Call.STATE_HOLDING
-        if (bridgeMerged || !customerReady || ai.state != Call.STATE_ACTIVE) return
-
-        val customerCanMerge = customer.conferenceableCalls.contains(ai)
-        val aiCanMerge = ai.conferenceableCalls.contains(customer)
-        if (!customerCanMerge && !aiCanMerge) return
-
-        runCatching {
-            bridgeMergeInFlight = true
-            if (customerCanMerge) customer.conference(ai) else ai.conference(customer)
-            getSharedPreferences("twiga_remote_desk", MODE_PRIVATE)
-                .edit().putString("ai_bridge_status", "merge_requested").apply()
-            // Telecom creates a conference parent asynchronously. Verify it before
-            // treating the bridge as live; otherwise disconnect the AI leg safely.
-            bridgeTimeout?.let(bridgeHandler::removeCallbacks)
-            val verify = Runnable {
-                val merged = calls.any { parent ->
-                    parent.children.contains(customer) && parent.children.contains(ai)
-                }
-                bridgeMergeInFlight = false
-                if (merged) {
-                    bridgeMerged = true
-                    getSharedPreferences("twiga_remote_desk", MODE_PRIVATE)
-                        .edit().putString("ai_bridge_status", "connected").apply()
-                } else {
-                    failBridge("Carrier did not merge the two calls")
-                }
-            }
-            bridgeTimeout = verify
-            bridgeHandler.postDelayed(verify, 2500L)
-        }.onFailure {
-            failBridge(it.message ?: "Conference merge failed")
-        }
-    }
-
-    private fun scheduleBridgeFallback() {
-        bridgeTimeout?.let(bridgeHandler::removeCallbacks)
-        val timeout = Runnable {
-            if (!bridgeMerged) failBridge("AI call did not join the customer call")
-        }
-        bridgeTimeout = timeout
-        bridgeHandler.postDelayed(timeout, 25000L)
-    }
-
-    private fun failBridge(reason: String) {
-        if (bridgeMerged) return
-        bridgeTimeout?.let(bridgeHandler::removeCallbacks)
-        bridgeTimeout = null
-        runCatching {
-            aiCall?.takeIf { it.state != Call.STATE_DISCONNECTED }?.disconnect()
-        }
-        // A managed AI call must never leave the customer connected to silence.
-        runCatching {
-            customerCall?.takeIf { it.state != Call.STATE_DISCONNECTED }?.disconnect()
-        }
-        getSharedPreferences("twiga_remote_desk", MODE_PRIVATE)
-            .edit().putBoolean("bridge_next_call", false).apply()
-        getSharedPreferences("twiga_remote_desk", MODE_PRIVATE)
-            .edit().putString("ai_bridge_status", "failed: " + reason.take(120)).apply()
-        customerCall = null
-        aiCall = null
-        bridgeRequested = false
-        bridgeMergeInFlight = false
-    }
-
-    private fun samePhoneNumber(a: String, b: String): Boolean {
-        val left = a.filter { it.isDigit() }
-        val right = b.filter { it.isDigit() }
-        return left.isNotBlank() && right.isNotBlank() &&
-            (left == right || left.takeLast(9) == right.takeLast(9))
-    }
-
     override fun onCallRemoved(call: Call) {
         super.onCallRemoved(call)
         callerIdCallbacks.remove(call)?.let(call::unregisterCallback)
-        autoAnswerRequested.remove(call)
-        if (!bridgeMerged && call != customerCall && call != aiCall) {
-            getSharedPreferences("twiga_remote_desk", MODE_PRIVATE).edit()
-                .putBoolean("bridge_next_call", false).apply()
-        }
         callHandler.removeCall(call)
-        if (!bridgeMerged && !bridgeMergeInFlight && (call == customerCall || call == aiCall)) {
-            failBridge("One of the calls ended before conference was established")
-        } else if (bridgeMerged && calls.isEmpty()) {
-            bridgeTimeout?.let(bridgeHandler::removeCallbacks)
-            bridgeTimeout = null
-            customerCall = null
-            aiCall = null
-            bridgeRequested = false
-            bridgeMerged = false
-        }
     }
 
     override fun onCallAudioStateChanged(audioState: CallAudioState) {
@@ -293,7 +116,6 @@ class InCallServiceImpl : InCallService() {
     }
 
     override fun onUnbind(intent: Intent): Boolean {
-        bridgeTimeout?.let(bridgeHandler::removeCallbacks)
         callHandler.tearDown()
         telecomAdapter.detach(this)
         notificationManager.detach()
@@ -302,7 +124,6 @@ class InCallServiceImpl : InCallService() {
     }
 
     override fun onDestroy() {
-        bridgeTimeout?.let(bridgeHandler::removeCallbacks)
         super.onDestroy()
     }
 }

@@ -19,8 +19,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Keeps the paired SIM phone connected to the TWIGA workspace.
- * AI call bridging remains carrier-conference dependent; no protected SIM audio is captured.
+ * Keeps the paired handset SIM connected to the TWIGA workspace.
+ * It syncs call state and executes owner-requested SIM dial/answer/end commands.
+ * Cellular call audio is not captured or streamed to an AI provider.
  */
 class RemoteDeskService : Service() {
     @Volatile private var running = false
@@ -35,6 +36,12 @@ class RemoteDeskService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        // Never inherit a previous build's second-number bridge or silent auto-answer.
+        RemoteDesk.prefs(this).edit()
+            .putBoolean("auto_answer", false)
+            .remove("ai_line")
+            .remove("bridge_next_call")
+            .apply()
         try {
             showNotice()
         } catch (e: Exception) {
@@ -97,15 +104,13 @@ class RemoteDeskService : Service() {
                         JSONObject().put("p_token", token).put("p_state", CallTracker.state(this))
                     )
                 )
-                val aiEnabled = out.optBoolean("ai_enabled")
-                val aiLine = runCatching {
-                    JSONObject(RemoteDesk.rpc("device_get_ai", JSONObject().put("p_token", token)))
-                        .optString("line").trim()
-                }.getOrDefault(RemoteDesk.prefs(this).getString("ai_line", "").orEmpty())
+                // Vapi/Retell are AI providers, not SIM dial targets. Keep the
+                // provider setting for the dashboard but never call a second number.
                 RemoteDesk.prefs(this).edit()
-                    .putString("ai_line", aiLine)
-                    .putBoolean("ai", aiEnabled)
-                    .putBoolean("auto_answer", aiEnabled && aiLine.isNotBlank())
+                    .putBoolean("ai", out.optBoolean("ai_enabled"))
+                    .putBoolean("auto_answer", false)
+                    .remove("ai_line")
+                    .remove("bridge_next_call")
                     .apply()
 
                 val commands = out.optJSONArray("commands") ?: JSONArray()
@@ -137,16 +142,13 @@ class RemoteDeskService : Service() {
                 "dial" -> {
                     val number = command.optString("number").trim()
                     if (number.isBlank()) throw IllegalArgumentException("No number")
-                    val prefs = RemoteDesk.prefs(this)
-                    val bridgeAi = prefs.getBoolean("ai", false) &&
-                        prefs.getString("ai_line", "").orEmpty().isNotBlank()
-                    prefs.edit().putString("dialing", number).putBoolean("bridge_next_call", bridgeAi).apply()
-                    try {
-                        telecom.placeCall(Uri.fromParts("tel", number, null), Bundle())
-                    } catch (error: Exception) {
-                        prefs.edit().putBoolean("bridge_next_call", false).apply()
-                        throw error
-                    }
+                    RemoteDesk.prefs(this).edit()
+                        .putString("dialing", number)
+                        .putBoolean("auto_answer", false)
+                        .remove("ai_line")
+                        .remove("bridge_next_call")
+                        .apply()
+                    telecom.placeCall(Uri.fromParts("tel", number, null), Bundle())
                 }
                 "answer" -> telecom.acceptRingingCall()
                 "decline", "hangup" -> if (!telecom.endCall()) {

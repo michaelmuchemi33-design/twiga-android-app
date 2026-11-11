@@ -890,7 +890,7 @@ V={overview:"Overview",pos:"POS",phone:"Phone",history:"Call History",ai:"AI Rec
     var d=await sb.from("devices").select("id,last_seen,ai_enabled").eq("business_id",BIZ.id).order("last_seen",{ascending:false}).limit(1),dev=d.data&&d.data[0];
     if(!dev){$("tmsg").textContent="Sign in to TWIGA on the Android app with this same business account; the phone will connect automatically.";return}
     if(!dev.last_seen||Date.now()-new Date(dev.last_seen).getTime()>=60000){$("tmsg").textContent="Your Android phone is offline. Open TWIGA on the phone and wait until it shows Connected.";return}
-    var r=await sb.from("call_commands").insert({business_id:BIZ.id,device_id:dev.id,action:"dial",number:n});$("tmsg").textContent=r.error?r.error.message:(dev.ai_enabled?"Call queued. The AI should join the SIM call if the AI line and carrier conference are ready.":"Call queued. Enable AI Receptionist if you want the AI to join.");}
+    var r=await sb.from("call_commands").insert({business_id:BIZ.id,device_id:dev.id,action:"dial",number:n});$("tmsg").textContent=r.error?r.error.message:"Call queued to the connected handset. The existing SIM places the call; cellular audio is not yet connected to Vapi/Retell.";}
    else if(a==="svsave"){var nm=$("sn").value.trim();if(!nm){$("smsg").textContent="Enter a name.";return}var kind=$("sk").value;
     await L("saveItem",{name:nm,price:$("sp").value||0,kind:kind,stock:$("ss").value||0,trackStock:kind==="product"});$("smsg").textContent="Saved.";$("sn").value="";svLoad()}
   }catch(x){var m=$("smsg")||$("tmsg");if(m)m.textContent=x.message}
