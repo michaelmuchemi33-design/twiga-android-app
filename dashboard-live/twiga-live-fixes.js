@@ -566,13 +566,14 @@
       if($("twigaProfile_reply_language"))$("twigaProfile_reply_language").value=row.reply_language||"match_customer";
     }catch(e){target.textContent="Could not load business profile: "+e.message}
   }
+  var TWIGA_ORIGINAL_AI_ROUTE=window.R.ai;
   window.R.ai=function(){
     setTimeout(loadBusinessProfile,0);
+    var existing=TWIGA_ORIGINAL_AI_ROUTE?TWIGA_ORIGINAL_AI_ROUTE():["AI Receptionist",C("AI settings",'<div class="pb">The original AI settings form could not be loaded.</div>')];
     return [
       "Set up your business once. The AI uses this information when answering calls, handling questions, recording orders and taking booking requests.",
-      C("Business information",'<div id="twigaBusinessProfile" class="pb sub">Loading business information…</div>')+
-      PC+
-      C("Try your AI receptionist",AIBOX)
+      C("Business information",'<div id="twigaBusinessProfile" class="pb sub">Loading business information…</div>'),
+      existing[1]
     ];
   };
   document.addEventListener("click",async function(e){
