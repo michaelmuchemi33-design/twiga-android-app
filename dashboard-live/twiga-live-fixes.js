@@ -569,8 +569,6 @@
   // One shared business profile is the primary AI setup on both web and Android.
   window.R.ai=function(){
     setTimeout(loadBusinessProfile,0);
-    window.V=window.V||{};
-    window.V.ai="Business & AI";
     var navItem=document.querySelector('#nav a[href="#ai"] span:nth-child(2)');
     if(navItem)navItem.textContent="Business & AI";
     var voiceTest=window.TWIGA_AI_TEST_BOX
@@ -581,6 +579,8 @@
       C("Describe your business",'<div class="pb"><div class="sub" style="margin-bottom:12px">Tell TWIGA what you sell, what you do, who you serve, your prices, opening hours and how customers should be helped. Save once; it is shared with the Android app.</div><div id="twigaBusinessProfile" class="sub">Loading your business profile…</div></div>')+voiceTest
     ];
   };
+  window.V=window.V||{};window.V.ai="Business & AI";
+  var aiNavItem=document.querySelector('#nav a[href="#ai"] span:nth-child(2)');if(aiNavItem)aiNavItem.textContent="Business & AI";
   document.addEventListener("click",async function(e){
     var b=e.target.closest("[data-profile-save]");if(!b)return;
     b.disabled=true;
