@@ -154,8 +154,6 @@ class CallsHandler @Inject constructor(
         newOngoingCall?.let { ongoingCall ->
             resolveContact(ongoingCall)
         }
-            }
-        }
         reconcileCallsFromTelecom()
     }
 
