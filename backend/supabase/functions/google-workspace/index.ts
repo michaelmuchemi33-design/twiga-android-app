@@ -373,7 +373,7 @@ Deno.serve(async (req: Request) => {
         const durationMinutes = Math.min(180, Math.max(15, Number(durationMatch?.[1] || 30)));
         const end = new Date(start.getTime() + durationMinutes * 60000);
         const pendingRequest = String(appointment.status || "").toLowerCase() === "requested";
-        const eventId = "twiga" + String(appointment.id).replace(/-/g, "").toLowerCase();
+        const eventId = "a" + String(appointment.id).replace(/-/g, "").toLowerCase();
         const event = {
           id: eventId,
           summary: (pendingRequest ? "REQUEST — CONFIRM: " : "") +
