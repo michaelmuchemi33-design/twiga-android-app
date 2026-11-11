@@ -51,6 +51,7 @@ class MainActivity : ComponentActivity() {
     private var pendingWebPermission: PermissionRequest? = null
     @Volatile private var googleOAuthInProgress = false
     private val deviceRegistrationInFlight = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val deviceRegistrationPolling = java.util.concurrent.atomic.AtomicBoolean(false)
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private val microphonePermission = registerForActivityResult(
@@ -232,8 +233,12 @@ class MainActivity : ComponentActivity() {
      * branch. Read the signed-in session from its same-origin WebView, register
      * once, and observe sign-out so the device token is cleared with the account.
      */
-    private fun attemptAutomaticDeviceRegistration() {
-        if (RemoteDesk.isPaired(this)) return
+    private fun attemptAutomaticDeviceRegistration(attempt: Int = 0) {
+        if (RemoteDesk.isPaired(this)) {
+            deviceRegistrationPolling.set(false)
+            return
+        }
+        if (attempt == 0 && !deviceRegistrationPolling.compareAndSet(false, true)) return
         val script = """
             (function() {
               if (!window.TwigaAndroid) return false;
@@ -266,8 +271,10 @@ class MainActivity : ComponentActivity() {
             })()
         """.trimIndent()
         webView?.evaluateJavascript(script) { result ->
-            if (result != "true" && !RemoteDesk.isPaired(this)) {
-                mainHandler.postDelayed({ attemptAutomaticDeviceRegistration() }, 700L)
+            if (result != "true" && !RemoteDesk.isPaired(this) && attempt < 40) {
+                mainHandler.postDelayed({ attemptAutomaticDeviceRegistration(attempt + 1) }, 700L)
+            } else {
+                deviceRegistrationPolling.set(false)
             }
         }
     }
