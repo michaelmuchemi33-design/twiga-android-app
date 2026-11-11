@@ -124,12 +124,11 @@ class MainActivity : ComponentActivity() {
 
         UpdateManager.autoCheck(applicationContext)
 
-        // The signed-in workspace auto-registers this handset. Start remote
-        // commands only after registration, the dialler role, and phone permissions.
-
+        // The user signs in first. The shared workspace then registers this
+        // handset; only after that do we request the Android phone role/permissions.
         showWorkspace()
         handleOAuthCallback(intent)
-        requestDefaultDialerIfNeeded()
+        resumePhoneAccess()
         handleDialIntent(intent)
     }
 
@@ -333,7 +332,13 @@ class MainActivity : ComponentActivity() {
                 mainHandler.post {
                     val js = "window.twigaNativeDeviceResult && window.twigaNativeDeviceResult(" + ok + ", " + JSONObject.quote(resultMessage) + ")"
                     webView?.evaluateJavascript(js, null)
-                    if (ok) requestPhonePermissions()
+                    if (ok) {
+                        if (!defaultPhoneManager.isDefaultDialer()) {
+                            requestDefaultDialerManually()
+                        } else {
+                            requestPhonePermissions()
+                        }
+                    }
                 }
             }.start()
         }
@@ -463,25 +468,13 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun requestDefaultDialerIfNeeded() {
-        val prefs = getSharedPreferences("twiga_setup", MODE_PRIVATE)
-        if (!defaultPhoneManager.isDefaultDialer()) {
-            if (!prefs.getBoolean("default_phone_prompted", false)) {
-                prefs.edit().putBoolean("default_phone_prompted", true).apply()
-                defaultPhoneManager.createRequestDefaultDialerIntent()?.let {
-                    defaultDialerRequest.launch(it)
-                }
-            } else {
-                // The owner can retry from the in-app Phone setup action.
-                requestFullScreenCallAccessIfNeeded()
-            }
-            return
+    private fun resumePhoneAccess() {
+        // Never interrupt the sign-in screen with a phone-role prompt. Returning
+        // devices resume automatically when their Android role is already granted.
+        if (RemoteDesk.isPaired(this) && defaultPhoneManager.isDefaultDialer()) {
+            requestPhonePermissions()
+            requestFullScreenCallAccessIfNeeded()
         }
-
-        // A returning user may already have granted the dialler role before
-        // pairing. Always re-check runtime permissions and restart the bridge.
-        if (RemoteDesk.isPaired(this)) requestPhonePermissions()
-        requestFullScreenCallAccessIfNeeded()
     }
 
     private fun requestFullScreenCallAccessIfNeeded() {
