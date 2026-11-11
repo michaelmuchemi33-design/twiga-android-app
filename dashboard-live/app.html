@@ -392,6 +392,7 @@ sb.auth.onAuthStateChange(function(e){if(e==="SIGNED_OUT")setTimeout(load,0)});
 async function L(a,d){var s=(await sb.auth.getSession()).data.session;if(!s)throw new Error("Please sign in again.");
  var r=await fetch(K.ledgerUrl,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:a,token:s.access_token,business_id:BIZ.id,data:d||{},txn:(d&&d.txn)||""})});
  var j=await r.json();if(!j.ok)throw new Error(String(j.error||"Request failed").replace(/^INACTIVE\|/,""));return j}
+window.TWIGA_LEDGER = L;
 async function overviewLoad(){
  try{
   var now=new Date(),day=new Date(now);day.setHours(0,0,0,0);
