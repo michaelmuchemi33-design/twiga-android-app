@@ -866,8 +866,7 @@ V={overview:"Overview",pos:"POS",phone:"Phone",history:"Call History",ai:"AI Rec
   var o=[];
   o.push(chk(!!SESS,"TWIGA sign-in",SESS&&SESS.user?SESS.user.email:"No active session"));
   o.push(chk(!!BIZ,"Business workspace",BIZ?BIZ.name:"No business is linked to this account"));
-  try{var u=await L("usage");o.push(chk(true,"Cloud storage",(u.used/1048576).toFixed(1)+" MB of 500 MB used"))}catch(x){o.push(chk(false,"Cloud storage",x.message))}
-  try{var hr=await fetch("https://twiga-api.twiga-ke.workers.dev/"),hj=await hr.json();o.push(chk(!!(hr.ok&&hj.ok),"TWIGA API",hj.app||"Health endpoint responded"))}catch(x){o.push(chk(false,"TWIGA API",x.message))}
+  try{var u=await L("usage");o.push(chk(true,"TWIGA API","Business ledger responded"));var used=Number(u.used||u.used_bytes||0);o.push(chk(true,"Cloud storage",used?(used/1048576).toFixed(1)+" MB used":"Storage usage endpoint responded"))}catch(x){o.push(chk(false,"TWIGA API",x.message));o.push(chk(false,"Cloud storage",x.message))}
   try{var cat=await sb.from("twiga_products").select("id",{count:"exact",head:true}).eq("business_id",BIZ.id);o.push(chk(!cat.error,"Catalogue",cat.error?cat.error.message:(cat.count||0)+" product/service record(s)"))}catch(x){o.push(chk(false,"Catalogue",x.message))}
   try{var ord=await sb.from("twiga_orders").select("id",{count:"exact",head:true}).eq("business_id",BIZ.id);o.push(chk(!ord.error,"Orders",ord.error?ord.error.message:(ord.count||0)+" order(s)"))}catch(x){o.push(chk(false,"Orders",x.message))}
   try{var ap=await sb.from("twiga_appointments").select("id",{count:"exact",head:true}).eq("business_id",BIZ.id);o.push(chk(!ap.error,"Appointments",ap.error?ap.error.message:(ap.count||0)+" appointment(s)"))}catch(x){o.push(chk(false,"Appointments",x.message))}
