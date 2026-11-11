@@ -28,6 +28,16 @@
     <string name="about_section_developer" comment="Heading for developer information on the About screen.">Developer</string>
     <string name="about_section_community" comment="Heading for community links on the About screen.">Community</string>
     <string name="about_section_open_source" comment="Heading for source-code and support links on the About screen.">Open source and support</string>
+    <string name="about_section_legal">Legal and privacy</string>
+    <string name="privacy_policy">Privacy Policy</string>
+    <string name="privacy_policy_description">How TWIGA handles account, customer and call information</string>
+    <string name="url_privacy_policy" translatable="false">https://twiga.co.ke/privacy.html</string>
+    <string name="user_agreement">User Agreement</string>
+    <string name="user_agreement_description">Terms for using the TWIGA phone app and business services</string>
+    <string name="url_user_agreement" translatable="false">https://twiga.co.ke/terms.html</string>
+    <string name="twiga_support">TWIGA support</string>
+    <string name="twiga_support_description">Email support@twiga.co.ke</string>
+    <string name="url_twiga_support" translatable="false">mailto:support@twiga.co.ke</string>
     <string name="about_section_credits" comment="Heading for third-party credits on the About screen.">Credits</string>
     <string name="typography_credit_title" comment="Title of the font credit card on the About screen.">Typography</string>
     <string name="developer_credit" translatable="false">Alen Ajam</string>
