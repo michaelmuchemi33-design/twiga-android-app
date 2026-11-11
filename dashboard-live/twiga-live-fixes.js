@@ -531,6 +531,196 @@
       ]}),"No order payments yet."):empty("No order payments yet","Cash and pay-later checkout results will be recorded here.");
     }catch(e){target.textContent="Could not load payments: "+e.message}
   }
+
+  // Structured business setup, real overview, reports and follow-ups.
+  var PROFILE_FIELDS=[
+    ["business_summary","Business summary","What should a new customer know about the business?"],
+    ["what_they_sell","What you sell","Products, packages, brands and price ranges."],
+    ["what_they_do","What you do","Services, appointments, repairs, deliveries or other work."],
+    ["products_and_services","Products and services","List names, sizes, variations and typical durations. Keep exact prices in the catalogue."],
+    ["target_customers","Target customers","Who do you normally serve?"],
+    ["unique_selling_points","What makes the business different","Quality, location, speed, warranties or special offers."],
+    ["service_area","Service area","Counties, towns, delivery radius or branches."],
+    ["opening_hours","Opening hours","Opening and closing times, days and public-holiday rules."],
+    ["delivery_and_payment","Delivery and payment","Delivery options, cash, pay-later and payment rules. Do not promise M-Pesa until enabled."],
+    ["returns_and_refunds","Returns and refunds","Refund, exchange and cancellation policy."],
+    ["frequently_asked_questions","Frequently asked questions","Write common questions and accurate answers."],
+    ["assistant_instructions","Special AI instructions","How the receptionist should handle unusual requests, uncertainty and escalation."]
+  ];
+  function profileFormHtml(row){
+    return '<div class="g2">'+PROFILE_FIELDS.map(function(f){
+      return '<label>'+esc(f[1])+'<textarea id="twigaProfile_'+f[0]+'" rows="'+(f[0]==="business_summary"?3:2)+'" maxlength="5000" placeholder="'+esc(f[2])+'" style="width:100%">'+esc(row[f[0]]||"")+'</textarea></label>';
+    }).join("")+
+    '<label>Brand voice<input id="twigaProfile_brand_voice" type="text" maxlength="120" value="'+esc(row.brand_voice||"Warm, helpful and professional")+'" style="width:100%"></label>'+
+    '<label>Reply language<select id="twigaProfile_reply_language" style="width:100%"><option value="match_customer">Match the customer (English / Kiswahili)</option><option value="en">English</option><option value="sw">Kiswahili</option></select></label></div>';
+  }
+  async function loadBusinessProfile(){
+    var target=$("twigaBusinessProfile");if(!target)return;
+    try{
+      var result=await twigaDb().from("twiga_business_profiles").select("*").eq("business_id",twigaBusinessId()).maybeSingle();
+      if(result.error)throw result.error;
+      var row=result.data||{};
+      target.innerHTML=profileFormHtml(row)+
+        '<div class="row" style="gap:8px;margin-top:12px"><button class="btn pri" data-profile-save>Save business information</button>'+
+        '<span id="twigaProfileMessage" class="sub" aria-live="polite">These details are added to the AI receptionist instructions.</span></div>';
+      if($("twigaProfile_reply_language"))$("twigaProfile_reply_language").value=row.reply_language||"match_customer";
+    }catch(e){target.textContent="Could not load business profile: "+e.message}
+  }
+  window.R.ai=function(){
+    setTimeout(loadBusinessProfile,0);
+    return [
+      "Set up your business once. The AI uses this information when answering calls, handling questions, recording orders and taking booking requests.",
+      C("Business information",'<div id="twigaBusinessProfile" class="pb sub">Loading business information…</div>')+
+      PC+
+      C("Try your AI receptionist",AIBOX)
+    ];
+  };
+  document.addEventListener("click",async function(e){
+    var b=e.target.closest("[data-profile-save]");if(!b)return;
+    b.disabled=true;
+    var msg=$("twigaProfileMessage");
+    try{
+      var row={business_id:twigaBusinessId(),updated_by:twigaUserId(),updated_at:new Date().toISOString()};
+      PROFILE_FIELDS.forEach(function(f){row[f[0]]=$("twigaProfile_"+f[0]).value.trim()});
+      row.brand_voice=$("twigaProfile_brand_voice").value.trim();
+      row.reply_language=$("twigaProfile_reply_language").value;
+      var saved=await twigaDb().from("twiga_business_profiles").upsert(row,{onConflict:"business_id"});
+      if(saved.error)throw saved.error;
+
+      // Keep the actual provider prompt in sync with the structured business profile.
+      var current=await twigaDb().from("business_ai").select("prompt,greeting,auto_reply,faq,rules").eq("business_id",twigaBusinessId()).maybeSingle();
+      if(current.error)throw current.error;
+      var old=current.data||{};
+      var base=String(old.prompt||"").split("\n\n[TWIGA STRUCTURED BUSINESS PROFILE]\n")[0].trim();
+      var profileLines=PROFILE_FIELDS.map(function(f){return f[1]+": "+row[f[0]]}).filter(function(x){return x.split(": ").slice(1).join(": ").trim()!==""});
+      profileLines.push("Brand voice: "+row.brand_voice,"Reply language: "+row.reply_language);
+      var prompt=(base?base+"\n\n":"")+"[TWIGA STRUCTURED BUSINESS PROFILE]\n"+profileLines.join("\n");
+      var faq=[old.faq||"",row.frequently_asked_questions||""].filter(Boolean).join("\n\n");
+      var ai=await twigaDb().rpc("save_business_ai",{
+        p_business:twigaBusinessId(),
+        p_prompt:prompt,
+        p_greeting:old.greeting||"",
+        p_auto_reply:old.auto_reply||"",
+        p_faq:faq,
+        p_rules:old.rules||""
+      });
+      if(ai.error)throw ai.error;
+      if(msg)msg.textContent="Saved. Your structured business profile and the AI receptionist prompt are now in sync.";
+    }catch(err){if(msg)msg.textContent="Could not save business profile: "+err.message}
+    finally{b.disabled=false}
+  });
+
+  window.R.overview=function(){
+    setTimeout(loadTwigaOverview,0);
+    return[
+      "Live activity from this business only. Every total is calculated from saved calls, orders and appointments.",
+      '<div class="stats" id="twigaOverviewStats">'+S("Calls today","—","Loading")+S("Orders today","—","Loading")+S("Collected today","—","Loading")+S("Appointments today","—","Loading")+'</div>'+
+      '<div class="g2">'+C("Upcoming appointments",'<div id="twigaOverviewAppointments" class="pb sub">Loading…</div>')+
+      C("Recent calls",'<div id="twigaOverviewCalls" class="pb sub">Loading…</div>')+'</div>'
+    ];
+  };
+  async function loadTwigaOverview(){
+    if(!$("twigaOverviewStats"))return;
+    try{
+      var start=new Date();start.setHours(0,0,0,0);
+      var results=await Promise.all([
+        twigaDb().from("call_events").select("direction,number,state,updated_at").eq("business_id",twigaBusinessId()).gte("updated_at",start.toISOString()).order("updated_at",{ascending:false}).limit(100),
+        twigaDb().from("twiga_call_records").select("direction,from_number,to_number,status,started_at,created_at,duration_seconds,summary").eq("business_id",twigaBusinessId()).gte("created_at",start.toISOString()).order("created_at",{ascending:false}).limit(100),
+        twigaDb().from("twiga_orders").select("total_amount,payment_status,created_at").eq("business_id",twigaBusinessId()).gte("created_at",start.toISOString()),
+        twigaDb().from("twiga_appointments").select("customer_name,phone,scheduled_at,notes,status").eq("business_id",twigaBusinessId()).gte("scheduled_at",start.toISOString()).lt("scheduled_at",new Date(start.getTime()+86400000).toISOString()).order("scheduled_at",{ascending:true}).limit(30)
+      ]);
+      results.forEach(function(x){if(x.error)throw x.error});
+      var phoneCalls=results[0].data||[],aiCalls=results[1].data||[],orders=results[2].data||[],appts=results[3].data||[];
+      var revenue=orders.filter(function(x){return x.payment_status==="paid"}).reduce(function(n,x){return n+Number(x.total_amount||0)},0);
+      var allCalls=phoneCalls.length+aiCalls.length;
+      $("twigaOverviewStats").innerHTML=S("Calls today",allCalls,"Saved SIM and AI call records")+
+        S("Orders today",orders.length,"POS, staff and AI orders")+
+        S("Collected today",money(revenue),"Orders marked paid")+
+        S("Appointments today",appts.length,"Saved appointments");
+      $("twigaOverviewAppointments").innerHTML=appts.length?T(["Time","Customer","Service / notes"],appts.slice(0,10).map(function(x){return[
+        new Date(x.scheduled_at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),
+        esc(x.customer_name),esc(x.notes||"Appointment")
+      ]}),"No appointments today."):empty("No appointments today","New bookings will appear here once saved.");
+      var calls=phoneCalls.map(function(x){return{when:x.updated_at,source:"SIM",direction:x.direction,number:x.number,status:x.state,detail:""}})
+        .concat(aiCalls.map(function(x){return{when:x.started_at||x.created_at,source:"AI",direction:x.direction,number:x.from_number||x.to_number,status:x.status,detail:x.summary||""}}))
+        .sort(function(a,b){return new Date(b.when)-new Date(a.when)}).slice(0,10);
+      $("twigaOverviewCalls").innerHTML=calls.length?T(["Time","Source","Number","Result","Summary"],calls.map(function(x){return[
+        new Date(x.when).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),
+        esc(x.source),esc(x.number||"Unknown"),esc(x.status||"—"),esc(x.detail||"")
+      ]}),"No calls today."):empty("No calls today","SIM and AI call records will appear here after real calls are made.");
+    }catch(e){
+      if($("twigaOverviewCalls"))$("twigaOverviewCalls").textContent="Could not load overview: "+e.message;
+    }
+  }
+
+  window.R.reports=function(){
+    setTimeout(loadTwigaReports,0);
+    return[
+      "Reports are calculated from the real order and call records saved by this TWIGA business. No estimates or sample conversion rates are shown.",
+      '<div class="stats" id="twigaReportStats">'+S("Orders","—","Loading")+S("Revenue","—","Loading")+S("Paid","—","Loading")+S("Calls","—","Loading")+'</div>'+
+      C("Recent business orders",'<div id="twigaReportOrders" class="pb sub">Loading…</div>')+
+      C("Call outcomes",'<div id="twigaReportCalls" class="pb sub">Loading…</div>')
+    ];
+  };
+  async function loadTwigaReports(){
+    try{
+      var since=new Date();since.setDate(since.getDate()-7);
+      var [orders,calls,sim]=await Promise.all([
+        twigaDb().from("twiga_orders").select("order_number,customer_name,total_amount,payment_status,status,created_at").eq("business_id",twigaBusinessId()).gte("created_at",since.toISOString()).order("created_at",{ascending:false}).limit(200),
+        twigaDb().from("twiga_call_records").select("direction,from_number,to_number,status,duration_seconds,summary,created_at").eq("business_id",twigaBusinessId()).gte("created_at",since.toISOString()).order("created_at",{ascending:false}).limit(200),
+        twigaDb().from("call_events").select("direction,number,state,updated_at").eq("business_id",twigaBusinessId()).gte("updated_at",since.toISOString()).order("updated_at",{ascending:false}).limit(200)
+      ]);
+      [orders,calls,sim].forEach(function(x){if(x.error)throw x.error});
+      var o=orders.data||[],ai=calls.data||[],phone=sim.data||[];
+      var total=o.reduce(function(n,x){return n+Number(x.total_amount||0)},0),paid=o.filter(function(x){return x.payment_status==="paid"}).reduce(function(n,x){return n+Number(x.total_amount||0)},0);
+      $("twigaReportStats").innerHTML=S("Orders",o.length,"Last 7 days")+S("Order value",money(total),"Last 7 days")+S("Collected",money(paid),"Marked paid only")+S("Calls",ai.length+phone.length,"SIM and AI records");
+      $("twigaReportOrders").innerHTML=o.length?T(["Date","Order","Customer","Total","Payment"],o.slice(0,50).map(function(x){return[
+        esc(new Date(x.created_at).toLocaleString()),esc(x.order_number||"—"),esc(x.customer_name),money(x.total_amount),G(esc(x.payment_status||"unpaid"),x.payment_status==="paid"?"ok":"or")
+      ]}),"No orders in the last 7 days."):empty("No orders yet","Orders will be recorded here as they are created.");
+      var callRows=ai.map(function(x){return[esc(new Date(x.created_at).toLocaleString()),"AI",esc(x.direction),esc(x.status),dur(x.duration_seconds),esc(x.summary||"")]})
+        .concat(phone.map(function(x){return[esc(new Date(x.updated_at).toLocaleString()),"SIM",esc(x.direction),esc(x.state), "—", esc(x.number||"")] }));
+      $("twigaReportCalls").innerHTML=callRows.length?T(["When","Source","Direction","Status","Duration","Summary / number"],callRows.slice(0,100),"No calls yet."):empty("No call reports yet","Make a real SIM or AI call to populate this report.");
+    }catch(e){
+      if($("twigaReportOrders"))$("twigaReportOrders").textContent="Could not load reports: "+e.message;
+    }
+  }
+
+  window.R.followups=function(){
+    setTimeout(loadTwigaFollowups,0);
+    return[
+      "Missed calls, customer requests and unpaid orders that still need attention.",
+      '<div class="g2">'+C("Pending team tasks",'<div id="twigaFollowupTasks" class="pb sub">Loading…</div>')+
+      C("Unpaid orders",'<div id="twigaFollowupOrders" class="pb sub">Loading…</div>')+
+      C("Missed calls",'<div id="twigaFollowupMissed" class="pb sub">Loading…</div>')+'</div>'
+    ];
+  };
+  async function loadTwigaFollowups(){
+    try{
+      var [tasks,orders,missed]=await Promise.all([
+        twigaDb().from("twiga_followups").select("id,customer_name,phone_number,task,channel,due_at,status,consent_status").eq("business_id",twigaBusinessId()).in("status",["pending","due","open"]).order("due_at",{ascending:true}).limit(100),
+        twigaDb().from("twiga_orders").select("order_number,customer_name,customer_phone,total_amount,payment_status,created_at").eq("business_id",twigaBusinessId()).neq("payment_status","paid").order("created_at",{ascending:false}).limit(100),
+        twigaDb().from("call_events").select("number,state,updated_at").eq("business_id",twigaBusinessId()).eq("state","missed").order("updated_at",{ascending:false}).limit(50)
+      ]);
+      [tasks,orders,missed].forEach(function(x){if(x.error)throw x.error});
+      var t=tasks.data||[],o=orders.data||[],m=missed.data||[];
+      $("twigaFollowupTasks").innerHTML=t.length?'<div style="display:grid;gap:8px">'+t.map(function(x){return'<div class="row" style="justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)"><div><b>'+esc(x.customer_name||x.phone_number)+'</b><div class="sub">'+esc(x.task)+' · Due '+esc(new Date(x.due_at).toLocaleString())+'</div><div class="sub">'+esc(x.channel)+' · consent '+esc(x.consent_status)+'</div></div><button class="btn sm" data-followup-done="'+esc(x.id)+'">Mark done</button></div>'}).join("")+'</div>':empty("No pending tasks","New follow-ups created from calls will appear here.");
+      $("twigaFollowupOrders").innerHTML=o.length?T(["Order","Customer","Balance","Created"],o.map(function(x){return[
+        esc(x.order_number||"—"),esc(x.customer_name),money(x.total_amount),esc(new Date(x.created_at).toLocaleString())
+      ]}),"No unpaid orders."):empty("No unpaid orders","Orders marked paid will disappear from this list.");
+      $("twigaFollowupMissed").innerHTML=m.length?T(["Number","Missed at"],m.map(function(x){return[esc(x.number||"Unknown"),esc(new Date(x.updated_at).toLocaleString())]}),"No missed calls."):empty("No missed calls","Missed SIM calls will appear here after call events are recorded.");
+    }catch(e){
+      if($("twigaFollowupTasks"))$("twigaFollowupTasks").textContent="Could not load follow-ups: "+e.message;
+    }
+  }
+  document.addEventListener("click",async function(e){
+    var b=e.target.closest("[data-followup-done]");if(!b)return;
+    b.disabled=true;
+    try{
+      var result=await twigaDb().from("twiga_followups").update({status:"completed",completed_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",b.dataset.followupDone).eq("business_id",twigaBusinessId());
+      if(result.error)throw result.error;
+      await loadTwigaFollowups();
+    }catch(err){b.disabled=false;b.textContent=err.message}
+  });
   window.render();
   window.route(1);
 })();
