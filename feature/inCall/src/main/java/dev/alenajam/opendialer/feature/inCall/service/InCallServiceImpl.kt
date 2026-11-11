@@ -2,6 +2,7 @@ package dev.alenajam.opendialer.feature.inCall.service
 
 import android.content.Intent
 import android.os.Build
+import android.os.IBinder
 import android.telecom.Call
 import android.telecom.CallAudioState
 import android.telecom.CallEndpoint
