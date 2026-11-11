@@ -297,7 +297,17 @@ Deno.serve(async (req: Request) => {
       throw new HttpError(403, "Only a TWIGA business owner or administrator can connect or disconnect Google Workspace.");
     }
 
-    if (action === "oauth.config") return reply(req, { clientId: env("GOOGLE_CLIENT_ID"), scopes: REQUIRED_SCOPES });
+    if (action === "oauth.config") {
+      const clientId = env("GOOGLE_CLIENT_ID");
+      const clientSecret = env("GOOGLE_CLIENT_SECRET");
+      let encryptionReady = false;
+      try { encryptionReady = unb64(env("GOOGLE_TOKEN_ENCRYPTION_KEY")).length === 32; } catch { encryptionReady = false; }
+      return reply(req, {
+        clientId,
+        scopes: REQUIRED_SCOPES,
+        serverConfigured: !!(clientId && clientSecret && encryptionReady),
+      });
+    }
     if (action === "connect") return reply(req, await connectGoogle(admin, user.id, businessId, body));
     if (action === "status") {
       const connection = await getConnection(admin, businessId);
