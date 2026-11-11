@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>TWIGA – Live Calls</title>
 <script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
-<link rel="icon" id="fav" href="data:,"><script src="config.js"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script><link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="icon" id="fav" type="image/png" href="/twiga-mark.png"><link rel="apple-touch-icon" href="/twiga-mark.png"><script src="config.js"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script><link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--logo:url("https://raw.githubusercontent.com/michaelmuchemi33-design/twiga-android-app/main/app/src/main/res/drawable-nodpi/twiga_logo.webp");--logofull:url("https://raw.githubusercontent.com/michaelmuchemi33-design/twiga-android-app/main/app/src/main/res/drawable-nodpi/twiga_logo.webp")}
+:root{--logo:url("/twiga-mark.png");--logofull:url("/twiga-mark.png")}
 :root{--bg:#FFFFFF;--panel:#FFFFFF;--soft:#F6F6F5;--line:#E7E5E2;--ink:#111111;--mute:#6B6863;--side:#111111;--sideink:#EDEBE8;--sidemute:#9A968F;--or:#DE752E;--orsoft:#FEEFE3;--ok:#1F8A5B;--oksoft:#E4F4EC;--bad:#C23B2E;--badsoft:#FBE9E6;color-scheme:light}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171716;--panel:#1E1E1D;--soft:#262625;--line:#33322F;--ink:#F3F1EE;--mute:#A09C95;--side:#0B0B0B;--orsoft:#3A2412;--oksoft:#16301F;--badsoft:#3A1C18;color-scheme:dark}}
 :root[data-theme="dark"]{--bg:#171716;--panel:#1E1E1D;--soft:#262625;--line:#33322F;--ink:#F3F1EE;--mute:#A09C95;--side:#0B0B0B;--orsoft:#3A2412;--oksoft:#16301F;--badsoft:#3A1C18;color-scheme:dark}
@@ -345,8 +345,108 @@ var svc=[["Knotless braids, medium",3500],["Box braids",3000],["Wash and blow-dr
 var docs=[["QT-2041","Amina Hassan","Quotation","Knotless braids, medium",3500,"Sent"],["PL-1180","Wanjiru Kamau","Payment link","Knotless braids, medium",3500,"Sent"],["RC-0912","Brian Otieno","Receipt","Men’s haircut",500,"Paid"],["PL-1179","Mercy Wambui","Payment link","Gel nails",1500,"Paid"]];
 function pv(){var n=$("pc").value,s=svc[+$("ps").value],t=$("pt").value,a="KES "+s[1].toLocaleString();$("pvb").textContent=t==="Quotation"?"Hello "+n+", here is your quotation from TWIGA Salon:\n"+s[0]+": "+a+"\nValid for 7 days. Reply YES and I will book it for you.":t==="Payment link"?"Hello "+n+", please pay "+a+" for "+s[0]+" using this PalPlus link:\n[PalPlus payment link]":"Thank you, "+n+". We received "+a+" for "+s[0]+".\nYour receipt is attached."}
 R.payments=function(){var nm=calls.filter(function(c){return c.name!=="Unknown caller"}).map(function(c){return c.name}),o=function(a){return a.map(function(x,i){return '<option value="'+(typeof x==="string"?x:i)+'">'+(typeof x==="string"?x:x[0]+", KES "+x[1].toLocaleString())+'</option>'}).join('')};return["Send quotations, payment links and receipts to customers on WhatsApp. This is a preview until PalPlus and WhatsApp are connected.",'<div class="stats">'+S("Quotes sent",8,"This week")+S("Payment links",11,"Sent")+S("Paid",9,"Through PalPlus")+S("Collected","KES 31,200","This week")+'</div><div class="g2">'+C("New message",'<div class="pb"><label>Customer<br><select id="pc" onchange="pv()" style="width:100%">'+o(nm)+'</select></label><label>Service<br><select id="ps" onchange="pv()" style="width:100%">'+o(svc)+'</select></label><label>Send<br><select id="pt" onchange="pv()" style="width:100%"><option>Quotation</option><option>Payment link</option><option>Receipt</option></select></label><div><button class="btn pri" data-send>Send on WhatsApp</button></div></div>')+C("WhatsApp preview",'<div class="pb"><div class="bubble" id="pvb"></div></div>')+'</div>'+C("Sent documents",T(["No.","Customer","Type","Service","KES","Status"],docs.map(function(d){return[d[0],d[1],d[2],d[3],d[4].toLocaleString(),G(d[5],d[5]==="Paid"?"ok":"or")]})))]};
-var LOGIN='<div class="lg"><div class="lgf" role="img" aria-label="TWIGA"></div><h1>Welcome to TWIGA</h1><div class="sub">Sign in or create your business workspace. Your 7-day trial includes receptionist tools, bookings, customer follow-ups and business activity in one place.</div><div class="pb" style="margin-top:18px;text-align:left"><button class="btn pri" data-act="g" style="width:100%;text-align:center">Continue with Google</button><div style="text-align:center;padding:12px;color:var(--mute);font-size:12px">OR USE YOUR EMAIL</div><label style="display:block;margin:8px 0 4px">Full name <input id="authName" type="text" autocomplete="name" placeholder="Your name" style="width:100%;padding:11px;border:1px solid var(--bd);border-radius:12px"></label><label style="display:block;margin:8px 0 4px">Email address <input id="authEmail" type="email" autocomplete="email" placeholder="you@business.co.ke" style="width:100%;padding:11px;border:1px solid var(--bd);border-radius:12px"></label><label style="display:block;margin:8px 0 4px">Password <input id="authPassword" type="password" autocomplete="current-password" minlength="8" placeholder="At least 8 characters" style="width:100%;padding:11px;border:1px solid var(--bd);border-radius:12px"></label><label style="display:flex;gap:8px;align-items:flex-start;margin:12px 0;font-size:12px;line-height:1.5"><input id="acceptLegal" type="checkbox" style="margin-top:3px"><span>I agree to the TWIGA <a href="https://twiga.co.ke/privacy" target="_blank" rel="noopener">Privacy Policy</a> and <a href="https://twiga.co.ke/terms" target="_blank" rel="noopener">User Agreement</a>.</span></label><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px"><button class="btn" data-act="emailLogin">Log in</button><button class="btn pri" data-act="emailSignup">Create account</button></div><button class="btn" data-act="resendConfirm" style="width:100%;margin-top:8px">Resend confirmation email</button><div class="sub" id="lerr" role="status" aria-live="polite" style="margin-top:10px"></div></div></div>';
-function route(keep){var k=(location.hash||"#overview").slice(1),signup=k==="signup";if(signup)k="login";if(window.gate_&&gate_(k))return;if(k==="login"){document.body.classList.add("auth");$("v-live").hidden=true;$("v-other").hidden=false;$("v-other").innerHTML=LOGIN;if(signup){var sh=$("v-other").querySelector("h1");if(sh)sh.textContent="Create your TWIGA account";var ss=$("v-other").querySelector(".sub");if(ss)ss.textContent="Create your business workspace and start your 7-day free trial.";var lb=$("v-other").querySelector('[data-act="emailLogin"]');if(lb)lb.textContent="I already have an account";var pw=$("authPassword");if(pw)pw.autocomplete="new-password";var nm=$("authName");if(nm)nm.focus()}if(window.lucide)lucide.createIcons();return}document.body.classList.remove("auth");if(!V[k])k="overview";[].forEach.call($("nav").querySelectorAll("a"),function(a){var on=a.getAttribute("href")==="#"+k;a.className=on?"on":"";if(on)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")});$("v-live").hidden=k!=="live";$("v-other").hidden=k==="live";if(k==="live"){render()}else{var r=R[k]();$("v-other").innerHTML='<div class="top"><div><h1>'+(r[2]||V[k])+'</h1><div class="sub">'+r[0]+'</div></div></div>'+r[1]}[].forEach.call(document.querySelectorAll("#tabbar a"),function(a){a.className=a.getAttribute("href")==="#"+k?"on":""});if($("pvb"))pv();if(window.lucide)lucide.createIcons();if(keep!==1)window.scrollTo(0,0)}
+var LOGIN = "\n<div class=\"twiga-auth\">\n  <aside class=\"auth-story\">\n    <div class=\"auth-brand\"><span class=\"auth-brand-mark\"><img src=\"/twiga-mark.png\" alt=\"TWIGA giraffe mark\"></span><span><b>TWIGA</b><small>BUSINESS WORKSPACE</small></span></div>\n    <div class=\"auth-story-copy\">\n      <div class=\"auth-eyebrow\"><span></span> MADE FOR KENYAN BUSINESSES</div>\n      <h1>Keep your business moving.</h1>\n      <p>One workspace for the customer conversations and everyday work that keep your business running.</p>\n    </div>\n    <div class=\"auth-feature-list\">\n      <div class=\"auth-feature\"><span class=\"auth-feature-icon\"><i data-lucide=\"smartphone\"></i></span><div><b>Your phone stays yours</b><small>Use the Android handset and existing SIM you already have.</small></div></div>\n      <div class=\"auth-feature\"><span class=\"auth-feature-icon\"><i data-lucide=\"calendar-check\"></i></span><div><b>Bookings and follow-ups</b><small>Keep appointments, customer details and next steps together.</small></div></div>\n      <div class=\"auth-feature\"><span class=\"auth-feature-icon\"><i data-lucide=\"package\"></i></span><div><b>One business catalogue</b><small>Keep services, products, prices and POS records in one place.</small></div></div>\n    </div>\n    <div class=\"auth-story-bottom\">Built for local teams · English and Kiswahili</div>\n    <div class=\"auth-orbit auth-orbit-one\"></div><div class=\"auth-orbit auth-orbit-two\"></div>\n  </aside>\n  <section class=\"auth-main\">\n    <div class=\"auth-card\">\n      <div class=\"auth-card-head\">\n        <div class=\"auth-card-eyebrow\" id=\"authKicker\">WELCOME BACK</div>\n        <h2 id=\"authTitle\">Sign in to TWIGA</h2>\n        <p id=\"authIntro\">Open your business workspace with your TWIGA account.</p>\n      </div>\n      <div class=\"auth-mode-tabs\" role=\"tablist\" aria-label=\"Account access\">\n        <button type=\"button\" role=\"tab\" aria-selected=\"true\" class=\"is-active\" data-auth-mode=\"login\">Sign in</button>\n        <button type=\"button\" role=\"tab\" aria-selected=\"false\" data-auth-mode=\"signup\">Create account</button>\n      </div>\n      <button type=\"button\" class=\"auth-google\" data-act=\"g\">\n        <svg viewBox=\"0 0 48 48\" aria-hidden=\"true\"><path fill=\"#FFC107\" d=\"M43.6 24.5c0-1.4-.1-2.8-.4-4.1H24v7.8h11a9.4 9.4 0 0 1-4.1 6.2v5.1h6.6c3.9-3.6 6.1-8.9 6.1-15z\"/><path fill=\"#FF3D00\" d=\"M24 44c5.5 0 10.1-1.8 13.5-4.8l-6.6-5.1c-1.8 1.2-4.1 2-6.9 2-5.3 0-9.8-3.6-11.4-8.4H5.8V33C9.2 39.6 16.1 44 24 44z\"/><path fill=\"#4CAF50\" d=\"M12.6 27.7a12 12 0 0 1 0-7.4v-5.4H5.8a20 20 0 0 0 0 18.2z\"/><path fill=\"#1976D2\" d=\"M24 11.9c3 0 5.7 1 7.8 3.1l5.8-5.8C34.1 5.9 29.5 4 24 4 16.1 4 9.2 8.4 5.8 14.9l6.8 5.4c1.6-4.8 6.1-8.4 11.4-8.4z\"/></svg>\n        <span>Continue with Google</span>\n      </button>\n      <p class=\"auth-google-note\">By continuing with Google, you agree to the <a href=\"https://twiga.co.ke/privacy\" target=\"_blank\" rel=\"noopener\">Privacy Policy</a> and <a href=\"https://twiga.co.ke/terms\" target=\"_blank\" rel=\"noopener\">Terms</a>.</p>\n      <div class=\"auth-divider\"><span>or continue with email</span></div>\n      <form id=\"twigaAuthForm\" class=\"auth-form\" novalidate>\n        <input type=\"hidden\" id=\"authMode\" value=\"login\">\n        <div class=\"auth-field\" id=\"authNameRow\" hidden><label for=\"authName\">Full name</label><input class=\"auth-input\" id=\"authName\" type=\"text\" autocomplete=\"name\" maxlength=\"120\" placeholder=\"Your name\"></div>\n        <div class=\"auth-field\"><label for=\"authEmail\">Email address</label><input class=\"auth-input\" id=\"authEmail\" type=\"email\" name=\"email\" autocomplete=\"username\" required placeholder=\"you@business.co.ke\"></div>\n        <div class=\"auth-field\">\n          <div class=\"auth-label-row\"><label for=\"authPassword\">Password</label><button type=\"button\" class=\"auth-text-button\" data-auth-toggle>Show</button></div>\n          <input class=\"auth-input\" id=\"authPassword\" type=\"password\" name=\"password\" autocomplete=\"current-password\" required minlength=\"8\" placeholder=\"Enter your password\">\n        </div>\n        <div class=\"auth-forgot-row\" id=\"authForgotRow\"><button type=\"button\" class=\"auth-text-button\" data-act=\"forgot\">Forgot password?</button></div>\n        <label class=\"auth-legal\" id=\"authLegalRow\" hidden><input id=\"acceptLegal\" type=\"checkbox\"><span>I agree to the TWIGA <a href=\"https://twiga.co.ke/privacy\" target=\"_blank\" rel=\"noopener\">Privacy Policy</a> and <a href=\"https://twiga.co.ke/terms\" target=\"_blank\" rel=\"noopener\">User Agreement</a>.</span></label>\n        <button type=\"submit\" class=\"auth-submit\" id=\"authSubmit\">Sign in</button>\n      </form>\n      <button type=\"button\" class=\"auth-resend\" data-act=\"resendConfirm\">Didn't receive your confirmation email? <span>Resend it</span></button>\n      <div class=\"auth-status\" id=\"lerr\" role=\"status\" aria-live=\"polite\"></div>\n    </div>\n    <div class=\"auth-support\">Need help? <a href=\"mailto:support@twiga.co.ke\">support@twiga.co.ke</a></div>\n  </section>\n</div>";
+var RESET_PASSWORD = "\n<div class=\"twiga-auth twiga-auth-reset\">\n  <aside class=\"auth-story\">\n    <div class=\"auth-brand\"><span class=\"auth-brand-mark\"><img src=\"/twiga-mark.png\" alt=\"TWIGA giraffe mark\"></span><span><b>TWIGA</b><small>BUSINESS WORKSPACE</small></span></div>\n    <div class=\"auth-story-copy\"><div class=\"auth-eyebrow\"><span></span> ACCOUNT SECURITY</div><h1>Choose a new password.</h1><p>Set a password you can use the next time you sign in to your TWIGA workspace.</p></div>\n    <div class=\"auth-story-bottom\">Your business account · Your control</div>\n    <div class=\"auth-orbit auth-orbit-one\"></div><div class=\"auth-orbit auth-orbit-two\"></div>\n  </aside>\n  <section class=\"auth-main\"><div class=\"auth-card\">\n    <div class=\"auth-card-head\"><div class=\"auth-card-eyebrow\">PASSWORD RECOVERY</div><h2>Set a new password</h2><p>Use at least 8 characters. Enter it twice to confirm.</p></div>\n    <form id=\"twigaResetForm\" class=\"auth-form\" novalidate>\n      <div class=\"auth-field\"><label for=\"newPassword\">New password</label><input class=\"auth-input\" id=\"newPassword\" type=\"password\" autocomplete=\"new-password\" minlength=\"8\" required placeholder=\"At least 8 characters\"></div>\n      <div class=\"auth-field\"><label for=\"confirmPassword\">Confirm new password</label><input class=\"auth-input\" id=\"confirmPassword\" type=\"password\" autocomplete=\"new-password\" minlength=\"8\" required placeholder=\"Enter it again\"></div>\n      <button type=\"submit\" class=\"auth-submit\" id=\"resetSubmit\">Update password</button>\n    </form>\n    <div class=\"auth-status\" id=\"lerr\" role=\"status\" aria-live=\"polite\"></div>\n    <a class=\"auth-back-link\" href=\"#login\">Back to sign in</a>\n  </div><div class=\"auth-support\">Need help? <a href=\"mailto:support@twiga.co.ke\">support@twiga.co.ke</a></div></section>\n</div>";
+
+function authStatus(message,success){
+ var el=$("lerr");if(!el)return;
+ el.textContent=message||"";
+ el.className="auth-status"+(success?" is-success":"");
+}
+function authMessage(error){
+ var m=String(error&&error.message||error||"Something went wrong.");
+ if(/invalid login credentials/i.test(m))return "That email and password do not match. Check them and try again.";
+ if(/email not confirmed/i.test(m))return "Please confirm your email using the link in your inbox, then sign in again.";
+ if(/user already registered/i.test(m))return "An account already exists with this email. Switch to Sign in instead.";
+ if(/password should be at least/i.test(m))return "Choose a password with at least 8 characters.";
+ return m;
+}
+function setAuthMode(mode){
+ var signup=mode==="signup";
+ if($("authMode"))$("authMode").value=signup?"signup":"login";
+ if($("authTitle"))$("authTitle").textContent=signup?"Create your TWIGA account":"Sign in to TWIGA";
+ if($("authKicker"))$("authKicker").textContent=signup?"START YOUR WORKSPACE":"WELCOME BACK";
+ if($("authIntro"))$("authIntro").textContent=signup?"Create one account for your business workspace on web and Android.":"Open your business workspace with your TWIGA account.";
+ if($("authNameRow"))$("authNameRow").hidden=!signup;
+ if($("authLegalRow"))$("authLegalRow").hidden=!signup;
+ if($("authForgotRow"))$("authForgotRow").hidden=signup;
+ if($("authSubmit"))$("authSubmit").textContent=signup?"Create account":"Sign in";
+ if($("authPassword")){$("authPassword").autocomplete=signup?"new-password":"current-password";$("authPassword").minLength=signup?8:0;$("authPassword").placeholder=signup?"At least 8 characters":"Enter your password";}
+ document.querySelectorAll("[data-auth-mode]").forEach(function(b){var active=b.dataset.authMode===(signup?"signup":"login");b.classList.toggle("is-active",active);b.setAttribute("aria-selected",active?"true":"false")});
+ authStatus("");
+}
+function route(keep){
+ var k=(location.hash||"#overview").slice(1),signup=k==="signup";
+ if(signup)k="login";
+ if(k==="reset-password"){
+  document.body.classList.add("auth");$("v-live").hidden=true;$("v-other").hidden=false;$("v-other").innerHTML=RESET_PASSWORD;document.title="Reset password | TWIGA";
+  if(window.lucide)lucide.createIcons();return;
+ }
+ if(window.gate_&&gate_(k))return;
+ if(k==="login"){
+  document.body.classList.add("auth");$("v-live").hidden=true;$("v-other").hidden=false;$("v-other").innerHTML=LOGIN;setAuthMode(signup?"signup":"login");document.title=(signup?"Create account":"Sign in")+" | TWIGA";
+  if(window.lucide)lucide.createIcons();return;
+ }
+ document.body.classList.remove("auth");document.title="TWIGA – Live Calls";
+ if(!V[k])k="overview";
+ [].forEach.call($("nav").querySelectorAll("a"),function(a){var on=a.getAttribute("href")==="#"+k;a.className=on?"on":"";if(on)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")});
+ $("v-live").hidden=k!=="live";$("v-other").hidden=k==="live";
+ if(k==="live"){render()}else{var r=R[k]();$("v-other").innerHTML='<div class="top"><div><h1>'+(r[2]||V[k])+'</h1><div class="sub">'+r[0]+'</div></div></div>'+r[1]}
+ [].forEach.call(document.querySelectorAll("#tabbar a"),function(a){a.className=a.getAttribute("href")==="#"+k?"on":""});
+ if($("pvb"))pv();if(window.lucide)lucide.createIcons();if(keep!==1)window.scrollTo(0,0);
+}
+document.addEventListener("click",function(e){
+ var mode=e.target.closest("[data-auth-mode]");
+ if(mode){location.hash=mode.dataset.authMode==="signup"?"#signup":"#login";return}
+ var toggle=e.target.closest("[data-auth-toggle]");
+ if(toggle&&$("authPassword")){var p=$("authPassword"),show=p.type==="password";p.type=show?"text":"password";toggle.textContent=show?"Hide":"Show";return}
+});
+document.addEventListener("submit",async function(e){
+ if(e.target.id==="twigaAuthForm"){
+  e.preventDefault();
+  var mode=$("authMode")?.value||"login",email=($("authEmail")?.value||"").trim().toLowerCase(),password=$("authPassword")?.value||"";
+  if(!email||!password){authStatus("Enter your email address and password.");return}
+  var primary=$("authSubmit");if(primary){primary.disabled=true;primary.textContent=mode==="signup"?"Creating account…":"Signing in…"}
+  document.querySelectorAll(".auth-google").forEach(function(b){b.disabled=true});
+  try{
+   if(mode==="signup"){
+    var name=($("authName")?.value||"").trim();
+    if(name.length<2){authStatus("Enter your full name.");return}
+    if(password.length<8){authStatus("Choose a password with at least 8 characters.");return}
+    if(!$("acceptLegal")?.checked){authStatus("Please accept the Privacy Policy and User Agreement to create your account.");return}
+    var created=await sb.auth.signUp({email:email,password:password,options:{emailRedirectTo:location.origin+"/#login",data:{full_name:name}}});
+    if(created.error){authStatus(authMessage(created.error));return}
+    if(created.data.session){authStatus("Your account is ready. Opening your workspace…",true);await load()}
+    else{authStatus("Account created. Check your inbox for the TWIGA confirmation link, then return here to sign in. You can resend the email below.",true)}
+   }else{
+    var signed=await sb.auth.signInWithPassword({email:email,password:password});
+    if(signed.error){authStatus(authMessage(signed.error));return}
+    authStatus("Signed in. Opening your workspace…",true);await load();
+   }
+  }catch(err){authStatus(authMessage(err))}
+  finally{
+   if(primary){primary.disabled=false;primary.textContent=(($("authMode")?.value||"login")==="signup")?"Create account":"Sign in"}
+   document.querySelectorAll(".auth-google").forEach(function(b){b.disabled=false});
+  }
+ }
+ else if(e.target.id==="twigaResetForm"){
+  e.preventDefault();
+  var p=($("newPassword")?.value||""),c=($("confirmPassword")?.value||"");
+  if(p.length<8){authStatus("Choose a password with at least 8 characters.");return}
+  if(p!==c){authStatus("The two passwords do not match.");return}
+  var button=$("resetSubmit");if(button){button.disabled=true;button.textContent="Updating…"}
+  try{
+   var current=(await sb.auth.getSession()).data.session;
+   if(!current){authStatus("This reset link has expired or was already used. Request a new password reset from the sign-in page.");return}
+   var updated=await sb.auth.updateUser({password:p});
+   if(updated.error){authStatus(authMessage(updated.error));return}
+   authStatus("Your password has been updated. You can now sign in with it.",true);
+   e.target.reset();
+  }catch(err){authStatus(authMessage(err))}
+  finally{if(button){button.disabled=false;button.textContent="Update password"}}
+ }
+});
+
 var IC={overview:"layout-dashboard",phone:"phone",history:"history",ai:"bot",appointments:"calendar-check",calendar:"calendar",customers:"users",services:"scissors",orders:"shopping-bag",payments:"credit-card",followups:"phone-forwarded",reports:"trending-up",integrations:"plug",whatsapp:"message-circle",campaigns:"megaphone",staff:"user-check",settings:"settings"};
 $("nav").innerHTML=Object.keys(V).map(function(k){return '<a href="#'+k+'"><span class="ni"><i data-lucide="'+IC[k]+'"></i></span><span style="flex:1">'+V[k]+'</span>'+(k==="live"?'<span class="n" id="navLive">2</span>':'')+'</a>'}).join("");
 document.addEventListener("click",function(e){var b=e.target.closest("[data-open]");if(b){sel=+b.dataset.open;location.hash="#live";return}b=e.target.closest("[data-ap]");if(b){var p=b.dataset.ap.split(":");appts[+p[0]][4]=p[1];route(1);return}b=e.target.closest("[data-fu]");if(b){fu[+b.dataset.fu][2]=1;route(1);return}b=e.target.closest("[data-save]");if(b){var t=b.textContent;b.textContent="Saved";setTimeout(function(){b.textContent=t},1500)}});
@@ -611,7 +711,7 @@ document.addEventListener("click",async function(e){
  var b=e.target.closest("[data-act]");if(!b)return;
  var a=b.dataset.act,id=b.dataset.id;
  try{
-  if(a==="g"){if(!$("acceptLegal")?.checked){$("lerr").textContent="Please review and accept the TWIGA Privacy Policy and User Agreement.";return}var nativeOAuth=!!(window.TwigaAndroid&&typeof window.TwigaAndroid.beginGoogleOAuth==="function");if(nativeOAuth)window.TwigaAndroid.beginGoogleOAuth();var o=await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:nativeOAuth?"twiga://auth/callback":location.origin+"/"}});if(o.error){if(nativeOAuth&&typeof window.TwigaAndroid.cancelGoogleOAuth==="function")window.TwigaAndroid.cancelGoogleOAuth();$("lerr").textContent=o.error.message}}
+  if(a==="g"){var signupMode=$("authMode")?.value==="signup";if(signupMode&&!$("acceptLegal")?.checked){authStatus("Please accept the Privacy Policy and User Agreement to create your account with Google.");return}var googleButton=e.target.closest("[data-act=\"g\"]");if(googleButton){googleButton.disabled=true;googleButton.querySelector("span").textContent="Opening Google…"}try{var nativeOAuth=!!(window.TwigaAndroid&&typeof window.TwigaAndroid.beginGoogleOAuth==="function");if(nativeOAuth)window.TwigaAndroid.beginGoogleOAuth();var o=await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:nativeOAuth?"twiga://auth/callback":location.origin+"/"}});if(o.error){if(nativeOAuth&&typeof window.TwigaAndroid.cancelGoogleOAuth==="function")window.TwigaAndroid.cancelGoogleOAuth();authStatus(authMessage(o.error));if(googleButton){googleButton.disabled=false;googleButton.querySelector("span").textContent="Continue with Google"}}}catch(googleError){authStatus(authMessage(googleError));if(googleButton){googleButton.disabled=false;googleButton.querySelector("span").textContent="Continue with Google"}}}
   else if(a==="emailLogin"){
     var email=($("authEmail")?.value||"").trim().toLowerCase(),password=$("authPassword")?.value||"";
     if(!email||!password){$("lerr").textContent="Enter your email and password.";return}
@@ -626,6 +726,9 @@ document.addEventListener("click",async function(e){
     if(created.error){$("lerr").textContent=created.error.message;return}
     if(created.data.session){$("lerr").textContent="Your account is ready. Loading your workspace…";await load()}
     else{$("lerr").textContent="Account created. Check your inbox for the TWIGA confirmation button, then return here to log in. If it does not arrive, use Resend confirmation email."}
+  }
+  else if(a==="forgot"){
+    var resetEmail=($("authEmail")?.value||"").trim().toLowerCase();if(!resetEmail){authStatus("Enter your email address first, then choose Forgot password.");$("authEmail")?.focus();return}var resetResult=await sb.auth.resetPasswordForEmail(resetEmail,{redirectTo:location.origin+"/#reset-password"});authStatus(resetResult.error?authMessage(resetResult.error):"Password reset instructions have been sent if an account exists for that email. Check your inbox.",!resetResult.error);
   }
   else if(a==="resendConfirm"){
     var email=($("authEmail")?.value||"").trim().toLowerCase();
