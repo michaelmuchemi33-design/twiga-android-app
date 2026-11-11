@@ -169,9 +169,9 @@
   }
 
   // Keep non-live integrations explicitly disabled instead of showing fabricated successes.
-  window.R.campaigns=function(){return["Outbound automation is not enabled in production yet. No sample campaign results are displayed.",C("Scheduled campaigns",'<div class="pb empty-state"><b>Campaigns are not active</b><span>Calling windows, opt-out checks, budgets and consent controls must be connected before scheduled calls can be enabled.</span></div>')]};
-  window.R.staff=function(){return["Set up real staff contacts before enabling call transfers.",C("Staff and transfers",'<div class="pb empty-state"><b>No staff transfer list configured</b><span>Add verified staff names and phone numbers in business settings before routing customer calls.</span></div>')]};
-  window.R.whatsapp=function(){return["WhatsApp messaging is not connected to this workspace yet.",C("WhatsApp connection",'<div class="pb"><b>WhatsApp Business connection required</b><span class="sub">Automatic sending is not enabled. Connect an approved WhatsApp Business Platform provider before enabling automated messages.</span></div>')]};
+  window.R.campaigns=function(){return["Campaigns are in testing and are not available for live customer calls yet.",C("Campaigns · Testing",'<div class="pb empty-state"><b>Testing — not enabled</b><span>Scheduling, consent checks, call windows and reporting must pass testing before activation.</span></div>')]};
+  window.R.staff=function(){return["Staff and call transfers are in testing and cannot be used for live customer calls yet.",C("Staff & transfers · Testing",'<div class="pb empty-state"><b>Testing — not enabled</b><span>Staff routing and transfer destinations are not active.</span></div>')]};
+  window.R.whatsapp=function(){return["WhatsApp is coming soon.",C("WhatsApp · Coming soon",'<div class="pb empty-state"><b>Coming soon</b><span>WhatsApp messaging will appear here after the approved business messaging integration is ready.</span></div>')]};
 
 
   // POS and catalogue use the same Supabase records as the AI receptionist.
