@@ -50,6 +50,7 @@ class MainActivity : ComponentActivity() {
     private var phonePermissionRequestInFlight = false
     private var pendingWebPermission: PermissionRequest? = null
     @Volatile private var googleOAuthInProgress = false
+    private val deviceRegistrationInFlight = java.util.concurrent.atomic.AtomicBoolean(false)
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private val microphonePermission = registerForActivityResult(
@@ -240,40 +241,52 @@ class MainActivity : ComponentActivity() {
         }
 
         @JavascriptInterface
-        fun claimPairingCode(code: String) {
-            val clean = code.filter { it.isDigit() }.take(6)
-            if (clean.length != 6 || RemoteDesk.isPaired(this@MainActivity)) return
+        fun registerDevice(accessToken: String, businessId: String) {
+            val jwt = accessToken.trim()
+            val business = businessId.trim()
+            if (jwt.isBlank() || !business.matches(Regex("^[0-9a-fA-F-]{36}$"))) return
+            if (RemoteDesk.isPaired(this@MainActivity) || !deviceRegistrationInFlight.compareAndSet(false, true)) return
+
             Thread {
                 var success = false
-                var message = "Could not pair this phone."
+                var message = "Could not connect this phone to TWIGA."
                 try {
                     val response = JSONObject(
-                        RemoteDesk.rpc(
-                            "device_claim",
-                            JSONObject().put("p_code", clean).put("p_name", Build.MODEL ?: "Android phone")
+                        RemoteDesk.rpcAuthenticated(
+                            "device_register",
+                            JSONObject()
+                                .put("p_business_id", business)
+                                .put("p_name", (Build.MANUFACTURER + " " + Build.MODEL).trim()),
+                            jwt
                         )
                     )
-                    if (response.has("error")) throw IllegalStateException(response.optString("error"))
                     val token = response.optString("token")
-                    if (token.isBlank()) throw IllegalStateException("The pairing service did not return a device token.")
+                    if (token.isBlank()) throw IllegalStateException("The device registration service did not return a token.")
                     RemoteDesk.save(this@MainActivity, token, response.optString("business"))
                     success = true
-                    message = "Phone connected. Enabling call permissions…"
+                    message = "This phone is securely connected to " + response.optString("business", "your TWIGA business") + "."
                 } catch (error: Exception) {
-                    message = error.message ?: "Pairing failed. Check your connection and try again."
+                    message = error.message ?: "Device registration failed. Check your connection and sign in again."
+                } finally {
+                    deviceRegistrationInFlight.set(false)
                 }
+
                 val ok = success
                 val resultMessage = message
                 mainHandler.post {
-                    val js = "window.twigaNativePairResult && window.twigaNativePairResult($ok, ${JSONObject.quote(resultMessage)})"
+                    val js = "window.twigaNativeDeviceResult && window.twigaNativeDeviceResult(" + ok + ", " + JSONObject.quote(resultMessage) + ")"
                     webView?.evaluateJavascript(js, null)
-                    if (ok) {
-                        // requestPhonePermissions starts the remote bridge only
-                        // after the required phone permissions are confirmed.
-                        requestPhonePermissions()
-                    }
+                    if (ok) requestPhonePermissions()
                 }
             }.start()
+        }
+
+        @JavascriptInterface
+        fun clearDeviceRegistration() {
+            runOnUiThread {
+                stopService(Intent(this@MainActivity, RemoteDeskService::class.java))
+                RemoteDesk.unpair(this@MainActivity)
+            }
         }
     }
 
