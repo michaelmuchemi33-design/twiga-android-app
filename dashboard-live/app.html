@@ -674,11 +674,10 @@ function draw(){
  if(live){side+='<div class="cb" style="padding:14px"><div class="sub">'+(live.direction==="in"?"Incoming call":"Outgoing call")+'</div><b style="font-size:20px">'+esc(live.number||"Unknown number")+'</b><div class="tm" style="margin:4px 0"><span id="tmr" data-t="'+live.updated_at+'">0:00</span> '+G(ST[live.state][0],ST[live.state][1])+'</div><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">'+(live.state==="ringing"&&live.direction==="in"?'<button class="btn pri" data-act="cmd" data-a="answer">Answer</button><button class="btn" data-act="cmd" data-a="decline">Decline</button>':'<button class="btn pri" data-act="cmd" data-a="hangup">Hang up</button>')+'</div></div>'}
  else side+='<div class="sub">'+(on?"No active call.":DEV?"The Android app is not online. Sign in with the same TWIGA account; it connects automatically.":"Sign in to TWIGA Android with this same TWIGA account. The app registers automatically; no separate phone-pairing step is used.")+'</div>';
  if(CMD&&Date.now()-new Date(CMD.created_at)<30000)side+='<div class="sub">'+(CMD.status==="failed"?"Failed: "+esc(CMD.message||""):CMD.status==="done"?"Sent to phone.":"Sending to phone...")+'</div>';
- if(DEV)side+='<div class="opt" style="padding:8px 0"><div><b>AI receptionist</b><span>Enable the receptionist for supported call flows. The handset SIM is the call gateway. Vapi or Retell is the AI provider, not a phone number. This build does not yet stream cellular call audio to the provider, so leave AI auto-answer off for live customer calls until the device audio path is implemented and tested.</span></div><label class="sw"><input type="checkbox" id="aisw" aria-label="AI receptionist"'+(DEV.ai_enabled?" checked":"")+'><s></s></label></div>';
+ if(DEV)side+='<div class="opt" style="padding:8px 0"><div><b>AI on SIM calls</b><span>Not available yet. TWIGA can manage normal calls on this handset SIM, but this app build does not receive the live cellular call audio needed by Vapi or Retell. The browser AI voice test is separate and does not answer SIM calls.</span></div><strong class="sub">Not connected</strong></div>';
  if(window.TwigaAndroid&&!on)side+='<div style="display:grid;gap:6px;margin-top:12px"><button class="btn pri" data-act="nativeSetup">Enable phone access</button><div class="sub">One-time Android system permission. This is not phone pairing; your phone is already linked to this TWIGA account.</div></div>';
  side+='<div class="sub" style="margin-top:10px"></div></div></div>';
- var keep=Date.now()-AIT<4000&&$("aisw")?$("aisw").checked:null;
- $("dside").innerHTML=side;if(keep!==null&&$("aisw"))$("aisw").checked=keep;
+ $("dside").innerHTML=side;
  $("dhist").innerHTML=C("Recent calls",EV.length?T(["Time","Call","Number","Status","Length",""],EV.map(function(e){return[new Date(e.updated_at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),(e.direction==="in"?"In":"Out")+(e.ai_on?" "+G("AI on","or"):""),esc(e.number||"Unknown"),G(ST[e.state][0],ST[e.state][1]),dur(e.duration_s),e.number?'<button class="btn sm" data-act="redial" data-n="'+esc(e.number)+'">Call back</button>':""]})):'<div class="pb sub">No calls yet. Calls made or received on the connected Android phone appear here.</div>');
  if(window.lucide)lucide.createIcons()}
 setInterval(function(){var t=$("tmr");if(t)t.textContent=dur((Date.now()-new Date(t.dataset.t))/1000)},1000);
@@ -696,7 +695,6 @@ async function send(a,n){
  var r=await sb.from("call_commands").insert({business_id:BIZ.id,device_id:DEV.id,action:a,number:n||null});
  if(r.error)dmsg(r.error.message);else{dmsg(a==="dial"?"Calling "+n+"...":"Sent.");pull()}}
 document.addEventListener("input",function(e){if(e.target.id==="dn")NUM=e.target.value});
-document.addEventListener("change",function(e){if(e.target.id==="aisw"&&DEV){AIT=Date.now();sb.rpc("set_device_ai",{p_device:DEV.id,p_enabled:e.target.checked}).then(function(r){if(r.error)dmsg(r.error.message)})}});
 document.addEventListener("click",async function(e){
  var b=e.target.closest("[data-act]");if(!b||!$("dp"))return;var a=b.dataset.act;
  if(a==="k"){NUM+=b.dataset.k;$("dn").value=NUM}
