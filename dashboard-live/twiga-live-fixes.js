@@ -566,14 +566,19 @@
       if($("twigaProfile_reply_language"))$("twigaProfile_reply_language").value=row.reply_language||"match_customer";
     }catch(e){target.textContent="Could not load business profile: "+e.message}
   }
-  var TWIGA_ORIGINAL_AI_ROUTE=window.R.ai;
+  // One shared business profile is the primary AI setup on both web and Android.
   window.R.ai=function(){
     setTimeout(loadBusinessProfile,0);
-    var existing=TWIGA_ORIGINAL_AI_ROUTE?TWIGA_ORIGINAL_AI_ROUTE():["AI Receptionist",C("AI settings",'<div class="pb">The original AI settings form could not be loaded.</div>')];
+    window.V=window.V||{};
+    window.V.ai="Business & AI";
+    var navItem=document.querySelector('#nav a[href="#ai"] span:nth-child(2)');
+    if(navItem)navItem.textContent="Business & AI";
+    var voiceTest=window.TWIGA_AI_TEST_BOX
+      ? C("Try your AI receptionist",window.TWIGA_AI_TEST_BOX)
+      : C("AI receptionist test",'<div class="pb sub">The voice-test module is not loaded. Refresh the workspace and try again.</div>');
     return [
-      "Set up your business once. The AI uses this information when answering calls, handling questions, recording orders and taking booking requests.",
-      C("Business information",'<div id="twigaBusinessProfile" class="pb sub">Loading business information…</div>'),
-      existing[1]
+      "Describe your business once. Your website and Android app use the same saved profile.",
+      C("Describe your business",'<div class="pb"><div class="sub" style="margin-bottom:12px">Tell TWIGA what you sell, what you do, who you serve, your prices, opening hours and how customers should be helped. Save once; it is shared with the Android app.</div><div id="twigaBusinessProfile" class="sub">Loading your business profile…</div></div>')+voiceTest
     ];
   };
   document.addEventListener("click",async function(e){
