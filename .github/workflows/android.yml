@@ -45,6 +45,19 @@ jobs:
             echo "No permanent release key configured. Debug APK will be built for testing; no release will be published."
           fi
 
+      - name: Verify Android project root
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Workspace: $GITHUB_WORKSPACE"
+          test -x ./gradlew || { echo "ERROR: gradlew is missing from the repository root."; exit 1; }
+          test -f settings.gradle || { echo "ERROR: settings.gradle is missing from the repository root."; exit 1; }
+          grep -Fq '":app"' settings.gradle || { echo "ERROR: settings.gradle does not include the :app module."; exit 1; }
+          if [ -d business-assistant ]; then
+            echo "Found legacy business-assistant directory; root build remains authoritative."
+          fi
+          ./gradlew --no-daemon projects
+
       - name: Run tests and build debug APK
         run: |
           chmod +x ./gradlew
