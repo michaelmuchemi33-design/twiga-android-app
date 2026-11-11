@@ -674,7 +674,7 @@ function draw(){
  else side+='<div class="sub">'+(on?"No active call.":DEV?"The Android app is not online. Sign in with the same TWIGA account; it connects automatically.":"Sign in to TWIGA Android with this same TWIGA account. The app registers automatically; no separate phone-pairing step is used.")+'</div>';
  if(CMD&&Date.now()-new Date(CMD.created_at)<30000)side+='<div class="sub">'+(CMD.status==="failed"?"Failed: "+esc(CMD.message||""):CMD.status==="done"?"Sent to phone.":"Sending to phone...")+'</div>';
  if(DEV)side+='<div class="opt" style="padding:8px 0"><div><b>AI receptionist</b><span>Enable the receptionist for supported call flows. Cellular-call audio participation depends on Android and carrier support and must be verified on the handset.</span></div><label class="sw"><input type="checkbox" id="aisw" aria-label="AI receptionist"'+(DEV.ai_enabled?" checked":"")+'><s></s></label></div>';
- 
+ if(window.TwigaAndroid&&!on)side+='<div style="display:grid;gap:6px;margin-top:12px"><button class="btn pri" data-act="nativeSetup">Enable phone access</button><div class="sub">One-time Android system permission. This is not phone pairing; your phone is already linked to this TWIGA account.</div></div>';
  side+='<div class="sub" style="margin-top:10px"></div></div></div>';
  var keep=Date.now()-AIT<4000&&$("aisw")?$("aisw").checked:null;
  $("dside").innerHTML=side;if(keep!==null&&$("aisw"))$("aisw").checked=keep;
