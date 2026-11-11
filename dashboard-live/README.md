@@ -6,13 +6,15 @@ The Android app opens this same production workspace at `https://app.twiga.co.ke
 
 The Android app opens this workspace and signs in using the same TWIGA business account. Once the authenticated business membership is loaded, the Android bridge automatically registers that handset with Supabase and stores its private device token. There is no six-digit pairing code. The dashboard then shows device status, call activity and remote SIM-call controls. Android still requires the user to approve the default phone role and phone permissions.
 
-## SIM AI call path
+## Handset SIM gateway and AI providers
 
-- The business saves its Vapi inbound AI number in `ai_lines` from the AI Receptionist page.
-- The paired Android service reads that number using the authenticated `device_get_ai(p_token)` RPC and receives the AI-enabled state using `device_sync(p_token,p_state)`.
-- When AI is enabled and a number is configured, Android's `InCallService` auto-answers an incoming SIM call, dials the configured Vapi number as a second call using the same SIM, and requests a Telecom conference merge. Active outgoing calls can also be joined to the AI number.
-- This uses the carrier's conference-call feature as the audio path. It does not capture or inject protected SIM-call audio.
-- Conference support, call waiting, default SIM selection, Vapi number reachability, call costs, and real handset behavior must be validated with the actual Safaricom/Airtel SIM. If merge is not available, the app attempts to disconnect the AI leg and restore the customer call.
+- The Android handset running TWIGA, with the owner's existing physical SIM, is the standard call gateway. The cellular call uses the person's SIM and their normal number.
+- Vapi or Retell is the AI provider layer (speech, reasoning and voice). Neither provider is a required business phone number, a SIP trunk, or a second SIM for standard handset mode.
+- No virtual number is required for the normal TWIGA handset/SIM setup. A virtual business number is a separate optional paid add-on and must never be provisioned as part of the core setup.
+- The Android app registers the handset, reads call state, and can place/answer/end calls through Android Telecom permissions. The dashboard is the control surface for that handset.
+- **Current implementation limitation:** this repository currently records and controls SIM call state but does not capture and stream the protected cellular call audio to Vapi or Retell. The earlier carrier-conference/second-number bridge is not the intended standard architecture. Do not represent SIM-call AI answering as operational until a compliant on-device audio path has been implemented and tested on physical devices and SIM networks.
+- The browser microphone test is a separate provider test over the internet; passing it does not prove that a SIM call is connected to the AI.
+
 
 ## Files
 

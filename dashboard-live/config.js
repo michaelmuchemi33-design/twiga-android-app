@@ -14,10 +14,10 @@ document.documentElement.classList.add("pre");
   var add=function(){
     if(document.getElementById("twiga-polish"))return;
     var link=document.createElement("link");
-    link.id="twiga-polish";link.rel="stylesheet";link.href="/twiga-polish.css?v=2";
+    link.id="twiga-polish";link.rel="stylesheet";link.href="/twiga-polish.css?v=3";
     document.head.appendChild(link);
     var script=document.createElement("script");
-    script.src="/twiga-live-fixes.js?v=2";script.async=false;
+    script.src="/twiga-live-fixes.js?v=3";script.async=false;
     function showLoadError(){
       if(document.getElementById("twiga-live-load-error"))return;
       var box=document.createElement("div");box.id="twiga-live-load-error";
