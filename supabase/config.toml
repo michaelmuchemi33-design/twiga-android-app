@@ -1,0 +1,4 @@
+project_id = "ztyxxikkposfpxsutnfr"
+
+[functions.twiga-scheduled-calls]
+verify_jwt = false

@@ -729,6 +729,186 @@
       await loadTwigaFollowups();
     }catch(err){b.disabled=false;b.textContent=err.message}
   });
+  // Live phone line, provider connections, voice catalogue and scheduled AI calls.
+  var twigaProviderCache = { saut: null, grok: null };
+  async function twigaInvoke(name, body) {
+    var result = await twigaDb().functions.invoke(name, { body: body || {} });
+    if (result.error) throw result.error;
+    var data = result.data || {};
+    if (data.error) throw new Error(data.error);
+    return data;
+  }
+  function twigaStatus(text, ok) {
+    return '<span class="badge" style="display:inline-block;padding:4px 9px;border-radius:99px;background:'+(ok?'#FFF2E8':'#F2F2F0')+';color:'+(ok?'#B84E00':'#555555')+';font-size:12px;font-weight:700">'+esc(text)+'</span>';
+  }
+  function twigaPhoneCardHtml(line) {
+    if (!line) return '<div class="pb"><b>No AI phone number assigned</b><div class="sub">Connect a SautiKit line to enable AI inbound and outbound calls for this business.</div></div>';
+    var settings=line.settings||{};
+    var voice=settings.inbound_voice||'Not selected';
+    var rev=settings.inbound_agent_revision||'—'; var lastTest=settings.last_outbound_test_call_status||'';
+    return '<div class="pb"><div class="row" style="justify-content:space-between;gap:12px;align-items:center"><div><div class="sub">TWIGA AI phone number</div><div style="font-size:24px;font-weight:800;letter-spacing:.3px">'+esc(line.line_number||'—')+'</div></div>'+twigaStatus('SautiKit',line.provider==='sautikit')+'</div><div class="g2" style="margin-top:12px"><div><div class="sub">Inbound calls</div>'+twigaStatus(line.inbound_enabled?(line.inbound_status||'enabled'):'disabled',line.inbound_enabled&&line.inbound_status==='active')+'</div><div><div class="sub">Outbound calls</div>'+twigaStatus(line.outbound_enabled?(line.outbound_status||'enabled'):'disabled',line.outbound_enabled&&line.outbound_status==='active')+'</div><div><div class="sub">Published AI voice</div><b>'+esc(voice)+'</b></div><div><div class="sub">Agent revision</div><b>'+esc(String(rev))+'</b></div></div><div class="sub" style="margin-top:10px">'+(lastTest?'<b>Latest verified test:</b> '+esc(lastTest.replaceAll('_',' '))+'<br>':'')+'Inbound is marked active only after the real number route is verified. A physical Android SIM is separate from this SautiKit AI line.</div></div>';
+  }
+  async function loadTwigaPhoneLine() {
+    var target=$('twigaPhoneLineCard'); if(!target)return;
+    try {
+      var q=await twigaDb().from('twiga_phone_lines').select('line_number,provider,provider_reference,inbound_enabled,inbound_status,outbound_enabled,outbound_status,settings,updated_at').eq('business_id',twigaBusinessId()).order('created_at',{ascending:false}).limit(1).maybeSingle();
+      if(q.error)throw q.error;
+      target.innerHTML=twigaPhoneCardHtml(q.data);
+    } catch(e) { target.textContent='Could not load AI phone number: '+e.message; }
+  }
+  var previousPhonePage=window.R.phone;
+  if(previousPhonePage) window.R.phone=function(){
+    var base=previousPhonePage.apply(this,arguments)||['',''];
+    setTimeout(loadTwigaPhoneLine,0);
+    var description='The AI phone line below is separate from the Android handset SIM. The handset page can manage normal SIM calls, but cellular call audio is not yet bridged into the AI agent.';
+    return [description,'<div id="twigaPhoneLineCard" class="card pg" style="margin-bottom:14px"><div class="pb sub">Loading assigned AI phone number…</div></div>'+String(base[1]||'')];
+  };
+
+  async function loadTwigaProviderConnections() {
+    var target=$('twigaProviderConnections'); if(!target)return;
+    target.innerHTML='<div class="pb sub">Checking provider connections…</div>';
+    try {
+      var results=await Promise.all([
+        twigaInvoke('twiga-sautikit',{action:'get_config',businessId:twigaBusinessId()}),
+        twigaInvoke('twiga-platform-secrets',{action:'get_config'})
+      ]);
+      var sk=results[0], gx=results[1]; twigaProviderCache.saut=sk; twigaProviderCache.grok=gx;
+      var line=sk.phoneLine||null;
+      var skHtml='<div class="pb"><div class="row" style="justify-content:space-between;gap:8px"><b>SautiKit voice calling</b>'+twigaStatus(sk.keyConfigured?'API key connected':'API key needed',!!sk.keyConfigured)+'</div><div class="sub" style="margin:8px 0">'+(line?'AI line: '+esc(line.line_number||'—')+' · Inbound '+esc(line.inbound_status||'—')+' · Outbound '+esc(line.outbound_status||'—'):'No AI line assigned to this business yet.')+'</div>'+(sk.keyConfigured?'<div class="sub">Encrypted key saved'+(sk.keyLast4?' · ending '+esc(sk.keyLast4):'')+'. Voice catalogue: '+(sk.models||[]).reduce(function(n,m){return n+(m.voices||[]).length},0)+' selectable voices across '+(sk.models||[]).length+' models.</div>':'<label>SautiKit API key<br><input type="password" id="twigaSautikitKey" autocomplete="new-password" placeholder="Paste your SautiKit API key" style="width:100%"></label><div class="sub">Use the API key from your existing SautiKit account. The key is validated and stored securely when you connect it here.</div><div style="margin-top:10px"><button class="btn pri" data-provider-save="sautikit">Validate & connect SautiKit</button></div>')+'</div>';
+      var gxHtml='<div class="pb"><div class="row" style="justify-content:space-between;gap:8px"><b>Grok (xAI)</b>'+twigaStatus(gx.keyConfigured?'API key connected':'API key needed',!!gx.keyConfigured)+'</div>'+(gx.keyConfigured?'<div class="sub" style="margin:8px 0">Encrypted key saved'+(gx.keyLast4?' · ending '+esc(gx.keyLast4):'')+'. The key was validated against xAI models.</div>':'<label>Grok / xAI API key<br><input type="password" id="twigaGrokKey" autocomplete="new-password" placeholder="Paste your xAI API key" style="width:100%"></label><a href="https://console.x.ai/team/default/api-keys" target="_blank" rel="noopener noreferrer" style="color:#f97316;font-weight:700">Get a Grok API key ↗</a><div style="margin-top:10px"><button class="btn pri" data-provider-save="grok">Validate & save Grok key</button></div>')+'</div>';
+      var googleOk=!!(gx.clientIdConfigured&&gx.clientSecretConfigured&&gx.encryptionReady);
+      var googleHtml='<div class="pb"><div class="row" style="justify-content:space-between;gap:8px"><b>Google Workspace OAuth</b>'+twigaStatus(googleOk?'Server credentials configured':'Needs configuration',googleOk)+'</div><div class="sub" style="margin-top:8px">Client ID: '+(gx.clientIdConfigured?'set':'missing')+' · Client secret: '+(gx.clientSecretConfigured?'set':'missing')+' · Token encryption: '+(gx.encryptionReady?'ready':'missing')+'</div><a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" style="color:#f97316;font-weight:700">Open Google Cloud credentials ↗</a></div>';
+      target.innerHTML='<div class="g2">'+C('SautiKit · Voice provider',skHtml)+C('Grok · Business setup assistant',gxHtml)+C('Google · OAuth configuration',googleHtml)+'</div><div id="twigaProviderMessage" class="sub" aria-live="polite" style="margin-top:8px">API keys are validated on the server and stored in encrypted Supabase Vault. They are not saved in browser storage.</div>';
+    } catch(e) { target.innerHTML='<div class="pb"><b>Could not load provider status</b><div class="sub">'+esc(e.message)+'</div></div>'; }
+  }
+  var previousIntegrationsPage=window.R.integrations;
+  if(previousIntegrationsPage) window.R.integrations=function(){
+    var base=previousIntegrationsPage.apply(this,arguments)||['',''];
+    setTimeout(loadTwigaProviderConnections,0);
+    return [base[0],String(base[1]||'')+C('AI provider connections','<div id="twigaProviderConnections" class="pb sub">Loading provider connections…</div>')];
+  };
+  document.addEventListener('click',async function(e){
+    var b=e.target.closest('[data-provider-save]'); if(!b)return;
+    var provider=b.dataset.providerSave, input=$(provider==='grok'?'twigaGrokKey':'twigaSautikitKey'), msg=$('twigaProviderMessage'), key=input&&input.value.trim();
+    if(!key){if(msg)msg.textContent='Paste the API key first.';return;}
+    b.disabled=true; if(msg)msg.textContent='Validating the key and saving it securely…';
+    try {
+      var result=provider==='grok'
+        ? await twigaInvoke('twiga-platform-secrets',{action:'save_xai_key',apiKey:key})
+        : await twigaInvoke('twiga-sautikit',{action:'connect',apiKey:key});
+      if(input)input.value='';
+      if(msg)msg.textContent=result.message||'Connection validated and saved.';
+      await loadTwigaProviderConnections();
+      if($('twigaSautiKitVoicePanel'))loadTwigaSautiKitVoicePanel();
+    } catch(err) { if(msg)msg.textContent=err.message||'Could not connect provider.'; b.disabled=false; }
+  });
+
+  async function loadTwigaSautiKitVoicePanel() {
+    var target=$('twigaSautiKitVoicePanel'); if(!target)return;
+    try {
+      var cfg=twigaProviderCache.saut||await twigaInvoke('twiga-sautikit',{action:'get_config',businessId:twigaBusinessId()});
+      twigaProviderCache.saut=cfg;
+      if(!cfg.keyConfigured){target.innerHTML='<div class="pb sub">Connect the SautiKit API key in Integrations to load the live voice catalogue. The proven female voice remains the current default.</div>';return;}
+      if(!cfg.phoneLine||!cfg.agent){target.innerHTML='<div class="pb sub">SautiKit is connected, but this business has no linked AI phone line and published agent yet.</div>';return;}
+      var models=cfg.models||[], settings=cfg.phoneLine.settings||{}, currentModel=settings.inbound_model_id||cfg.agent.model||'sautikit-flash';
+      var selected=models.find(function(m){return m.id===currentModel})||models[0];
+      var voices=selected&&selected.voices||[], currentVoice=settings.inbound_voice||cfg.agent.voice||'Woman';
+      var modelOpts=models.map(function(m){return '<option value="'+esc(m.id)+'" '+(m.id===selected.id?'selected':'')+'>'+esc(m.id)+' · '+((m.voices||[]).length)+' voices · KSh '+(Number(m.rate_per_minute_minor||0)/100).toFixed(2)+'/min</option>'}).join('');
+      var voiceOpts=voices.map(function(v){return '<option value="'+esc(v)+'" '+(v===currentVoice?'selected':'')+'>'+esc(v)+'</option>'}).join('');
+      var core=String(cfg.agent.base_prompt||'').split('----- TWIGA FRONT DESK SETTINGS -----')[0].trim(); var scripts=cfg.scripts||{};
+      target.innerHTML='<div class="pb"><div class="row" style="justify-content:space-between;gap:8px"><b>Live SautiKit voice library</b>'+twigaStatus(String(voices.length)+' voices in selected model',voices.length>0)+'</div><div class="sub" style="margin:6px 0">All options below come from SautiKit. Publishing changes this agent for inbound and outbound calls on this number. The current female voice stays live until you publish another choice.</div><label>AI model<br><select id="twigaSautiModel" style="width:100%">'+modelOpts+'</select></label><label>Voice<br><select id="twigaSautiVoice" style="width:100%">'+voiceOpts+'</select></label><div class="sub" id="twigaSautiVoiceCount">'+voices.length+' available voices from SautiKit.</div><label>Core receptionist instructions<br><textarea id="twigaSautiCorePrompt" rows="4" maxlength="12000" style="width:100%">'+esc(core)+'</textarea></label><label>What the receptionist says first<br><textarea id="twigaSautiGreeting" rows="2" maxlength="4000" style="width:100%">'+esc(scripts.greeting||'')+'</textarea></label><label>Inbound call instructions<br><textarea id="twigaSautiInboundPrompt" rows="3" maxlength="5000" style="width:100%">'+esc(scripts.inbound||'')+'</textarea></label><label>Outbound call instructions<br><textarea id="twigaSautiOutboundPrompt" rows="3" maxlength="5000" style="width:100%">'+esc(scripts.outbound||'')+'</textarea></label><button class="btn pri" data-publish-sautikit style="margin-top:10px">Publish voice and receptionist instructions</button><div class="sub" id="twigaSautiPublishMessage" aria-live="polite" style="margin-top:8px">Current published voice: '+esc(currentVoice)+'.</div></div>';
+      var modelEl=$('twigaSautiModel'), voiceEl=$('twigaSautiVoice');
+      if(modelEl)modelEl.addEventListener('change',function(){var m=models.find(function(x){return x.id===modelEl.value}),v=m&&m.voices||[];voiceEl.innerHTML=v.map(function(x){return '<option value="'+esc(x)+'">'+esc(x)+'</option>'}).join('');$('twigaSautiVoiceCount').textContent=v.length+' available voices from SautiKit.';});
+    } catch(e) { target.textContent='Could not load SautiKit voices: '+e.message; }
+  }
+  var previousAiPage=window.R.ai;
+  if(previousAiPage) window.R.ai=function(){
+    var base=previousAiPage.apply(this,arguments)||['',''];
+    setTimeout(loadTwigaSautiKitVoicePanel,0);
+    return [base[0],String(base[1]||'')+C('SautiKit voice selection','<div id="twigaSautiKitVoicePanel" class="pb sub">Loading SautiKit voice catalogue…</div>')];
+  };
+  document.addEventListener('click',async function(e){
+    var b=e.target.closest('[data-publish-sautikit]'); if(!b)return;
+    b.disabled=true; var msg=$('twigaSautiPublishMessage'); if(msg)msg.textContent='Publishing selected voice…';
+    try {
+      var cfg=twigaProviderCache.saut||await twigaInvoke('twiga-sautikit',{action:'get_config',businessId:twigaBusinessId()});
+      var result=await twigaInvoke('twiga-sautikit',{action:'publish_agent',businessId:twigaBusinessId(),model:$('twigaSautiModel').value,voice:$('twigaSautiVoice').value,corePrompt:$('twigaSautiCorePrompt').value,greeting:$('twigaSautiGreeting').value,inboundPrompt:$('twigaSautiInboundPrompt').value,outboundPrompt:$('twigaSautiOutboundPrompt').value});
+      if(msg)msg.textContent=result.message||('Published '+result.voice+' on revision '+result.revision+'.');
+      twigaProviderCache.saut=null; await loadTwigaSautiKitVoicePanel(); await loadTwigaPhoneLine();
+    } catch(err) { if(msg)msg.textContent=err.message||'Could not publish voice.'; b.disabled=false; }
+  });
+
+  // Consent-gated timer, callback and outreach queue. The cron worker sends due calls.
+  window.R.campaigns=function(){
+    setTimeout(loadTwigaScheduledCalls,0);
+    var form='<div class="pb"><label>Customer name<br><input id="twigaCallName" maxlength="120" placeholder="Customer or contact name" style="width:100%"></label><label>Phone number<br><input id="twigaCallPhone" inputmode="tel" maxlength="24" placeholder="+2547XXXXXXXX" style="width:100%"></label><label>Reason for call<br><textarea id="twigaCallReason" rows="2" maxlength="500" placeholder="Appointment reminder, requested callback, order follow-up…" style="width:100%"></textarea></label><label>Trigger<br><select id="twigaCallTrigger" style="width:100%"><option value="timer">Timer · call at the scheduled time</option><option value="missed_call">Missed-call callback</option><option value="appointment_reminder">Appointment reminder</option><option value="follow_up">Customer follow-up</option><option value="conditional">Conditional outreach</option></select></label><label>Call date and time (your device time)<br><input id="twigaCallWhen" type="datetime-local" style="width:100%"></label><div class="g2"><label>Allowed from<br><input id="twigaCallWindowStart" type="time" value="08:00" style="width:100%"></label><label>Allowed until<br><input id="twigaCallWindowEnd" type="time" value="20:00" style="width:100%"></label></div><label>Source missed-call ID (required for missed-call trigger)<br><input id="twigaCallSourceId" maxlength="80" placeholder="Optional call record UUID" style="width:100%"></label><label>Order ID (for unpaid-order condition)<br><input id="twigaCallOrderId" maxlength="80" placeholder="Optional order UUID" style="width:100%"></label><label><input id="twigaCallOnlyMissed" type="checkbox"> Only call if the source call is still missed/unanswered</label><label><input id="twigaCallOnlyUnpaid" type="checkbox"> Only call if the order is still unpaid</label><label><input id="twigaCallConsent" type="checkbox" required> The person has requested this callback or explicitly consented to receive it.</label><button class="btn pri" data-scheduled-create style="margin-top:10px">Schedule AI call</button><div class="sub" id="twigaCallFormMessage" aria-live="polite" style="margin-top:8px">Calls are only dispatched with recorded consent, an active SautiKit line and a connected SautiKit API key. Permitted calling hours are enforced in the contact’s timezone.</div></div>';
+    return ['Schedule customer callbacks, appointment reminders and consent-based outreach. Timer and conditional rules are stored per business.', '<div class="g2">'+C('Schedule a call',form)+C('Scheduled calls','<div id="twigaScheduledCallsList" class="pb sub">Loading scheduled calls…</div>')+'</div>'];
+  };
+  async function loadTwigaScheduledCalls(){
+    var target=$('twigaScheduledCallsList'); if(!target)return;
+    try{
+      var q=await twigaDb().from('twiga_scheduled_calls').select('id,customer_name,phone_number,reason,scheduled_at,timezone,trigger_type,status,consent_status,last_error,provider_call_id').eq('business_id',twigaBusinessId()).order('scheduled_at',{ascending:true}).limit(100);
+      if(q.error)throw q.error; var rows=q.data||[];
+      if(!rows.length){target.innerHTML=empty('No scheduled calls yet','Create a timer, appointment reminder or requested callback.');return;}
+      target.innerHTML=T(['When','Contact','Reason','Trigger','Status',''],rows.map(function(x){var canCancel=['scheduled','waiting_for_provider'].includes(x.status);return[dateText(x.scheduled_at),esc(x.customer_name||x.phone_number)+'<div class="sub">'+esc(x.phone_number)+'</div>',esc(x.reason),esc(x.trigger_type),G(esc(x.status),x.status==='submitted'||x.status==='completed'?'ok':x.status==='failed'?'bad':'or'),canCancel?'<button class="btn sm" data-scheduled-cancel="'+esc(x.id)+'">Cancel</button>':''];}));
+      var waiting=rows.filter(function(x){return x.status==='waiting_for_provider'}).length;
+      if(waiting)target.innerHTML+='<div class="sub" style="margin-top:8px">'+waiting+' call(s) are waiting for the SautiKit API key or an active business line. Connect SautiKit in Integrations to enable dispatch.</div>';
+    }catch(e){target.textContent='Could not load scheduled calls: '+e.message;}
+  }
+  function e164(value){var n=String(value||'').replace(/[\\s().-]/g,'');if(/^0[17]\\d{8}$/.test(n))n='+254'+n.slice(1);else if(/^254[17]\\d{8}$/.test(n))n='+'+n;return /^\\+[1-9]\\d{7,14}$/.test(n)?n:'';}
+  document.addEventListener('click',async function(e){
+    var create=e.target.closest('[data-scheduled-create]');
+    if(create){
+      var msg=$('twigaCallFormMessage'); create.disabled=true;
+      try{
+        var phone=e164($('twigaCallPhone').value),reason=$('twigaCallReason').value.trim(),when=$('twigaCallWhen').value,trigger=$('twigaCallTrigger').value;
+        if(!phone)throw new Error('Enter a valid phone number in international format, e.g. +2547XXXXXXXX.');
+        if(!reason)throw new Error('Enter the reason for the call.');
+        if(!when||!Number.isFinite(new Date(when).getTime()))throw new Error('Choose a valid call date and time.');
+        if(!$('twigaCallConsent').checked)throw new Error('Confirm that the person requested or consented to this call.');
+        var sourceId=$('twigaCallSourceId').value.trim(),orderId=$('twigaCallOrderId').value.trim(),onlyMissed=$('twigaCallOnlyMissed').checked,onlyUnpaid=$('twigaCallOnlyUnpaid').checked;
+        if((trigger==='missed_call'||onlyMissed)&&!sourceId)throw new Error('Enter the source missed-call record ID for this condition.');
+        if(onlyUnpaid&&!orderId)throw new Error('Enter the order ID for the unpaid-order condition.');
+        var start=$('twigaCallWindowStart').value||'08:00',end=$('twigaCallWindowEnd').value||'20:00';
+        if(start>=end)throw new Error('The calling window end must be later than its start.');
+        var conditions={only_if_missed_call:onlyMissed,only_if_unpaid:onlyUnpaid};
+        if(orderId)conditions.order_id=orderId;
+        var row={business_id:twigaBusinessId(),customer_name:$('twigaCallName').value.trim(),phone_number:phone,reason:reason,scheduled_at:new Date(when).toISOString(),timezone:'Africa/Nairobi',consent_status:'requested',trigger_type:trigger,trigger_conditions:conditions,source_call_id:sourceId||null,calling_window_start:start,calling_window_end:end,max_attempts:1,created_by:twigaUserId(),status:'scheduled'};
+        var result=await twigaDb().from('twiga_scheduled_calls').insert(row).select('id').single(); if(result.error)throw result.error;
+        if(msg)msg.textContent='Call saved. The once-a-minute worker will dispatch it when the SautiKit key and active business line are ready.';
+        $('twigaCallName').value='';$('twigaCallPhone').value='';$('twigaCallReason').value='';$('twigaCallConsent').checked=false;
+        await loadTwigaScheduledCalls();
+      }catch(err){if(msg)msg.textContent=err.message||'Could not schedule call.';}
+      create.disabled=false;return;
+    }
+    var cancel=e.target.closest('[data-scheduled-cancel]'); if(cancel){cancel.disabled=true;try{var res=await twigaDb().from('twiga_scheduled_calls').update({status:'cancelled',updated_at:new Date().toISOString()}).eq('id',cancel.dataset.scheduledCancel).eq('business_id',twigaBusinessId());if(res.error)throw res.error;await loadTwigaScheduledCalls();}catch(err){cancel.disabled=false;cancel.textContent=err.message;} }
+  });
+
+  window.twigaSetupMessages=window.twigaSetupMessages||[];
+  function renderTwigaSetupChat(){var h=$('twigaSetupChatHistory');if(!h)return;h.innerHTML=window.twigaSetupMessages.map(function(m){var who=m.role==='assistant'?'TWIGA setup assistant':'You';return '<div style="margin:8px 0;padding:10px;border-radius:10px;background:'+(m.role==='assistant'?'#F4F4F2':'#FFF2E8')+'"><b>'+who+'</b><div style="white-space:pre-wrap">'+esc(m.content)+'</div></div>';}).join('');h.scrollTop=h.scrollHeight;}
+  document.addEventListener('click',async function(e){
+    var open=e.target.closest('[data-grok-setup-open]');if(open){var panel=$('twigaSetupChat');if(panel)panel.style.display='block';if(!window.twigaSetupMessages.length)window.twigaSetupMessages.push({role:'assistant',content:'Karibu! Tell me your business name, what you sell or do, who your customers are, and where you serve them. I will help prepare the profile for your review.'});renderTwigaSetupChat();return;}
+    var close=e.target.closest('[data-grok-setup-close]');if(close){var p=$('twigaSetupChat');if(p)p.style.display='none';return;}
+    var send=e.target.closest('[data-grok-setup-send]');if(!send)return;
+    var input=$('twigaSetupChatInput'),status=$('twigaSetupChatStatus'),message=input&&input.value.trim();if(!message)return;
+    window.twigaSetupMessages.push({role:'user',content:message});input.value='';renderTwigaSetupChat();send.disabled=true;if(status)status.textContent='Grok is preparing the next setup question…';
+    try{
+      var auth=await twigaDb().auth.getUser(),user=auth.data&&auth.data.user||{};
+      var result=await twigaInvoke('twiga-setup-assistant',{messages:window.twigaSetupMessages,ownerProfile:{name:(user.user_metadata&&(user.user_metadata.full_name||user.user_metadata.name))||'',email:user.email||''}});
+      window.twigaSetupMessages.push({role:'assistant',content:result.reply||'Tell me a little more about your business.'});renderTwigaSetupChat();
+      var profile=result.businessProfile||result.business_profile||{};
+      if(profile.business_name&&$('bn'))$('bn').value=profile.business_name;
+      if(profile.business_type&&$('bt'))$('bt').value=profile.business_type;
+      if(profile.business_summary&&$('bsummary'))$('bsummary').value=profile.business_summary;
+      else if((profile.what_they_do||profile.what_they_sell)&&$('bsummary'))$('bsummary').value=profile.what_they_do||profile.what_they_sell;
+      if((profile.products_and_services||profile.what_they_sell)&&$('bservices'))$('bservices').value=profile.products_and_services||profile.what_they_sell;
+      if(profile.service_area&&$('barea'))$('barea').value=profile.service_area;
+      if(profile.opening_hours&&$('bhours'))$('bhours').value=profile.opening_hours;
+      if(status)status.textContent=result.readyToBuild?'Profile is ready. Review the filled fields and press Create workspace. Missing details: '+(result.missingFields||[]).join(', '):'Profile partially filled. Answer the next question to complete it. Missing: '+(result.missingFields||[]).join(', ');
+    }catch(err){window.twigaSetupMessages.push({role:'assistant',content:err.message||'Grok could not complete the setup step.'});renderTwigaSetupChat();if(status)status.textContent=err.message||'Check the Grok API key in Integrations.';}
+    send.disabled=false;
+  });
+
   window.render();
   window.route(1);
   window.TWIGA_LIVE_UI_READY = true;
